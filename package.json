@@ -1,0 +1,23 @@
+{
+  "name": "translation-extension",
+  "version": "1.0.0",
+  "description": "Chrome Translation Extension with offline Pinyin and English IPA",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && node scripts/build.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "pinyin-pro": "^3.26.0",
+    "tailwindcss": "^4.0.0-beta.8"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0-beta.8",
+    "@types/chrome": "^0.0.268",
+    "@types/node": "^20.14.9",
+    "typescript": "^5.5.2",
+    "vite": "^5.3.1",
+    "vitest": "^1.6.0"
+  }
+}
