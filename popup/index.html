@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Translation Extension Settings</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../src/index.css">
+  <style>
+    body {
+      font-family: 'Outfit', sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 text-slate-100 w-80 p-5 select-none antialiased min-h-[420px]">
+  <div class="flex flex-col gap-5">
+    <!-- Header -->
+    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+      <div class="flex items-center gap-2">
+        <div class="p-2 bg-blue-600/20 text-blue-400 rounded-xl border border-blue-500/10">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 21l5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 0 1 6-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138c.896.061 1.785.147 2.666.257m-2.666-2.621a9 9 0 0 1 3.224 5.29" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-sm font-bold bg-gradient-to-r from-blue-400 to-teal-400 bg-clip-text text-transparent">PolyTranslate</h1>
+          <p class="text-[10px] text-slate-400">Multi-language Learning Tool</p>
+        </div>
+      </div>
+      
+      <!-- Active Switch -->
+      <label class="relative inline-flex items-center cursor-pointer">
+        <input type="checkbox" id="active-toggle" class="sr-only peer" checked>
+        <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
+      </label>
+    </div>
+
+    <!-- Settings Form -->
+    <div class="flex flex-col gap-4">
+      <!-- Languages Configuration -->
+      <div class="bg-slate-900/40 border border-slate-800/60 rounded-xl p-3 flex flex-col gap-3">
+        <h2 class="text-2xs font-bold text-slate-400 tracking-wider uppercase">Languages</h2>
+        
+        <div class="grid grid-cols-3 gap-2">
+          <div class="flex flex-col gap-1">
+            <label for="primary-lang" class="text-3xs font-medium text-slate-400">Primary</label>
+            <select id="primary-lang" class="bg-slate-800 border border-slate-700 rounded-lg py-1 px-1.5 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer">
+              <option value="vi" selected>VIE (Việt)</option>
+              <option value="en">ENG (Anh)</option>
+              <option value="zh">CHI (Trung)</option>
+            </select>
+          </div>
+          
+          <div class="flex flex-col gap-1">
+            <label for="secondary-lang" class="text-3xs font-medium text-slate-400">Secondary</label>
+            <select id="secondary-lang" class="bg-slate-800 border border-slate-700 rounded-lg py-1 px-1.5 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer">
+              <option value="vi">VIE (Việt)</option>
+              <option value="en" selected>ENG (Anh)</option>
+              <option value="zh">CHI (Trung)</option>
+            </select>
+          </div>
+
+          <div class="flex flex-col gap-1">
+            <label for="reverse-lang" class="text-3xs font-medium text-slate-400">Reverse</label>
+            <select id="reverse-lang" class="bg-slate-800 border border-slate-700 rounded-lg py-1 px-1.5 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer">
+              <option value="vi">VIE (Việt)</option>
+              <option value="en">ENG (Anh)</option>
+              <option value="zh" selected>CHI (Trung)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Trigger Configuration -->
+      <div class="bg-slate-900/40 border border-slate-800/60 rounded-xl p-3 flex flex-col gap-3">
+        <h2 class="text-2xs font-bold text-slate-400 tracking-wider uppercase">Behavior & Triggers</h2>
+        
+        <!-- Trigger Mode -->
+        <div class="flex items-center justify-between gap-4">
+          <div class="flex flex-col">
+            <span class="text-xs font-semibold">Trigger Mode</span>
+            <span class="text-3xs text-slate-400">How to trigger translation popup</span>
+          </div>
+          <select id="trigger-mode" class="bg-slate-800 border border-slate-700 rounded-lg py-1 px-2 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer w-24">
+            <option value="auto">Auto Mode</option>
+            <option value="icon" selected>Icon Mode</option>
+          </select>
+        </div>
+
+        <!-- Hotkey Modifier -->
+        <div class="flex items-center justify-between gap-4 border-t border-slate-800/40 pt-2.5">
+          <div class="flex flex-col">
+            <span class="text-xs font-semibold">Hotkey Constraint</span>
+            <span class="text-3xs text-slate-400">Hold key while selecting text</span>
+          </div>
+          <select id="hotkey" class="bg-slate-800 border border-slate-700 rounded-lg py-1 px-2 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer w-24">
+            <option value="none">None</option>
+            <option value="ctrl">Ctrl</option>
+            <option value="alt">Alt</option>
+            <option value="shift">Shift</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- TTS Configuration -->
+      <div class="bg-slate-900/40 border border-slate-800/60 rounded-xl p-3 flex items-center justify-between">
+        <div class="flex flex-col">
+          <span class="text-xs font-semibold">Text-to-Speech (TTS)</span>
+          <span class="text-3xs text-slate-400">Show pronunciation speaker button</span>
+        </div>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" id="tts-toggle" class="sr-only peer" checked>
+          <div class="w-8 h-4.5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[14px] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-blue-500"></div>
+        </label>
+      </div>
+    </div>
+
+    <!-- Status Message -->
+    <div id="status-msg" class="text-center text-[10px] text-emerald-400 font-medium opacity-0 transition-opacity duration-300">
+      Settings saved automatically
+    </div>
+  </div>
+  <script type="module" src="popup.ts"></script>
+</body>
+</html>
