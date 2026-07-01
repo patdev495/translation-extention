@@ -4,7 +4,6 @@ const activeToggle = document.getElementById('active-toggle') as HTMLInputElemen
 const primaryLang = document.getElementById('primary-lang') as HTMLSelectElement;
 const secondaryLang = document.getElementById('secondary-lang') as HTMLSelectElement;
 const reverseLang = document.getElementById('reverse-lang') as HTMLSelectElement;
-const triggerMode = document.getElementById('trigger-mode') as HTMLSelectElement;
 const hotkey = document.getElementById('hotkey') as HTMLSelectElement;
 const ttsToggle = document.getElementById('tts-toggle') as HTMLInputElement;
 const providerSelect = document.getElementById('provider') as HTMLSelectElement;
@@ -45,7 +44,6 @@ async function loadSettings() {
     primaryLang.value = settings.primaryTargetLang;
     secondaryLang.value = settings.secondaryTargetLang;
     reverseLang.value = settings.reverseTargetLang;
-    triggerMode.value = settings.triggerMode;
     hotkey.value = settings.hotkey;
     ttsToggle.checked = settings.ttsEnabled;
     providerSelect.value = settings.provider;
@@ -65,7 +63,6 @@ async function saveSettings() {
       primaryTargetLang: primaryLang.value,
       secondaryTargetLang: secondaryLang.value,
       reverseTargetLang: reverseLang.value,
-      triggerMode: triggerMode.value as 'auto' | 'icon',
       hotkey: hotkey.value as 'none' | 'ctrl' | 'alt' | 'shift',
       ttsEnabled: ttsToggle.checked,
       provider: providerSelect.value as 'google' | 'deepl',
@@ -94,7 +91,6 @@ activeToggle.addEventListener('change', saveSettings);
 primaryLang.addEventListener('change', saveSettings);
 secondaryLang.addEventListener('change', saveSettings);
 reverseLang.addEventListener('change', saveSettings);
-triggerMode.addEventListener('change', saveSettings);
 hotkey.addEventListener('change', saveSettings);
 ttsToggle.addEventListener('change', saveSettings);
 

@@ -34,7 +34,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-// Helper to check if hotkey is pressed
+// Helper to check if hotkey is held
 function isHotkeyMatched(event: MouseEvent): boolean {
   if (!settings) return true;
   switch (settings.hotkey) {
@@ -50,6 +50,51 @@ function isHotkeyMatched(event: MouseEvent): boolean {
   }
 }
 
+// Helper to check if pressed key matches hotkey
+function matchesHotkey(event: KeyboardEvent): boolean {
+  if (!settings) return false;
+  switch (settings.hotkey) {
+    case 'ctrl':
+      return event.key === 'Control';
+    case 'alt':
+      return event.key === 'Alt';
+    case 'shift':
+      return event.key === 'Shift';
+    default:
+      return false;
+  }
+}
+
+// 1. Keydown event listener for triggering translation via hotkey press
+document.addEventListener('keydown', (event) => {
+  if (!active || !settings || event.repeat) return;
+
+  if (matchesHotkey(event)) {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+
+    const selectedText = selection.toString().trim();
+    if (selectedText.length === 0) return;
+
+    // Do not trigger if typing in form fields
+    const activeEl = document.activeElement;
+    if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || (activeEl as HTMLElement).isContentEditable)) {
+      return;
+    }
+
+    const range = selection.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+    const x = rect.left + window.scrollX + (rect.width / 2);
+    const y = rect.top + window.scrollY;
+
+    // Save selection context
+    lastSelection = { text: selectedText, x, y };
+
+    performTranslation(selectedText, x, y);
+  }
+});
+
+// 2. Mouseup event listener for selection tracking
 document.addEventListener('mouseup', (event) => {
   const currentSettings = settings;
   if (!active || !currentSettings) return;
@@ -57,7 +102,7 @@ document.addEventListener('mouseup', (event) => {
   // Capture mouse coordinates, target, and path synchronously
   const x = event.pageX;
   const y = event.pageY;
-  const isHotkey = isHotkeyMatched(event);
+  const isHotkeyHeld = isHotkeyMatched(event);
   const root = document.getElementById('translation-extension-root');
   const isInsideRoot = root ? event.composedPath().includes(root) : false;
 
@@ -66,23 +111,26 @@ document.addEventListener('mouseup', (event) => {
     if (!selection || selection.rangeCount === 0) return;
 
     const selectedText = selection.toString().trim();
-    if (selectedText.length === 0) {
-      return;
-    }
+    if (selectedText.length === 0) return;
 
-    // Check if clicked inside our own tooltip root
+    // If clicked inside the tooltip root, do not trigger new selection
     if (isInsideRoot) return;
 
-    // Check hotkey constraint
-    if (!isHotkey) return;
-
-    // Save selection context at cursor position
+    // Save selection context
     lastSelection = { text: selectedText, x, y };
 
-    if (currentSettings.triggerMode === 'auto') {
+    if (currentSettings.hotkey === 'none') {
+      // Hotkey is 'none' -> Auto translate immediately
       performTranslation(selectedText, x, y);
     } else {
-      tooltip.showTrigger(x, y - 8);
+      // Hotkey is configured:
+      if (isHotkeyHeld) {
+        // If hotkey was held during selection -> translate immediately
+        performTranslation(selectedText, x, y);
+      } else {
+        // Otherwise, always show the floating trigger button (fallback option)
+        tooltip.showTrigger(x, y - 8);
+      }
     }
   }, 10);
 });

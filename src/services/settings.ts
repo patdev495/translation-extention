@@ -2,7 +2,6 @@ export interface Settings {
   primaryTargetLang: string;
   secondaryTargetLang: string;
   reverseTargetLang: string;
-  triggerMode: 'auto' | 'icon';
   hotkey: 'none' | 'ctrl' | 'alt' | 'shift';
   ttsEnabled: boolean;
   provider: 'google' | 'deepl';
@@ -14,7 +13,6 @@ export class SettingsManager {
     primaryTargetLang: 'vi',
     secondaryTargetLang: 'en',
     reverseTargetLang: 'zh',
-    triggerMode: 'icon',
     hotkey: 'none',
     ttsEnabled: true,
     provider: 'google',
