@@ -9,6 +9,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "pdfjs-dist": "^6.1.200",
     "pinyin-pro": "^3.26.0",
     "tailwindcss": "^4.0.0-beta.8"
   },

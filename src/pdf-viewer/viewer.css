@@ -1,0 +1,370 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --toolbar-h: 48px;
+  --toolbar-bg: #1e1e2e;
+  --toolbar-border: #313244;
+  --toolbar-text: #cdd6f4;
+  --toolbar-muted: #6c7086;
+  --toolbar-hover: #313244;
+  --viewer-bg: #12121f;
+  --page-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+  --accent: #89b4fa;
+  --accent-hover: #b4d0fb;
+  --danger: #f38ba8;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--viewer-bg);
+  color: var(--toolbar-text);
+}
+
+/* ── Toolbar ─────────────────────────────────────────────────────────────── */
+
+#toolbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--toolbar-h);
+  background: var(--toolbar-bg);
+  border-bottom: 1px solid var(--toolbar-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  z-index: 100;
+  gap: 8px;
+}
+
+#toolbar-left,
+#toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+#toolbar-center {
+  flex: 1;
+  text-align: center;
+  overflow: hidden;
+}
+
+#pdf-title {
+  font-size: 13px;
+  color: var(--toolbar-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+#toolbar button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--toolbar-text);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+#toolbar button:hover {
+  background: var(--toolbar-hover);
+  color: var(--accent-hover);
+}
+
+#toolbar button svg {
+  width: 16px;
+  height: 16px;
+}
+
+#page-info {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--toolbar-text);
+}
+
+#page-input {
+  width: 40px;
+  background: var(--toolbar-hover);
+  border: 1px solid var(--toolbar-border);
+  border-radius: 4px;
+  color: var(--toolbar-text);
+  font-size: 13px;
+  text-align: center;
+  padding: 2px 4px;
+  outline: none;
+}
+
+#page-input:focus {
+  border-color: var(--accent);
+}
+
+#page-total {
+  color: var(--toolbar-muted);
+}
+
+#zoom-level {
+  font-size: 12px;
+  color: var(--toolbar-muted);
+  min-width: 36px;
+  text-align: center;
+}
+
+/* ── Viewer Container ─────────────────────────────────────────────────────── */
+
+#viewer-container {
+  position: fixed;
+  top: var(--toolbar-h);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow-y: auto;
+  overflow-x: auto;
+  background: var(--viewer-bg);
+  padding: 24px 0 48px;
+}
+
+#pages-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+/* ── Page wrappers ────────────────────────────────────────────────────────── */
+
+.page-wrapper {
+  position: relative;
+  background: #fff;
+  box-shadow: var(--page-shadow);
+  border-radius: 2px;
+  overflow: hidden;
+  line-height: 0; /* prevent whitespace gaps */
+}
+
+.page-wrapper canvas {
+  display: block;
+}
+
+/* Text layer sits on top of canvas, invisible but selectable */
+.page-wrapper .textLayer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: auto;
+  line-height: 1;
+}
+
+.page-wrapper .textLayer span {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Highlight selected text */
+.page-wrapper .textLayer ::selection {
+  background: rgba(66, 135, 245, 0.35);
+}
+
+/* ── Loading Overlay ──────────────────────────────────────────────────────── */
+
+#loading-overlay {
+  position: fixed;
+  inset: var(--toolbar-h) 0 0 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: var(--viewer-bg);
+  z-index: 10;
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--toolbar-border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+#loading-text {
+  font-size: 13px;
+  color: var(--toolbar-muted);
+}
+
+/* ── Error Overlay ────────────────────────────────────────────────────────── */
+
+#error-overlay {
+  position: fixed;
+  inset: var(--toolbar-h) 0 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--viewer-bg);
+  z-index: 10;
+}
+
+#error-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 32px;
+  background: #1e1e2e;
+  border: 1px solid var(--toolbar-border);
+  border-radius: 12px;
+  max-width: 360px;
+  text-align: center;
+}
+
+#error-icon {
+  width: 40px;
+  height: 40px;
+  color: var(--danger);
+}
+
+#error-message {
+  font-size: 14px;
+  color: var(--toolbar-text);
+  line-height: 1.5;
+}
+
+#btn-enable-file-access {
+  background: var(--accent);
+  color: #1e1e2e;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+#btn-enable-file-access:hover {
+  background: var(--accent-hover);
+}
+
+/* ── Password Dialog ──────────────────────────────────────────────────────── */
+
+#password-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  backdrop-filter: blur(4px);
+}
+
+#password-dialog {
+  background: #1e1e2e;
+  border: 1px solid var(--toolbar-border);
+  border-radius: 12px;
+  padding: 28px 32px;
+  width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#password-dialog h2 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--toolbar-text);
+}
+
+#password-dialog p {
+  font-size: 13px;
+  color: var(--toolbar-muted);
+  line-height: 1.5;
+}
+
+#password-input {
+  width: 100%;
+  background: var(--viewer-bg);
+  border: 1px solid var(--toolbar-border);
+  border-radius: 8px;
+  color: var(--toolbar-text);
+  font-size: 14px;
+  padding: 8px 12px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+#password-input:focus {
+  border-color: var(--accent);
+}
+
+#password-error {
+  font-size: 12px;
+  color: var(--danger) !important;
+}
+
+#password-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+#btn-password-cancel {
+  background: transparent;
+  border: 1px solid var(--toolbar-border);
+  border-radius: 8px;
+  color: var(--toolbar-muted);
+  padding: 7px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+#btn-password-cancel:hover {
+  background: var(--toolbar-hover);
+}
+
+#btn-password-submit {
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  color: #1e1e2e;
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+#btn-password-submit:hover {
+  background: var(--accent-hover);
+}
