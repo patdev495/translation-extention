@@ -1,0 +1,34 @@
+export interface Settings {
+  primaryTargetLang: string;
+  secondaryTargetLang: string;
+  reverseTargetLang: string;
+  triggerMode: 'auto' | 'icon';
+  hotkey: 'none' | 'ctrl' | 'alt' | 'shift';
+  ttsEnabled: boolean;
+}
+
+export class SettingsManager {
+  static readonly DEFAULT_SETTINGS: Settings = {
+    primaryTargetLang: 'vi',
+    secondaryTargetLang: 'en',
+    reverseTargetLang: 'zh',
+    triggerMode: 'icon',
+    hotkey: 'none',
+    ttsEnabled: true,
+  };
+
+  static async getSettings(): Promise<Settings> {
+    const result = await chrome.storage.local.get('settings');
+    if (result && result.settings) {
+      return { ...this.DEFAULT_SETTINGS, ...result.settings };
+    }
+    return this.DEFAULT_SETTINGS;
+  }
+
+  static async updateSettings(settings: Partial<Settings>): Promise<Settings> {
+    const current = await this.getSettings();
+    const updated = { ...current, ...settings };
+    await chrome.storage.local.set({ settings: updated });
+    return updated;
+  }
+}
