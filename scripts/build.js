@@ -52,24 +52,28 @@ async function runBuild() {
     },
   });
 
-  // 3. Build Service Worker (ES module format — MV3 requires module type)
+  // 3. Build Service Worker (esbuild — fast, handles large deps like pinyin-pro)
   console.log('\n--- Building Service Worker ---');
-  await build({
-    build: {
-      rollupOptions: {
-        input: {
-          background: resolve(__dirname, '../src/background/service-worker.ts'),
-        },
-        output: {
-          entryFileNames: 'service-worker.js',
-          format: 'iife',
-        },
-      },
-      outDir: distPath,
-      emptyOutDir: false,
-      minify: false,
+  const esbuild = await import('esbuild');
+  const swResult = await esbuild.build({
+    entryPoints: [resolve(__dirname, '../src/background/service-worker.ts')],
+    bundle: true,
+    format: 'iife',
+    outfile: resolve(distPath, 'service-worker.js'),
+    platform: 'browser',
+    target: 'es2022',
+    minify: true,
+    logLevel: 'silent',
+    define: {
+      'process.env.NODE_ENV': '"production"',
     },
+    tsconfig: resolve(__dirname, '../tsconfig.json'),
   });
+  if (swResult.errors.length > 0) {
+    throw new Error(`Service worker build failed: ${swResult.errors[0].text}`);
+  }
+  const swSize = (await import('fs')).statSync(resolve(distPath, 'service-worker.js')).size;
+  console.log(`dist/service-worker.js  ${(swSize / 1024).toFixed(2)} kB`);
 
   // 4. Build PDF Viewer
   console.log('\n--- Building PDF Viewer ---');
@@ -93,7 +97,6 @@ async function runBuild() {
       },
       outDir: distPath,
       emptyOutDir: false,
-      minify: false,
     },
   });
 
