@@ -10,11 +10,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       try {
         const settings = await SettingsManager.getSettings();
         
-        // 1. First translation to detect source language
-        const firstRes = await TranslationEngine.translate(
+        // 1. First translation to detect source language using configured provider
+        const firstRes = await TranslationEngine.translateWithSettings(
           text,
           settings.primaryTargetLang,
-          settings.primaryTargetLang
+          settings
         );
         const detectedLang = firstRes.detectedLang;
 
@@ -39,7 +39,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           translation1 = firstRes.translation;
         } else {
           promises.push(
-            TranslationEngine.translate(text, targetLang1, targetLang1)
+            TranslationEngine.translateWithSettings(text, targetLang1, settings)
               .then(r => { translation1 = r.translation; })
           );
         }
@@ -48,7 +48,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           translation2 = firstRes.translation;
         } else {
           promises.push(
-            TranslationEngine.translate(text, targetLang2, targetLang2)
+            TranslationEngine.translateWithSettings(text, targetLang2, settings)
               .then(r => { translation2 = r.translation; })
           );
         }

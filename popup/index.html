@@ -104,6 +104,37 @@
         </div>
       </div>
 
+      <!-- Translation Provider Configuration -->
+      <div class="bg-slate-900/40 border border-slate-800/60 rounded-xl p-3 flex flex-col gap-3">
+        <h2 class="text-2xs font-bold text-slate-400 tracking-wider uppercase">Translation Provider</h2>
+        
+        <!-- Provider Select -->
+        <div class="flex items-center justify-between gap-4">
+          <div class="flex flex-col">
+            <span class="text-xs font-semibold">Engine</span>
+            <span class="text-3xs text-slate-400">Select translation engine</span>
+          </div>
+          <select id="provider" class="bg-slate-800 border border-slate-700 rounded-lg py-1 px-2 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer w-32">
+            <option value="google" selected>Google Translate</option>
+            <option value="deepl">DeepL API</option>
+          </select>
+        </div>
+
+        <!-- DeepL API Key Input (Hidden by default) -->
+        <div id="deepl-key-container" class="hidden flex flex-col gap-1 border-t border-slate-800/40 pt-2.5">
+          <label for="deepl-api-key" class="text-3xs font-medium text-slate-400">DeepL API Key</label>
+          <div class="relative flex items-center">
+            <input type="password" id="deepl-api-key" placeholder="Enter DeepL API Key..." class="bg-slate-800 border border-slate-700 rounded-lg py-1 pl-2 pr-8 text-xs text-white focus:outline-none focus:border-blue-500 w-full">
+            <button id="toggle-deepl-key" class="absolute right-2 text-slate-400 hover:text-slate-200 cursor-pointer transition-colors focus:outline-none" title="Toggle visibility" type="button">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5" id="eye-icon">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.43 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- TTS Configuration -->
       <div class="bg-slate-900/40 border border-slate-800/60 rounded-xl p-3 flex items-center justify-between">
         <div class="flex flex-col">

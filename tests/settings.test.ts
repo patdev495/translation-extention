@@ -45,6 +45,8 @@ describe('SettingsManager', () => {
       triggerMode: 'icon',
       hotkey: 'none',
       ttsEnabled: true,
+      provider: 'google',
+      deeplApiKey: '',
     });
   });
 
@@ -61,5 +63,7 @@ describe('SettingsManager', () => {
     expect(retrieved.secondaryTargetLang).toBe('en');
     expect(retrieved.reverseTargetLang).toBe('zh');
     expect(retrieved.triggerMode).toBe('auto');
+    expect(retrieved.provider).toBe('google');
+    expect(retrieved.deeplApiKey).toBe('');
   });
 });

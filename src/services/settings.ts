@@ -5,6 +5,8 @@ export interface Settings {
   triggerMode: 'auto' | 'icon';
   hotkey: 'none' | 'ctrl' | 'alt' | 'shift';
   ttsEnabled: boolean;
+  provider: 'google' | 'deepl';
+  deeplApiKey: string;
 }
 
 export class SettingsManager {
@@ -15,6 +17,8 @@ export class SettingsManager {
     triggerMode: 'icon',
     hotkey: 'none',
     ttsEnabled: true,
+    provider: 'google',
+    deeplApiKey: '',
   };
 
   static async getSettings(): Promise<Settings> {

@@ -48,6 +48,13 @@ The execution of translating the Source Text into two distinct target languages 
 **Reverse Target Language**:
 The third fallback language configured by the user, which dynamically replaces either the Primary or Secondary Target Language if the detected Source Language matches one of them.
 
+**Translation Provider**:
+The active translation engine service (e.g., Google Translate or DeepL API) used by the extension to translate texts.
+
+**DeepL API Key**:
+The personal authentication token used to authorize requests against the DeepL Translation API.
+
+
 
 
 
