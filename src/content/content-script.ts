@@ -54,11 +54,12 @@ document.addEventListener('mouseup', (event) => {
   const currentSettings = settings;
   if (!active || !currentSettings) return;
 
-  // Capture mouse coordinates and target synchronously
+  // Capture mouse coordinates, target, and path synchronously
   const x = event.pageX;
   const y = event.pageY;
-  const target = event.target;
   const isHotkey = isHotkeyMatched(event);
+  const root = document.getElementById('translation-extension-root');
+  const isInsideRoot = root ? event.composedPath().includes(root) : false;
 
   setTimeout(async () => {
     const selection = window.getSelection();
@@ -70,8 +71,7 @@ document.addEventListener('mouseup', (event) => {
     }
 
     // Check if clicked inside our own tooltip root
-    const root = document.getElementById('translation-extension-root');
-    if (root && root.contains(target as Node)) return;
+    if (isInsideRoot) return;
 
     // Check hotkey constraint
     if (!isHotkey) return;
@@ -89,7 +89,8 @@ document.addEventListener('mouseup', (event) => {
 
 document.addEventListener('mousedown', (event) => {
   const root = document.getElementById('translation-extension-root');
-  if (root && root.contains(event.target as Node)) return;
+  const isInsideRoot = root ? event.composedPath().includes(root) : false;
+  if (isInsideRoot) return;
   
   tooltip.hide();
   tooltip.hideTrigger();
