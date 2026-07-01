@@ -139,7 +139,6 @@ async function runBuild() {
   mkdirSync(ortDstDir, { recursive: true });
   for (const file of readdirSync(ortSrcDir)) {
     if ((file.endsWith('.wasm') || file.endsWith('.mjs')) && 
-        !file.includes('jsep') && 
         !file.includes('asyncify') && 
         !file.includes('jspi')) {
       copyFileSync(resolve(ortSrcDir, file), resolve(ortDstDir, file));
