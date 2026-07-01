@@ -2,7 +2,7 @@ import { build } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { copyFileSync, existsSync, mkdirSync, renameSync, rmSync } from 'fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -118,6 +118,18 @@ async function runBuild() {
   copyFileSync(workerSrc, resolve(distPath, 'pdf.worker.min.mjs'));
   console.log('Copied pdf.min.mjs + pdf.worker.min.mjs → dist/');
 
+  // 6. Copy ONNX Runtime Web WASM assets for extension-local OCR inference.
+  console.log('\n--- Copying ONNX Runtime Web assets ---');
+  const ortSrcDir = resolve(__dirname, '../node_modules/onnxruntime-web/dist');
+  const ortDstDir = resolve(distPath, 'onnxruntime-web');
+  mkdirSync(ortDstDir, { recursive: true });
+  for (const file of readdirSync(ortSrcDir)) {
+    if (file.endsWith('.wasm') || file.endsWith('.mjs')) {
+      copyFileSync(resolve(ortSrcDir, file), resolve(ortDstDir, file));
+    }
+  }
+  console.log('Copied ONNX Runtime Web WASM assets to dist/onnxruntime-web/');
+
   console.log('\nBuild completed successfully!');
 }
 
@@ -125,4 +137,3 @@ runBuild().catch((err) => {
   console.error('Build failed:', err);
   process.exit(1);
 });
-

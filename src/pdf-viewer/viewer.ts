@@ -2,7 +2,9 @@ import {
   createTranslationContext,
   loadSettings,
   initTranslationListeners,
+  performTranslation,
 } from '../content/translation-init';
+import { recognizeImageRegion } from '../services/ocr';
 import { createPdfPasswordResolver } from './password';
 
 // pdfjs-dist is loaded at runtime via chrome.runtime.getURL() to avoid
@@ -40,6 +42,7 @@ const $pageTotal     = document.getElementById('page-total')!;
 const $zoomLevel     = document.getElementById('zoom-level')!;
 const $btnPrev       = document.getElementById('btn-prev')!;
 const $btnNext       = document.getElementById('btn-next')!;
+const $btnOcrRegion  = document.getElementById('btn-ocr-region') as HTMLButtonElement;
 const $btnZoomIn     = document.getElementById('btn-zoom-in')!;
 const $btnZoomOut    = document.getElementById('btn-zoom-out')!;
 const $btnZoomFit    = document.getElementById('btn-zoom-fit')!;
@@ -51,6 +54,16 @@ let pdfDoc: any = null;
 let numPages = 0;
 let scale = 1.0;
 let currentPage = 1;
+const translationCtx = createTranslationContext();
+let ocrSelectionMode = false;
+let ocrBusy = false;
+let ocrSelection: {
+  pageWrapper: HTMLElement;
+  pageCanvas: HTMLCanvasElement;
+  boxEl: HTMLDivElement;
+  startX: number;
+  startY: number;
+} | null = null;
 
 // Per-page render state: tracks running render tasks and rendered canvases
 const pageRendered = new Map<number, boolean>();
@@ -301,6 +314,170 @@ function updateCurrentPageFromScroll() {
 
 // ─── Toolbar controls ──────────────────────────────────────────────────────
 
+function setOcrSelectionMode(enabled: boolean) {
+  ocrSelectionMode = enabled;
+  document.body.classList.toggle('ocr-selection-mode', enabled);
+  $btnOcrRegion.classList.toggle('active', enabled);
+  $btnOcrRegion.setAttribute('aria-pressed', String(enabled));
+  $btnOcrRegion.title = enabled
+    ? 'OCR region selection is active'
+    : 'Select image region for OCR translation (Ctrl+Space)';
+}
+
+function matchesOcrShortcut(event: KeyboardEvent): boolean {
+  const shortcut = translationCtx.settings?.ocrShortcut ?? 'ctrl-space';
+  if (shortcut === 'disabled') return false;
+
+  const key = event.key.toLowerCase();
+  if (shortcut === 'ctrl-space') {
+    return event.ctrlKey && !event.altKey && !event.shiftKey && event.code === 'Space';
+  }
+  if (shortcut === 'alt-o') {
+    return event.altKey && !event.ctrlKey && !event.shiftKey && key === 'o';
+  }
+  if (shortcut === 'ctrl-shift-o') {
+    return event.ctrlKey && event.shiftKey && !event.altKey && key === 'o';
+  }
+  return false;
+}
+
+function getPointInPage(wrapper: HTMLElement, event: MouseEvent) {
+  const rect = wrapper.getBoundingClientRect();
+  return {
+    x: Math.max(0, Math.min(event.clientX - rect.left, rect.width)),
+    y: Math.max(0, Math.min(event.clientY - rect.top, rect.height)),
+  };
+}
+
+function updateSelectionBox(boxEl: HTMLElement, startX: number, startY: number, endX: number, endY: number) {
+  const left = Math.min(startX, endX);
+  const top = Math.min(startY, endY);
+  const width = Math.abs(endX - startX);
+  const height = Math.abs(endY - startY);
+  boxEl.style.left = `${left}px`;
+  boxEl.style.top = `${top}px`;
+  boxEl.style.width = `${width}px`;
+  boxEl.style.height = `${height}px`;
+}
+
+function removeOcrProgress() {
+  document.querySelectorAll('.ocr-progress-indicator').forEach((el) => el.remove());
+}
+
+function showOcrProgress(wrapper: HTMLElement, rect: DOMRect, message: string) {
+  removeOcrProgress();
+  const indicator = document.createElement('div');
+  indicator.className = 'ocr-progress-indicator';
+  indicator.innerHTML = '<span class="mini-spinner"></span><span></span>';
+  const textEl = indicator.querySelector('span:last-child')!;
+  textEl.textContent = message;
+  indicator.style.left = `${rect.left}px`;
+  indicator.style.top = `${Math.max(8, rect.top - 34)}px`;
+  wrapper.appendChild(indicator);
+  return indicator;
+}
+
+function cropPageCanvas(pageCanvas: HTMLCanvasElement, wrapper: HTMLElement, rect: DOMRect): HTMLCanvasElement {
+  const canvasRect = pageCanvas.getBoundingClientRect();
+  const scaleX = pageCanvas.width / canvasRect.width;
+  const scaleY = pageCanvas.height / canvasRect.height;
+  const cropCanvas = document.createElement('canvas');
+  cropCanvas.width = Math.max(1, Math.round(rect.width * scaleX));
+  cropCanvas.height = Math.max(1, Math.round(rect.height * scaleY));
+
+  const cropCtx = cropCanvas.getContext('2d', { willReadFrequently: true })!;
+  const wrapperRect = wrapper.getBoundingClientRect();
+  const sx = Math.round((wrapperRect.left + rect.left - canvasRect.left) * scaleX);
+  const sy = Math.round((wrapperRect.top + rect.top - canvasRect.top) * scaleY);
+  cropCtx.drawImage(pageCanvas, sx, sy, cropCanvas.width, cropCanvas.height, 0, 0, cropCanvas.width, cropCanvas.height);
+  return cropCanvas;
+}
+
+async function translateOcrRegion(wrapper: HTMLElement, pageCanvas: HTMLCanvasElement, rect: DOMRect) {
+  if (ocrBusy || rect.width < 8 || rect.height < 8) return;
+  ocrBusy = true;
+
+  const progress = showOcrProgress(wrapper, rect, 'Preparing OCR...');
+  try {
+    const cropCanvas = cropPageCanvas(pageCanvas, wrapper, rect);
+    const text = await recognizeImageRegion(cropCanvas, (state) => {
+      const textEl = progress.querySelector('span:last-child');
+      if (textEl) textEl.textContent = state.message;
+    });
+
+    if (!text) {
+      const textEl = progress.querySelector('span:last-child');
+      if (textEl) textEl.textContent = 'No text found in this region.';
+      window.setTimeout(removeOcrProgress, 1800);
+      return;
+    }
+
+    const wrapperRect = wrapper.getBoundingClientRect();
+    const x = wrapperRect.left + window.scrollX + rect.left + rect.width / 2;
+    const y = wrapperRect.top + window.scrollY + rect.top;
+    removeOcrProgress();
+    performTranslation(translationCtx, text, x, y);
+  } catch (err) {
+    const textEl = progress.querySelector('span:last-child');
+    if (textEl) textEl.textContent = err instanceof Error ? err.message : 'OCR failed.';
+    window.setTimeout(removeOcrProgress, 3000);
+  } finally {
+    ocrBusy = false;
+    setOcrSelectionMode(false);
+  }
+}
+
+function startOcrSelection(event: MouseEvent) {
+  if (!ocrSelectionMode || ocrBusy) return;
+
+  const wrapper = (event.target as Element | null)?.closest('.page-wrapper') as HTMLElement | null;
+  if (!wrapper) return;
+  const pageCanvas = wrapper.querySelector('canvas') as HTMLCanvasElement | null;
+  if (!pageCanvas) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+  window.getSelection()?.removeAllRanges();
+
+  const point = getPointInPage(wrapper, event);
+  const boxEl = document.createElement('div');
+  boxEl.className = 'ocr-selection-box';
+  wrapper.appendChild(boxEl);
+  updateSelectionBox(boxEl, point.x, point.y, point.x, point.y);
+
+  ocrSelection = {
+    pageWrapper: wrapper,
+    pageCanvas,
+    boxEl,
+    startX: point.x,
+    startY: point.y,
+  };
+}
+
+function moveOcrSelection(event: MouseEvent) {
+  if (!ocrSelection) return;
+  event.preventDefault();
+  const point = getPointInPage(ocrSelection.pageWrapper, event);
+  updateSelectionBox(ocrSelection.boxEl, ocrSelection.startX, ocrSelection.startY, point.x, point.y);
+}
+
+function finishOcrSelection(event: MouseEvent) {
+  if (!ocrSelection) return;
+  event.preventDefault();
+
+  const selection = ocrSelection;
+  ocrSelection = null;
+  const point = getPointInPage(selection.pageWrapper, event);
+  const rect = new DOMRect(
+    Math.min(selection.startX, point.x),
+    Math.min(selection.startY, point.y),
+    Math.abs(point.x - selection.startX),
+    Math.abs(point.y - selection.startY)
+  );
+  selection.boxEl.remove();
+  translateOcrRegion(selection.pageWrapper, selection.pageCanvas, rect);
+}
+
 $btnPrev.addEventListener('click', () => {
   if (currentPage > 1) {
     currentPage--;
@@ -347,6 +524,30 @@ $btnZoomFit.addEventListener('click', async () => {
   rerenderAll();
 });
 
+$btnOcrRegion.addEventListener('click', () => {
+  if (ocrBusy) return;
+  setOcrSelectionMode(!ocrSelectionMode);
+});
+
+document.addEventListener('keydown', (event) => {
+  if (matchesOcrShortcut(event)) {
+    event.preventDefault();
+    if (!ocrBusy) setOcrSelectionMode(!ocrSelectionMode);
+    return;
+  }
+
+  if (event.key === 'Escape' && ocrSelectionMode) {
+    event.preventDefault();
+    ocrSelection?.boxEl.remove();
+    ocrSelection = null;
+    setOcrSelectionMode(false);
+  }
+});
+
+$viewerContainer.addEventListener('mousedown', startOcrSelection, true);
+$viewerContainer.addEventListener('mousemove', moveOcrSelection, true);
+document.addEventListener('mouseup', finishOcrSelection, true);
+
 $viewerContainer.addEventListener('scroll', updateCurrentPageFromScroll);
 
 // ─── File access button ────────────────────────────────────────────────────
@@ -357,16 +558,15 @@ $btnFileAccess.addEventListener('click', () => {
 
 // ─── Translation init ──────────────────────────────────────────────────────
 
-const ctx = createTranslationContext();
-loadSettings(ctx);
+loadSettings(translationCtx);
 
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === 'SETTINGS_UPDATED') {
-    loadSettings(ctx);
+    loadSettings(translationCtx);
   }
 });
 
-initTranslationListeners(ctx, document);
+initTranslationListeners(translationCtx, document);
 
 // ─── Bootstrap ─────────────────────────────────────────────────────────────
 

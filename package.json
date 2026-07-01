@@ -9,8 +9,10 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "onnxruntime-web": "^1.27.0",
     "pdfjs-dist": "^6.1.200",
     "pinyin-pro": "^3.26.0",
+    "ppu-paddle-ocr": "^6.0.0",
     "tailwindcss": "^4.0.0-beta.8"
   },
   "devDependencies": {

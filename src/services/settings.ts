@@ -5,6 +5,7 @@ export interface Settings {
   secondaryTargetLang: TargetLanguage;
   reverseTargetLang: TargetLanguage;
   hotkey: 'none' | 'ctrl' | 'alt' | 'shift';
+  ocrShortcut: 'disabled' | 'ctrl-space' | 'alt-o' | 'ctrl-shift-o';
   ttsEnabled: boolean;
   provider: 'google' | 'deepl';
   deeplApiKey: string;
@@ -16,6 +17,7 @@ export class SettingsManager {
     secondaryTargetLang: 'en',
     reverseTargetLang: 'zh',
     hotkey: 'none',
+    ocrShortcut: 'ctrl-space',
     ttsEnabled: true,
     provider: 'google',
     deeplApiKey: '',

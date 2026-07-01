@@ -43,6 +43,7 @@ describe('SettingsManager', () => {
       secondaryTargetLang: 'en',
       reverseTargetLang: 'zh',
       hotkey: 'none',
+      ocrShortcut: 'ctrl-space',
       ttsEnabled: true,
       provider: 'google',
       deeplApiKey: '',
@@ -53,15 +54,18 @@ describe('SettingsManager', () => {
     const updated = await SettingsManager.updateSettings({
       primaryTargetLang: 'en',
       hotkey: 'ctrl',
+      ocrShortcut: 'alt-o',
     });
     expect(updated.primaryTargetLang).toBe('en');
     expect(updated.hotkey).toBe('ctrl');
+    expect(updated.ocrShortcut).toBe('alt-o');
 
     const retrieved = await SettingsManager.getSettings();
     expect(retrieved.primaryTargetLang).toBe('en');
     expect(retrieved.secondaryTargetLang).toBe('en');
     expect(retrieved.reverseTargetLang).toBe('zh');
     expect(retrieved.hotkey).toBe('ctrl');
+    expect(retrieved.ocrShortcut).toBe('alt-o');
     expect(retrieved.provider).toBe('google');
     expect(retrieved.deeplApiKey).toBe('');
   });

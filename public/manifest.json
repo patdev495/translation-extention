@@ -3,6 +3,9 @@
   "name": "Translation Extension (Anh - Việt - Trung)",
   "version": "1.0.0",
   "description": "Dịch qua lại giữa tiếng Anh, Việt, Trung kèm IPA/Pinyin offline và phát âm.",
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
   "permissions": [
     "storage",
     "webNavigation",
@@ -45,7 +48,8 @@
       "resources": [
         "pdf-viewer/viewer.html",
         "pdf.min.mjs",
-        "pdf.worker.min.mjs"
+        "pdf.worker.min.mjs",
+        "onnxruntime-web/*"
       ],
       "matches": [
         "<all_urls>",

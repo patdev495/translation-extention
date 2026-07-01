@@ -7,6 +7,7 @@ const baseSettings: Settings = {
   secondaryTargetLang: 'en',
   reverseTargetLang: 'zh',
   hotkey: 'none',
+  ocrShortcut: 'ctrl-space',
   ttsEnabled: true,
   provider: 'google',
   deeplApiKey: '',
