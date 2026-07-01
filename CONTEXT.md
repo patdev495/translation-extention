@@ -54,6 +54,28 @@ The active translation engine service (e.g., Google Translate or DeepL API) used
 **DeepL API Key**:
 The personal authentication token used to authorize requests against the DeepL Translation API.
 
+**CMU Pronouncing Dictionary (Offline IPA)**:
+The lightweight JSON pronouncing dictionary database (`cmu-dict.json`) containing IPA phonetic mappings for common English words, used by the Phonetics Engine offline.
+
+**Pinyin Pro**:
+The offline Chinese-to-Pinyin conversion library (`pinyin-pro`) integrated into the Phonetics Engine to transcribe Chinese characters with tone marks.
+
+**Dictionary Integration**:
+The quick-access buttons in the Translation Tooltip pointing to external dictionaries (Cambridge Dictionary for English, Hanzii for Chinese) for deep learning.
+
+**Shadow DOM Isolation**:
+The encapsulation mechanism used to render the Translation Tooltip, ensuring its glassmorphism styles are unaffected by the styles of the host webpage.
+
+**Draggable Tooltip**:
+The user interaction capability enabling the Translation Tooltip to be dragged anywhere on the screen by clicking and holding the card (excluding buttons/inputs).
+
+**Copy to Clipboard**:
+The quick-copy action button in the Tooltip allowing the user to copy the source text or translation to their clipboard.
+
+**TTS Voice Diagnostics**:
+The logging system in the console that outputs warning diagnostics if no matching system voice is found for the required locale during text-to-speech playback.
+
+
 
 
 

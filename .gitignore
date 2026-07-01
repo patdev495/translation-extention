@@ -22,5 +22,9 @@ lerna-debug.log*
 *.sw?
 .DS_Store
 
+#compress files
+*.zip
+
 # Local/Scratch files
 .gemini/
+
