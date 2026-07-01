@@ -4,6 +4,10 @@
   padding: 0;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 :root {
   --toolbar-h: 48px;
   --toolbar-bg: #1e1e2e;

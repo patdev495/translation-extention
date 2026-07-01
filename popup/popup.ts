@@ -1,4 +1,5 @@
 import { SettingsManager } from '../src/services/settings';
+import type { TargetLanguage } from '../src/services/translation-plan';
 
 const activeToggle = document.getElementById('active-toggle') as HTMLInputElement;
 const primaryLang = document.getElementById('primary-lang') as HTMLSelectElement;
@@ -125,9 +126,9 @@ async function saveSettings() {
     await chrome.storage.local.set({ active: activeToggle.checked });
     
     await SettingsManager.updateSettings({
-      primaryTargetLang: primaryLang.value,
-      secondaryTargetLang: secondaryLang.value,
-      reverseTargetLang: reverseLang.value,
+      primaryTargetLang: primaryLang.value as TargetLanguage,
+      secondaryTargetLang: secondaryLang.value as TargetLanguage,
+      reverseTargetLang: reverseLang.value as TargetLanguage,
       hotkey: hotkey.value as 'none' | 'ctrl' | 'alt' | 'shift',
       ttsEnabled: ttsToggle.checked,
       provider: providerSelect.value as 'google' | 'deepl',

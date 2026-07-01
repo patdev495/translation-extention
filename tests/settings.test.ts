@@ -65,4 +65,16 @@ describe('SettingsManager', () => {
     expect(retrieved.provider).toBe('google');
     expect(retrieved.deeplApiKey).toBe('');
   });
+
+  test('should allow disabling individual translation targets', async () => {
+    const updated = await SettingsManager.updateSettings({
+      primaryTargetLang: 'none',
+      secondaryTargetLang: 'none',
+      reverseTargetLang: 'none',
+    });
+
+    expect(updated.primaryTargetLang).toBe('none');
+    expect(updated.secondaryTargetLang).toBe('none');
+    expect(updated.reverseTargetLang).toBe('none');
+  });
 });

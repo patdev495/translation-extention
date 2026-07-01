@@ -151,7 +151,11 @@ export class TranslationTooltip {
   show(x: number, y: number, sourceText: string, data: any, ttsEnabled: boolean = true) {
     if (!this.tooltipEl || !this.shadow) return;
 
-    const { detectedLang, sourcePhonetics, translation1, translation2 } = data;
+    const { detectedLang, sourcePhonetics } = data;
+    const translations = Array.isArray(data.translations)
+      ? data.translations
+      : [data.translation1, data.translation2].filter(Boolean);
+    const [translation1, translation2] = translations;
     const cssUrl = chrome.runtime.getURL('popup.css');
 
     const getLangLabel = (l: string) => {
@@ -207,9 +211,12 @@ export class TranslationTooltip {
           ` : ''}
         </div>
 
+        ${translations.length > 0 ? `
         <div class="border-t border-slate-150 dark:border-slate-800/80"></div>
+        ` : ''}
 
         <!-- Translation 1 Block -->
+        ${translation1 ? `
         <div class="flex flex-col gap-1">
           <div class="flex items-center justify-between gap-2">
             <span class="text-3xs font-bold text-slate-400 dark:text-slate-500 tracking-wider uppercase">${getLangLabel(translation1.lang)}</span>
@@ -237,10 +244,14 @@ export class TranslationTooltip {
             <span class="text-xs font-mono text-teal-600 dark:text-teal-400 font-medium break-words leading-none">${translation1.phonetics}</span>
           ` : ''}
         </div>
+        ` : ''}
 
+        ${translation1 && translation2 ? `
         <div class="border-t border-slate-150 dark:border-slate-800/80"></div>
+        ` : ''}
 
         <!-- Translation 2 Block -->
+        ${translation2 ? `
         <div class="flex flex-col gap-1">
           <div class="flex items-center justify-between gap-2">
             <span class="text-3xs font-bold text-slate-400 dark:text-slate-500 tracking-wider uppercase">${getLangLabel(translation2.lang)}</span>
@@ -268,6 +279,7 @@ export class TranslationTooltip {
             <span class="text-xs font-mono text-teal-600 dark:text-teal-400 font-medium break-words leading-none">${translation2.phonetics}</span>
           ` : ''}
         </div>
+        ` : ''}
       </div>
     `;
 

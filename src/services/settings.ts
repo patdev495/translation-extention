@@ -1,7 +1,9 @@
+import type { TargetLanguage } from './translation-plan';
+
 export interface Settings {
-  primaryTargetLang: string;
-  secondaryTargetLang: string;
-  reverseTargetLang: string;
+  primaryTargetLang: TargetLanguage;
+  secondaryTargetLang: TargetLanguage;
+  reverseTargetLang: TargetLanguage;
   hotkey: 'none' | 'ctrl' | 'alt' | 'shift';
   ttsEnabled: boolean;
   provider: 'google' | 'deepl';

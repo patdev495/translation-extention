@@ -1,24 +1,10 @@
 import { TranslationEngine } from '../services/translation';
 import { SettingsManager } from '../services/settings';
 import { PhoneticEngine } from '../services/phonetics';
+import { PDF_VIEWER_PATH, shouldUseExtensionPdfViewer } from './pdf-redirect';
+import { getDetectionTarget, getTranslationTargets } from '../services/translation-plan';
 
 // ─── PDF Redirect Logic ────────────────────────────────────────────────────
-
-const PDF_VIEWER_PATH = 'pdf-viewer/viewer.html';
-
-/**
- * Returns true if the URL looks like a PDF by its path/query.
- */
-function isPdfUrl(url: string): boolean {
-  try {
-    const u = new URL(url);
-    // Ignore the viewer itself to avoid redirect loops
-    if (u.protocol === 'chrome-extension:') return false;
-    return /\.pdf(\?.*)?$/i.test(u.pathname);
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Builds the redirect URL pointing to our PDF viewer.
@@ -32,7 +18,7 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   if (details.frameId !== 0) return; // main frame only
 
   const { url, tabId } = details;
-  if (!isPdfUrl(url)) return;
+  if (!shouldUseExtensionPdfViewer(url)) return;
 
   // Check if extension is active
   const res = await chrome.storage.local.get('active');
@@ -89,50 +75,36 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       try {
         const settings = await SettingsManager.getSettings();
 
-        // 1. First translation to detect source language using configured provider
-        const firstRes = await TranslationEngine.translateWithSettings(
-          text,
-          settings.primaryTargetLang,
-          settings
+        // 1. Use the first enabled target to detect the source language. If all
+        // targets are none, skip translation and show only the source block.
+        const detectionTarget = getDetectionTarget(settings);
+        const firstRes = detectionTarget
+          ? await TranslationEngine.translateWithSettings(text, detectionTarget, settings)
+          : null;
+        const detectedLang = firstRes?.detectedLang ?? 'auto';
+
+        // 2. Determine visible target languages, omitting disabled slots.
+        const targetLangs = getTranslationTargets(settings, detectedLang);
+        const translations = await Promise.all(
+          targetLangs.map(async ({ lang }) => {
+            const result = firstRes && lang === detectionTarget
+              ? firstRes
+              : await TranslationEngine.translateWithSettings(text, lang, settings);
+
+            let phonetics = '';
+            if (lang === 'en') {
+              phonetics = PhoneticEngine.getEnglishIPA(result.translation);
+            } else if (lang === 'zh') {
+              phonetics = PhoneticEngine.getPinyin(result.translation);
+            }
+
+            return {
+              lang,
+              text: result.translation,
+              phonetics
+            };
+          })
         );
-        const detectedLang = firstRes.detectedLang;
-
-        // 2. Determine dual target languages using the reverse logic
-        let targetLang1 = settings.primaryTargetLang;
-        let targetLang2 = settings.secondaryTargetLang;
-
-        if (detectedLang === settings.primaryTargetLang) {
-          targetLang1 = settings.reverseTargetLang;
-          targetLang2 = settings.secondaryTargetLang;
-        } else if (detectedLang === settings.secondaryTargetLang) {
-          targetLang1 = settings.primaryTargetLang;
-          targetLang2 = settings.reverseTargetLang;
-        }
-
-        // 3. Perform dual translations (optimizing to reuse firstRes if possible)
-        let translation1 = '';
-        let translation2 = '';
-        const promises: Promise<any>[] = [];
-
-        if (targetLang1 === settings.primaryTargetLang) {
-          translation1 = firstRes.translation;
-        } else {
-          promises.push(
-            TranslationEngine.translateWithSettings(text, targetLang1, settings)
-              .then(r => { translation1 = r.translation; })
-          );
-        }
-
-        if (targetLang2 === settings.primaryTargetLang) {
-          translation2 = firstRes.translation;
-        } else {
-          promises.push(
-            TranslationEngine.translateWithSettings(text, targetLang2, settings)
-              .then(r => { translation2 = r.translation; })
-          );
-        }
-
-        await Promise.all(promises);
 
         // 4. Generate Phonetics (IPA/Pinyin)
         let sourcePhonetics = '';
@@ -145,35 +117,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sourcePhonetics = PhoneticEngine.getPinyin(text);
         }
 
-        let phonetics1 = '';
-        if (targetLang1 === 'en') {
-          phonetics1 = PhoneticEngine.getEnglishIPA(translation1);
-        } else if (targetLang1 === 'zh') {
-          phonetics1 = PhoneticEngine.getPinyin(translation1);
-        }
-
-        let phonetics2 = '';
-        if (targetLang2 === 'en') {
-          phonetics2 = PhoneticEngine.getEnglishIPA(translation2);
-        } else if (targetLang2 === 'zh') {
-          phonetics2 = PhoneticEngine.getPinyin(translation2);
-        }
-
         sendResponse({
           success: true,
           data: {
             detectedLang,
             sourcePhonetics,
-            translation1: {
-              lang: targetLang1,
-              text: translation1,
-              phonetics: phonetics1
-            },
-            translation2: {
-              lang: targetLang2,
-              text: translation2,
-              phonetics: phonetics2
-            }
+            translations
           }
         });
       } catch (error: any) {

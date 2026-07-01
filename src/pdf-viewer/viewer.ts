@@ -3,6 +3,7 @@ import {
   loadSettings,
   initTranslationListeners,
 } from '../content/translation-init';
+import { createPdfPasswordResolver } from './password';
 
 // pdfjs-dist is loaded at runtime via chrome.runtime.getURL() to avoid
 // bundling the entire library (~3MB) into the viewer chunk.
@@ -98,7 +99,7 @@ function promptPassword(wrongPassword: boolean): Promise<string | null> {
       const pw = $pwdInput.value;
       $pwdOverlay.setAttribute('hidden', '');
       cleanup();
-      resolve(pw || null);
+      resolve(pw);
     };
 
     const onCancel = () => {
@@ -132,17 +133,18 @@ async function loadPdf(url: string, password?: string): Promise<void> {
   try {
     const loadingTask = pdfjsLib.getDocument({
       url,
-      password,
+      password: password ?? '',
+    });
+    const resolvePdfPassword = createPdfPasswordResolver(promptPassword, {
+      allowPrompt: false,
+      maxEmptyPasswordAttempts: 3,
     });
 
     loadingTask.onPassword = async (updatePassword: (pw: string) => void, reason: number) => {
-      // reason 1 = first prompt, reason 2 = wrong password
-      const pw = await promptPassword(reason === 2);
-      if (pw === null) {
-        showError('PDF opening cancelled.');
+      const resolved = await resolvePdfPassword(updatePassword, reason);
+      if (!resolved) {
+        showError('Could not open this PDF without a password. Chrome may support this file, but PDF.js cannot decode it without password handling.');
         loadingTask.destroy();
-      } else {
-        updatePassword(pw);
       }
     };
 
@@ -380,7 +382,8 @@ initTranslationListeners(ctx, document);
 
   // Set initial zoom to fit width
   try {
-    const tempTask = pdfjsLib.getDocument({ url, stopAtErrors: true });
+    const tempTask = pdfjsLib.getDocument({ url, password: '', stopAtErrors: true });
+    tempTask.onPassword = (updatePassword: (pw: string) => void) => updatePassword('');
     const tempDoc = await tempTask.promise.catch(() => null);
     if (tempDoc) {
       const page = await tempDoc.getPage(1);

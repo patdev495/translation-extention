@@ -9,8 +9,20 @@ The mechanism used to translate text.
 _Avoid_: Google Translate Web interface, Official Translate API
 
 **Source Text**:
-The text selected by the user on a webpage to be translated.
-_Avoid_: Selected text, Input text
+The text selected by the user or extracted by OCR from a user-selected image region, then sent for translation.
+_Avoid_: Selected text, Input text, OCR output
+
+**Image Region**:
+A rectangular area selected by the user on a rendered page or image as the input for OCR before translation.
+_Avoid_: Screenshot area, Crop box
+
+**OCR Selection Mode**:
+A mode where the user selects an Image Region, the extension extracts Source Text from that region, and the existing Translation Tooltip displays the translation.
+_Avoid_: Screenshot translation mode, Area translate mode
+
+**OCR Progress Indicator**:
+The visible feedback shown after an Image Region is selected while OCR and translation are running.
+_Avoid_: Loading spinner, Processing badge
 
 **Trigger Mode**:
 The configuration determining how the translation popup is activated upon text selection.
@@ -23,6 +35,26 @@ A Trigger Mode where a small icon button appears near the selected text, which t
 
 **Hotkey**:
 A modifier key (e.g., Ctrl, Alt, Shift) that the user must hold while selecting text to trigger the translation.
+
+**OCR Shortcut**:
+The configurable keyboard shortcut that toggles OCR Selection Mode.
+_Default_: Ctrl+Space
+
+**PDF OCR Scope**:
+The initial OCR Selection Mode boundary where Image Region selection is supported inside the extension's PDF viewer before general webpage images.
+_Avoid_: Global OCR, Website OCR
+
+**OCR Model Tier**:
+The PP-OCRv6 model size used for local OCR in OCR Selection Mode.
+_Default_: PP-OCRv6 small
+
+**OCR Line Breaks**:
+The original line breaks preserved from OCR output when showing the Source Text and sending it to translation.
+_Avoid_: Flattened OCR text
+
+**OCR Model Cache**:
+The locally stored OCR model files downloaded on first use so later OCR Selection Mode runs can work without downloading the model again.
+_Avoid_: Bundled OCR model, Temporary model download
 
 **Primary Target Language**:
 The user's preferred language for receiving translations (typically Vietnamese).
