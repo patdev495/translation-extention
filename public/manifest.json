@@ -50,7 +50,8 @@
         "pdf-viewer/viewer.html",
         "pdf.min.mjs",
         "pdf.worker.min.mjs",
-        "onnxruntime-web/*"
+        "onnxruntime-web/*",
+        "models/*"
       ],
       "matches": [
         "<all_urls>",

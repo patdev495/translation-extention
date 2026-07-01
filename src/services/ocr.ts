@@ -98,11 +98,23 @@ async function createService(
 
   let modelPreset: ModelUrls;
   if (tier === 'tiny') {
-    modelPreset = ocrModule.V6_TINY_MODEL as ModelUrls;
+    modelPreset = {
+      detection: chrome.runtime.getURL('models/PP-OCRv6_tiny_det.ort'),
+      recognition: chrome.runtime.getURL('models/PP-OCRv6_tiny_rec.ort'),
+      charactersDictionary: chrome.runtime.getURL('models/ppocrv6_tiny_dict.txt'),
+    };
   } else if (tier === 'medium') {
-    modelPreset = ocrModule.V6_MEDIUM_MODEL as ModelUrls;
+    modelPreset = {
+      detection: chrome.runtime.getURL('models/PP-OCRv6_medium_det.ort'),
+      recognition: chrome.runtime.getURL('models/PP-OCRv6_medium_rec.ort'),
+      charactersDictionary: chrome.runtime.getURL('models/ppocrv6_dict.txt'),
+    };
   } else {
-    modelPreset = ocrModule.V6_SMALL_MODEL as ModelUrls;
+    modelPreset = {
+      detection: chrome.runtime.getURL('models/PP-OCRv6_small_det.ort'),
+      recognition: chrome.runtime.getURL('models/PP-OCRv6_small_rec.ort'),
+      charactersDictionary: chrome.runtime.getURL('models/ppocrv6_dict.txt'),
+    };
   }
 
   const model = await loadCachedModel(modelPreset, onProgress);
