@@ -138,7 +138,7 @@ async function runBuild() {
   const ortDstDir = resolve(distPath, 'onnxruntime-web');
   mkdirSync(ortDstDir, { recursive: true });
   for (const file of readdirSync(ortSrcDir)) {
-    if (file.endsWith('.wasm') || file.endsWith('.mjs')) {
+    if ((file.endsWith('.wasm') || file.endsWith('.mjs')) && !file.includes('jsep')) {
       copyFileSync(resolve(ortSrcDir, file), resolve(ortDstDir, file));
     }
   }
