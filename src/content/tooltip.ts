@@ -95,6 +95,20 @@ export class TranslationTooltip {
         return;
       }
 
+      // Handle Dictionary Button click
+      const dictBtn = target.closest('.dict-button');
+      if (dictBtn) {
+        const text = dictBtn.getAttribute('data-text');
+        const lang = dictBtn.getAttribute('data-lang');
+        if (text && lang) {
+          const url = this.getDictionaryUrl(text, lang);
+          if (url) {
+            window.open(url, '_blank');
+          }
+        }
+        return;
+      }
+
       // Handle TTS Button click
       const ttsBtn = target.closest('.tts-button');
       if (ttsBtn) {
@@ -148,6 +162,21 @@ export class TranslationTooltip {
       return norm.toUpperCase();
     };
 
+    const renderDictButton = (text: string, lang: string, sizeClass: string = "w-3.5 h-3.5", padClass: string = "p-0.5 rounded") => {
+      const url = this.getDictionaryUrl(text, lang);
+      if (!url) return '';
+      const isEn = lang.toLowerCase().split('-')[0] === 'en';
+      const title = isEn ? 'Open in Cambridge Dictionary' : 'Open in Hanzii Dictionary';
+      return `
+        <!-- Dict Button -->
+        <button class="dict-button ${padClass} hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-500 dark:text-slate-500 dark:hover:text-slate-400 transition-colors cursor-pointer shrink-0" data-text="${this.escapeHtml(text)}" data-lang="${lang}" title="${title}">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="${sizeClass}">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+          </svg>
+        </button>
+      `;
+    };
+
     let content = `
       <div class="flex flex-col gap-2.5 w-60 cursor-default">
         <!-- Source Block -->
@@ -161,6 +190,8 @@ export class TranslationTooltip {
                   <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 7.5V6.108c0-1.135.845-2.098 1.976-2.192.373-.03.748-.057 1.123-.08M15.75 18H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08M15.75 18.75v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5A3.375 3.375 0 006.375 7.5H5.25m11.9-3.664A2.251 2.251 0 0015 2.25h-1.5a2.251 2.251 0 00-2.15 1.586m5.8 0c.065.21.1.433.1.664v.75h-6V4.5c0-.231.035-.454.1-.664M6.75 7.5H4.875c-.621 0-1.125.504-1.125 1.125v12c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V16.5a9 9 0 00-9-9z" />
                 </svg>
               </button>
+              <!-- Dict Button -->
+              ${renderDictButton(sourceText, detectedLang, "w-3.5 h-3.5", "p-1 rounded-lg")}
               <!-- TTS Button -->
               <button class="tts-button p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors cursor-pointer shrink-0" data-text="${this.escapeHtml(sourceText)}" data-lang="${detectedLang}" title="Play pronunciation">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
@@ -187,6 +218,8 @@ export class TranslationTooltip {
                   <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 7.5V6.108c0-1.135.845-2.098 1.976-2.192.373-.03.748-.057 1.123-.08M15.75 18H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08M15.75 18.75v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5A3.375 3.375 0 006.375 7.5H5.25m11.9-3.664A2.251 2.251 0 0015 2.25h-1.5a2.251 2.251 0 00-2.15 1.586m5.8 0c.065.21.1.433.1.664v.75h-6V4.5c0-.231.035-.454.1-.664M6.75 7.5H4.875c-.621 0-1.125.504-1.125 1.125v12c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V16.5a9 9 0 00-9-9z" />
                 </svg>
               </button>
+              <!-- Dict Button -->
+              ${renderDictButton(translation1.text, translation1.lang, "w-3.5 h-3.5", "p-0.5 rounded")}
               <!-- TTS Button -->
               <button class="tts-button p-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-500 dark:text-slate-500 dark:hover:text-slate-400 transition-colors cursor-pointer shrink-0" data-text="${this.escapeHtml(translation1.text)}" data-lang="${translation1.lang}" title="Play pronunciation">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3.5 h-3.5">
@@ -214,6 +247,8 @@ export class TranslationTooltip {
                   <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 7.5V6.108c0-1.135.845-2.098 1.976-2.192.373-.03.748-.057 1.123-.08M15.75 18H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08M15.75 18.75v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5A3.375 3.375 0 006.375 7.5H5.25m11.9-3.664A2.251 2.251 0 0015 2.25h-1.5a2.251 2.251 0 00-2.15 1.586m5.8 0c.065.21.1.433.1.664v.75h-6V4.5c0-.231.035-.454.1-.664M6.75 7.5H4.875c-.621 0-1.125.504-1.125 1.125v12c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V16.5a9 9 0 00-9-9z" />
                 </svg>
               </button>
+              <!-- Dict Button -->
+              ${renderDictButton(translation2.text, translation2.lang, "w-3.5 h-3.5", "p-0.5 rounded")}
               <!-- TTS Button -->
               <button class="tts-button p-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-500 dark:text-slate-500 dark:hover:text-slate-400 transition-colors cursor-pointer shrink-0" data-text="${this.escapeHtml(translation2.text)}" data-lang="${translation2.lang}" title="Play pronunciation">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3.5 h-3.5">
@@ -265,6 +300,16 @@ export class TranslationTooltip {
     if (this.triggerEl) {
       this.triggerEl.classList.add('hidden');
     }
+  }
+
+  private getDictionaryUrl(text: string, lang: string): string | null {
+    const l = lang.toLowerCase().split('-')[0];
+    if (l === 'en') {
+      return `https://dictionary.cambridge.org/dictionary/english/${encodeURIComponent(text)}`;
+    } else if (l === 'zh') {
+      return `https://hanzii.net/search/word?query=${encodeURIComponent(text)}&hl=en`;
+    }
+    return null;
   }
 
   private speak(text: string, lang: string) {
