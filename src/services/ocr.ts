@@ -89,6 +89,7 @@ async function loadCachedModel(urls: ModelUrls, onProgress?: ProgressHandler): P
 
 async function createService(
   tier: 'tiny' | 'small' | 'medium',
+  language: 'ch' | 'latin' = 'ch',
   onProgress?: ProgressHandler
 ): Promise<InstanceType<PaddleOcrServiceCtor>> {
   ort.env.wasm.wasmPaths = chrome.runtime.getURL('onnxruntime-web/');
@@ -97,24 +98,32 @@ async function createService(
   const PaddleOcrService = ocrModule.PaddleOcrService as PaddleOcrServiceCtor;
 
   let modelPreset: ModelUrls;
-  if (tier === 'tiny') {
+  if (language === 'latin') {
     modelPreset = {
-      detection: chrome.runtime.getURL('models/PP-OCRv6_tiny_det.ort'),
-      recognition: chrome.runtime.getURL('models/PP-OCRv6_tiny_rec.ort'),
-      charactersDictionary: chrome.runtime.getURL('models/ppocrv6_tiny_dict.txt'),
-    };
-  } else if (tier === 'medium') {
-    modelPreset = {
-      detection: chrome.runtime.getURL('models/PP-OCRv6_medium_det.ort'),
-      recognition: chrome.runtime.getURL('models/PP-OCRv6_medium_rec.ort'),
-      charactersDictionary: chrome.runtime.getURL('models/ppocrv6_dict.txt'),
+      detection: chrome.runtime.getURL('models/PP-OCRv5_latin_det.onnx'),
+      recognition: chrome.runtime.getURL('models/PP-OCRv5_latin_rec.onnx'),
+      charactersDictionary: chrome.runtime.getURL('models/ppocrv5_latin_dict.txt'),
     };
   } else {
-    modelPreset = {
-      detection: chrome.runtime.getURL('models/PP-OCRv6_small_det.ort'),
-      recognition: chrome.runtime.getURL('models/PP-OCRv6_small_rec.ort'),
-      charactersDictionary: chrome.runtime.getURL('models/ppocrv6_dict.txt'),
-    };
+    if (tier === 'tiny') {
+      modelPreset = {
+        detection: chrome.runtime.getURL('models/PP-OCRv6_tiny_det.ort'),
+        recognition: chrome.runtime.getURL('models/PP-OCRv6_tiny_rec.ort'),
+        charactersDictionary: chrome.runtime.getURL('models/ppocrv6_tiny_dict.txt'),
+      };
+    } else if (tier === 'medium') {
+      modelPreset = {
+        detection: chrome.runtime.getURL('models/PP-OCRv6_medium_det.ort'),
+        recognition: chrome.runtime.getURL('models/PP-OCRv6_medium_rec.ort'),
+        charactersDictionary: chrome.runtime.getURL('models/ppocrv6_dict.txt'),
+      };
+    } else {
+      modelPreset = {
+        detection: chrome.runtime.getURL('models/PP-OCRv6_small_det.ort'),
+        recognition: chrome.runtime.getURL('models/PP-OCRv6_small_rec.ort'),
+        charactersDictionary: chrome.runtime.getURL('models/ppocrv6_dict.txt'),
+      };
+    }
   }
 
   const model = await loadCachedModel(modelPreset, onProgress);
@@ -131,15 +140,17 @@ async function createService(
 
 async function getService(
   tier: 'tiny' | 'small' | 'medium',
+  language: 'ch' | 'latin' = 'ch',
   onProgress?: ProgressHandler
 ): Promise<InstanceType<PaddleOcrServiceCtor>> {
-  let servicePromise = services.get(tier);
+  const key = `${tier}-${language}`;
+  let servicePromise = services.get(key);
   if (!servicePromise) {
-    servicePromise = createService(tier, onProgress).catch((err) => {
-      services.delete(tier);
+    servicePromise = createService(tier, language, onProgress).catch((err) => {
+      services.delete(key);
       throw err;
     });
-    services.set(tier, servicePromise);
+    services.set(key, servicePromise);
   }
   return servicePromise;
 }
@@ -147,9 +158,10 @@ async function getService(
 export async function recognizeImageRegion(
   canvas: HTMLCanvasElement,
   tier: 'tiny' | 'small' | 'medium' = 'small',
+  language: 'ch' | 'latin' = 'ch',
   onProgress?: ProgressHandler
 ): Promise<string> {
-  const service = await getService(tier, onProgress);
+  const service = await getService(tier, language, onProgress);
   onProgress?.({ stage: 'recognizing', message: 'Reading text from image...' });
   const result = await service.recognize(canvas, { flatten: false, strategy: 'per-line' });
   return result.text.trim();

@@ -45,6 +45,7 @@ describe('SettingsManager', () => {
       hotkey: 'none',
       ocrShortcut: 'ctrl-space',
       ocrModelTier: 'small',
+      ocrLanguage: 'ch',
       ttsEnabled: true,
       provider: 'google',
       deeplApiKey: '',

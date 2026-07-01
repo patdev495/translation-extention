@@ -21,7 +21,11 @@ const files = [
   { url: 'https://raw.githubusercontent.com/PT-Perkasa-Pilar-Utama/ppu-paddle-ocr-models/main/recognition/ppocrv6_dict.txt', name: 'ppocrv6_dict.txt' },
 
   { url: 'https://media.githubusercontent.com/media/PT-Perkasa-Pilar-Utama/ppu-paddle-ocr-models/main/detection/ort/PP-OCRv6_medium_det.ort', name: 'PP-OCRv6_medium_det.ort' },
-  { url: 'https://media.githubusercontent.com/media/PT-Perkasa-Pilar-Utama/ppu-paddle-ocr-models/main/recognition/ort/PP-OCRv6_medium_rec.ort', name: 'PP-OCRv6_medium_rec.ort' }
+  { url: 'https://media.githubusercontent.com/media/PT-Perkasa-Pilar-Utama/ppu-paddle-ocr-models/main/recognition/ort/PP-OCRv6_medium_rec.ort', name: 'PP-OCRv6_medium_rec.ort' },
+
+  { url: 'https://media.githubusercontent.com/media/PT-Perkasa-Pilar-Utama/ppu-paddle-ocr-models/main/detection/PP-OCRv5_mobile_det_infer.onnx', name: 'PP-OCRv5_latin_det.onnx' },
+  { url: 'https://media.githubusercontent.com/media/PT-Perkasa-Pilar-Utama/ppu-paddle-ocr-models/main/recognition/multi/latin/v5/latin_PP-OCRv5_mobile_rec_infer.onnx', name: 'PP-OCRv5_latin_rec.onnx' },
+  { url: 'https://raw.githubusercontent.com/PT-Perkasa-Pilar-Utama/ppu-paddle-ocr-models/main/recognition/multi/latin/v5/ppocrv5_latin_dict.txt', name: 'ppocrv5_latin_dict.txt' }
 ];
 
 function download(url, dest) {

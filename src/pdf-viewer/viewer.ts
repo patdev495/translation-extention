@@ -385,7 +385,8 @@ async function translateOcrRegion(wrapper: HTMLElement, pageCanvas: HTMLCanvasEl
   try {
     const cropCanvas = cropPageCanvas(pageCanvas, wrapper, rect);
     const tier = translationCtx.settings?.ocrModelTier ?? 'small';
-    const text = await recognizeImageRegion(cropCanvas, tier, (state) => {
+    const lang = translationCtx.settings?.ocrLanguage ?? 'ch';
+    const text = await recognizeImageRegion(cropCanvas, tier, lang, (state) => {
       const textEl = progress.querySelector('span:last-child');
       if (textEl) textEl.textContent = state.message;
     });

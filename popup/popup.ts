@@ -8,6 +8,7 @@ const reverseLang = document.getElementById('reverse-lang') as HTMLSelectElement
 const hotkey = document.getElementById('hotkey') as HTMLSelectElement;
 const ocrShortcut = document.getElementById('ocr-shortcut') as HTMLSelectElement;
 const ocrModelTier = document.getElementById('ocr-model-tier') as HTMLSelectElement;
+const ocrLanguage = document.getElementById('ocr-language') as HTMLSelectElement;
 const ttsToggle = document.getElementById('tts-toggle') as HTMLInputElement;
 const providerSelect = document.getElementById('provider') as HTMLSelectElement;
 const deeplKeyContainer = document.getElementById('deepl-key-container') as HTMLDivElement;
@@ -114,6 +115,7 @@ async function loadSettings() {
     hotkey.value = settings.hotkey;
     ocrShortcut.value = settings.ocrShortcut;
     ocrModelTier.value = settings.ocrModelTier;
+    ocrLanguage.value = settings.ocrLanguage;
     ttsToggle.checked = settings.ttsEnabled;
     providerSelect.value = settings.provider;
     deeplApiKeyInput.value = settings.deeplApiKey;
@@ -136,6 +138,7 @@ async function saveSettings() {
       hotkey: hotkey.value as 'none' | 'ctrl' | 'alt' | 'shift',
       ocrShortcut: ocrShortcut.value as 'disabled' | 'ctrl-space' | 'alt-o' | 'ctrl-shift-o',
       ocrModelTier: ocrModelTier.value as 'tiny' | 'small' | 'medium',
+      ocrLanguage: ocrLanguage.value as 'ch' | 'latin',
       ttsEnabled: ttsToggle.checked,
       provider: providerSelect.value as 'google' | 'deepl',
       deeplApiKey: deeplApiKeyInput.value,
@@ -166,6 +169,7 @@ reverseLang.addEventListener('change', saveSettings);
 hotkey.addEventListener('change', saveSettings);
 ocrShortcut.addEventListener('change', saveSettings);
 ocrModelTier.addEventListener('change', saveSettings);
+ocrLanguage.addEventListener('change', saveSettings);
 ttsToggle.addEventListener('change', saveSettings);
 
 providerSelect.addEventListener('change', () => {

@@ -2,11 +2,11 @@ import { recognizeImageRegion } from '../services/ocr';
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'RUN_OCR') {
-    const { dataUrl, rect, tier } = message;
+    const { dataUrl, rect, tier, language } = message;
 
     (async () => {
       try {
-        const text = await processOcr(dataUrl, rect, tier);
+        const text = await processOcr(dataUrl, rect, tier, language);
         sendResponse({ success: true, text });
       } catch (err: any) {
         console.error('OCR Error in offscreen document:', err);
@@ -21,7 +21,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 async function processOcr(
   dataUrl: string,
   rect: { x: number; y: number; width: number; height: number; devicePixelRatio?: number },
-  tier: 'tiny' | 'small' | 'medium' = 'small'
+  tier: 'tiny' | 'small' | 'medium' = 'small',
+  language: 'ch' | 'latin' = 'ch'
 ): Promise<string> {
   const dpr = rect.devicePixelRatio || 1;
   const sx = rect.x * dpr;
@@ -55,7 +56,7 @@ async function processOcr(
         );
 
         // Run local OCR
-        const text = await recognizeImageRegion(canvas, tier, (progress) => {
+        const text = await recognizeImageRegion(canvas, tier, language, (progress) => {
           // Send progress back to background (which will relay it to content script)
           chrome.runtime.sendMessage({
             type: 'OCR_PROGRESS',

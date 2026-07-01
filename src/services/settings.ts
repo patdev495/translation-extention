@@ -7,6 +7,7 @@ export interface Settings {
   hotkey: 'none' | 'ctrl' | 'alt' | 'shift';
   ocrShortcut: 'disabled' | 'ctrl-space' | 'alt-o' | 'ctrl-shift-o';
   ocrModelTier: 'tiny' | 'small' | 'medium';
+  ocrLanguage: 'ch' | 'latin';
   ttsEnabled: boolean;
   provider: 'google' | 'deepl';
   deeplApiKey: string;
@@ -20,6 +21,7 @@ export class SettingsManager {
     hotkey: 'none',
     ocrShortcut: 'ctrl-space',
     ocrModelTier: 'small',
+    ocrLanguage: 'ch',
     ttsEnabled: true,
     provider: 'google',
     deeplApiKey: '',

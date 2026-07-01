@@ -192,7 +192,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           type: 'RUN_OCR',
           dataUrl,
           rect,
-          tier: settings.ocrModelTier ?? 'small'
+          tier: settings.ocrModelTier ?? 'small',
+          language: settings.ocrLanguage ?? 'ch'
         });
 
         if (!ocrResponse || !ocrResponse.success) {
