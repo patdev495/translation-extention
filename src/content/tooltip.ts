@@ -148,10 +148,14 @@ export class TranslationTooltip {
     });
   }
 
-  show(x: number, y: number, sourceText: string, data: any) {
+  show(x: number, y: number, sourceText: string, data: any, ttsEnabled: boolean = true) {
     if (!this.tooltipEl || !this.shadow) return;
 
-    const { detectedLang, sourcePhonetics, translation1, translation2 } = data;
+    const { detectedLang, sourcePhonetics } = data;
+    const translations = Array.isArray(data.translations)
+      ? data.translations
+      : [data.translation1, data.translation2].filter(Boolean);
+    const [translation1, translation2] = translations;
     const cssUrl = chrome.runtime.getURL('popup.css');
 
     const getLangLabel = (l: string) => {
@@ -193,11 +197,13 @@ export class TranslationTooltip {
               <!-- Dict Button -->
               ${renderDictButton(sourceText, detectedLang, "w-3.5 h-3.5", "p-1 rounded-lg")}
               <!-- TTS Button -->
+              ${ttsEnabled ? `
               <button class="tts-button p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors cursor-pointer shrink-0" data-text="${this.escapeHtml(sourceText)}" data-lang="${detectedLang}" title="Play pronunciation">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" />
                 </svg>
               </button>
+              ` : ''}
             </div>
           </div>
           ${sourcePhonetics ? `
@@ -205,9 +211,12 @@ export class TranslationTooltip {
           ` : ''}
         </div>
 
+        ${translations.length > 0 ? `
         <div class="border-t border-slate-150 dark:border-slate-800/80"></div>
+        ` : ''}
 
         <!-- Translation 1 Block -->
+        ${translation1 ? `
         <div class="flex flex-col gap-1">
           <div class="flex items-center justify-between gap-2">
             <span class="text-3xs font-bold text-slate-400 dark:text-slate-500 tracking-wider uppercase">${getLangLabel(translation1.lang)}</span>
@@ -221,11 +230,13 @@ export class TranslationTooltip {
               <!-- Dict Button -->
               ${renderDictButton(translation1.text, translation1.lang, "w-3.5 h-3.5", "p-0.5 rounded")}
               <!-- TTS Button -->
+              ${ttsEnabled ? `
               <button class="tts-button p-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-500 dark:text-slate-500 dark:hover:text-slate-400 transition-colors cursor-pointer shrink-0" data-text="${this.escapeHtml(translation1.text)}" data-lang="${translation1.lang}" title="Play pronunciation">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3.5 h-3.5">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" />
                 </svg>
               </button>
+              ` : ''}
             </div>
           </div>
           <span class="text-slate-800 dark:text-slate-200 font-medium leading-normal break-words">${this.escapeHtml(translation1.text)}</span>
@@ -233,10 +244,14 @@ export class TranslationTooltip {
             <span class="text-xs font-mono text-teal-600 dark:text-teal-400 font-medium break-words leading-none">${translation1.phonetics}</span>
           ` : ''}
         </div>
+        ` : ''}
 
+        ${translation1 && translation2 ? `
         <div class="border-t border-slate-150 dark:border-slate-800/80"></div>
+        ` : ''}
 
         <!-- Translation 2 Block -->
+        ${translation2 ? `
         <div class="flex flex-col gap-1">
           <div class="flex items-center justify-between gap-2">
             <span class="text-3xs font-bold text-slate-400 dark:text-slate-500 tracking-wider uppercase">${getLangLabel(translation2.lang)}</span>
@@ -250,11 +265,13 @@ export class TranslationTooltip {
               <!-- Dict Button -->
               ${renderDictButton(translation2.text, translation2.lang, "w-3.5 h-3.5", "p-0.5 rounded")}
               <!-- TTS Button -->
+              ${ttsEnabled ? `
               <button class="tts-button p-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-500 dark:text-slate-500 dark:hover:text-slate-400 transition-colors cursor-pointer shrink-0" data-text="${this.escapeHtml(translation2.text)}" data-lang="${translation2.lang}" title="Play pronunciation">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3.5 h-3.5">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" />
                 </svg>
               </button>
+              ` : ''}
             </div>
           </div>
           <span class="text-slate-800 dark:text-slate-200 font-medium leading-normal break-words">${this.escapeHtml(translation2.text)}</span>
@@ -262,6 +279,7 @@ export class TranslationTooltip {
             <span class="text-xs font-mono text-teal-600 dark:text-teal-400 font-medium break-words leading-none">${translation2.phonetics}</span>
           ` : ''}
         </div>
+        ` : ''}
       </div>
     `;
 

@@ -1,8 +1,13 @@
+import type { TargetLanguage } from './translation-plan';
+
 export interface Settings {
-  primaryTargetLang: string;
-  secondaryTargetLang: string;
-  reverseTargetLang: string;
+  primaryTargetLang: TargetLanguage;
+  secondaryTargetLang: TargetLanguage;
+  reverseTargetLang: TargetLanguage;
   hotkey: 'none' | 'ctrl' | 'alt' | 'shift';
+  ocrShortcut: 'disabled' | 'ctrl-space' | 'alt-o' | 'ctrl-shift-o';
+  ocrModelTier: 'tiny' | 'small' | 'medium';
+  ocrLanguage: 'ch' | 'latin';
   ttsEnabled: boolean;
   provider: 'google' | 'deepl';
   deeplApiKey: string;
@@ -14,6 +19,9 @@ export class SettingsManager {
     secondaryTargetLang: 'en',
     reverseTargetLang: 'zh',
     hotkey: 'none',
+    ocrShortcut: 'ctrl-space',
+    ocrModelTier: 'small',
+    ocrLanguage: 'ch',
     ttsEnabled: true,
     provider: 'google',
     deeplApiKey: '',
