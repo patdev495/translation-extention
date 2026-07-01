@@ -341,6 +341,9 @@ export class TranslationTooltip {
     
     if (matchingVoice) {
       utterance.voice = matchingVoice;
+      console.log(`PolyTranslate TTS: Speaking using voice: "${matchingVoice.name}" (${matchingVoice.lang})`);
+    } else {
+      console.warn(`PolyTranslate TTS: No matching voice found for locale "${locale}". Falling back to default system voice.`);
     }
 
     window.speechSynthesis.speak(utterance);
