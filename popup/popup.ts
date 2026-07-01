@@ -10,9 +10,11 @@ const providerSelect = document.getElementById('provider') as HTMLSelectElement;
 const deeplKeyContainer = document.getElementById('deepl-key-container') as HTMLDivElement;
 const deeplApiKeyInput = document.getElementById('deepl-api-key') as HTMLInputElement;
 const toggleDeeplKeyBtn = document.getElementById('toggle-deepl-key') as HTMLButtonElement;
+const deeplKeyStatus = document.getElementById('deepl-key-status') as HTMLParagraphElement;
 const statusMsg = document.getElementById('status-msg') as HTMLDivElement;
 
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+let validationTimeout: ReturnType<typeof setTimeout> | null = null;
 
 function showStatus() {
   if (statusMsg) {
@@ -34,6 +36,68 @@ function updateDeepLContainer() {
   }
 }
 
+async function validateDeepLKey(key: string): Promise<boolean> {
+  if (!key) return false;
+  const isFree = key.endsWith(':fx');
+  const url = isFree 
+    ? 'https://api-free.deepl.com/v2/usage' 
+    : 'https://api.deepl.com/v2/usage';
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'Authorization': `DeepL-Auth-Key ${key}`
+      }
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+function showKeyMessage(msg: string, type: 'info' | 'success' | 'error') {
+  if (!deeplKeyStatus) return;
+  deeplKeyStatus.textContent = msg;
+  deeplKeyStatus.classList.remove('hidden', 'text-rose-500', 'text-emerald-400', 'text-slate-400');
+  
+  if (type === 'error') {
+    deeplKeyStatus.classList.add('text-rose-500');
+  } else if (type === 'success') {
+    deeplKeyStatus.classList.add('text-emerald-400');
+  } else {
+    deeplKeyStatus.classList.add('text-slate-400');
+  }
+}
+
+function hideKeyMessages() {
+  if (deeplKeyStatus) {
+    deeplKeyStatus.classList.add('hidden');
+  }
+}
+
+function triggerKeyValidation() {
+  if (validationTimeout) clearTimeout(validationTimeout);
+  
+  hideKeyMessages();
+  
+  if (providerSelect.value !== 'deepl') return;
+  
+  const key = deeplApiKeyInput.value.trim();
+  if (!key) {
+    showKeyMessage('Please enter your DeepL API Key.', 'info');
+    return;
+  }
+  
+  validationTimeout = setTimeout(async () => {
+    showKeyMessage('Validating API Key...', 'info');
+    const isValid = await validateDeepLKey(key);
+    if (isValid) {
+      showKeyMessage('✓ API Key is valid', 'success');
+    } else {
+      showKeyMessage('✗ API Key is invalid or expired', 'error');
+    }
+  }, 600);
+}
+
 async function loadSettings() {
   try {
     const settings = await SettingsManager.getSettings();
@@ -50,6 +114,7 @@ async function loadSettings() {
     deeplApiKeyInput.value = settings.deeplApiKey;
 
     updateDeepLContainer();
+    triggerKeyValidation();
   } catch (err) {
     console.error('Failed to load settings in popup:', err);
   }
@@ -96,9 +161,14 @@ ttsToggle.addEventListener('change', saveSettings);
 
 providerSelect.addEventListener('change', () => {
   updateDeepLContainer();
+  triggerKeyValidation();
   saveSettings();
 });
-deeplApiKeyInput.addEventListener('input', saveSettings);
+
+deeplApiKeyInput.addEventListener('input', () => {
+  triggerKeyValidation();
+  saveSettings();
+});
 
 // Password visibility toggle
 toggleDeeplKeyBtn.addEventListener('click', () => {
