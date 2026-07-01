@@ -305,7 +305,8 @@ export class TranslationTooltip {
   private getDictionaryUrl(text: string, lang: string): string | null {
     const l = lang.toLowerCase().split('-')[0];
     if (l === 'en') {
-      return `https://dictionary.cambridge.org/dictionary/english/${encodeURIComponent(text)}`;
+      const query = encodeURIComponent(text).replace(/%20/g, '+');
+      return `https://dictionary.cambridge.org/spellcheck/english/?q=${query}`;
     } else if (l === 'zh') {
       return `https://hanzii.net/search/word/${encodeURIComponent(text)}?hl=en`;
     }
