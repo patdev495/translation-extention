@@ -157,7 +157,7 @@ function performTranslation(text: string, x: number, y: number) {
     { type: 'TRANSLATE', text },
     (response) => {
       if (response && response.success) {
-        tooltip.show(x, y - 8, text, response.data);
+        tooltip.show(x, y - 8, text, response.data, settings?.ttsEnabled ?? true);
       } else {
         console.error('Translation error:', response?.error);
       }
