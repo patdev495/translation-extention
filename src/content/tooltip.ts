@@ -307,7 +307,7 @@ export class TranslationTooltip {
     if (l === 'en') {
       return `https://dictionary.cambridge.org/dictionary/english/${encodeURIComponent(text)}`;
     } else if (l === 'zh') {
-      return `https://hanzii.net/search/word?query=${encodeURIComponent(text)}&hl=en`;
+      return `https://hanzii.net/search/word/${encodeURIComponent(text)}?hl=en`;
     }
     return null;
   }
