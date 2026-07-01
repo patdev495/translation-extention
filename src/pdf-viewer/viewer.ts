@@ -3,6 +3,7 @@ import {
   loadSettings,
   initTranslationListeners,
   performTranslation,
+  matchesOcrShortcut,
 } from '../content/translation-init';
 import { recognizeImageRegion } from '../services/ocr';
 import { createPdfPasswordResolver } from './password';
@@ -324,23 +325,6 @@ function setOcrSelectionMode(enabled: boolean) {
     : 'Select image region for OCR translation (Ctrl+Space)';
 }
 
-function matchesOcrShortcut(event: KeyboardEvent): boolean {
-  const shortcut = translationCtx.settings?.ocrShortcut ?? 'ctrl-space';
-  if (shortcut === 'disabled') return false;
-
-  const key = event.key.toLowerCase();
-  if (shortcut === 'ctrl-space') {
-    return event.ctrlKey && !event.altKey && !event.shiftKey && event.code === 'Space';
-  }
-  if (shortcut === 'alt-o') {
-    return event.altKey && !event.ctrlKey && !event.shiftKey && key === 'o';
-  }
-  if (shortcut === 'ctrl-shift-o') {
-    return event.ctrlKey && event.shiftKey && !event.altKey && key === 'o';
-  }
-  return false;
-}
-
 function getPointInPage(wrapper: HTMLElement, event: MouseEvent) {
   const rect = wrapper.getBoundingClientRect();
   return {
@@ -400,7 +384,8 @@ async function translateOcrRegion(wrapper: HTMLElement, pageCanvas: HTMLCanvasEl
   const progress = showOcrProgress(wrapper, rect, 'Preparing OCR...');
   try {
     const cropCanvas = cropPageCanvas(pageCanvas, wrapper, rect);
-    const text = await recognizeImageRegion(cropCanvas, (state) => {
+    const tier = translationCtx.settings?.ocrModelTier ?? 'small';
+    const text = await recognizeImageRegion(cropCanvas, tier, (state) => {
       const textEl = progress.querySelector('span:last-child');
       if (textEl) textEl.textContent = state.message;
     });
@@ -530,7 +515,7 @@ $btnOcrRegion.addEventListener('click', () => {
 });
 
 document.addEventListener('keydown', (event) => {
-  if (matchesOcrShortcut(event)) {
+  if (matchesOcrShortcut(translationCtx, event)) {
     event.preventDefault();
     if (!ocrBusy) setOcrSelectionMode(!ocrSelectionMode);
     return;

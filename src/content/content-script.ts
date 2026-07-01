@@ -2,7 +2,9 @@ import {
   createTranslationContext,
   loadSettings,
   initTranslationListeners,
+  matchesOcrShortcut,
 } from './translation-init';
+import { toggleWebpageOcr } from './ocr-selection';
 
 const ctx = createTranslationContext();
 
@@ -20,4 +22,21 @@ chrome.runtime.onMessage.addListener((message) => {
 
 // Attach all translation event listeners to the document
 initTranslationListeners(ctx, document);
+
+// Attach OCR Shortcut listener to toggle webpage OCR Selection Mode
+document.addEventListener('keydown', (event) => {
+  if (!ctx.active || !ctx.settings) return;
+
+  if (matchesOcrShortcut(ctx, event)) {
+    // If the active element is an input, textarea, or contenteditable, don't trigger the shortcut
+    const activeEl = document.activeElement;
+    if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || (activeEl as HTMLElement).isContentEditable)) {
+      return;
+    }
+
+    event.preventDefault();
+    toggleWebpageOcr(ctx);
+  }
+});
+
 

@@ -45,7 +45,7 @@ The initial OCR Selection Mode boundary where Image Region selection is supporte
 _Avoid_: Global OCR, Website OCR
 
 **OCR Model Tier**:
-The PP-OCRv6 model size used for local OCR in OCR Selection Mode.
+The PP-OCRv6 model size configuration ('tiny' | 'small' | 'medium') used for local OCR in OCR Selection Mode.
 _Default_: PP-OCRv6 small
 
 **OCR Line Breaks**:

@@ -75,14 +75,15 @@ async function runBuild() {
   const swSize = (await import('fs')).statSync(resolve(distPath, 'service-worker.js')).size;
   console.log(`dist/service-worker.js  ${(swSize / 1024).toFixed(2)} kB`);
 
-  // 4. Build PDF Viewer
-  console.log('\n--- Building PDF Viewer ---');
+  // 4. Build PDF Viewer & Offscreen Document
+  console.log('\n--- Building PDF Viewer & Offscreen Document ---');
   await build({
     plugins: [tailwindcss()],
     build: {
       rollupOptions: {
         input: {
           viewer: resolve(__dirname, '../src/pdf-viewer/viewer.html'),
+          offscreen: resolve(__dirname, '../src/offscreen/offscreen.html'),
         },
         output: {
           entryFileNames: 'pdf-viewer/[name].js',
@@ -106,8 +107,21 @@ async function runBuild() {
   if (existsSync(viewerHtmlSrc)) {
     mkdirSync(resolve(distPath, 'pdf-viewer'), { recursive: true });
     renameSync(viewerHtmlSrc, viewerHtmlDst);
-    rmSync(resolve(distPath, 'src'), { recursive: true, force: true });
     console.log('Moved viewer.html → dist/pdf-viewer/viewer.html');
+  }
+
+  // Move offscreen.html from dist/src/offscreen/ → dist/offscreen.html
+  const offscreenHtmlSrc = resolve(distPath, 'src/offscreen/offscreen.html');
+  const offscreenHtmlDst = resolve(distPath, 'offscreen.html');
+  if (existsSync(offscreenHtmlSrc)) {
+    renameSync(offscreenHtmlSrc, offscreenHtmlDst);
+    console.log('Moved offscreen.html → dist/offscreen.html');
+  }
+
+  // Clean up dist/src/
+  if (existsSync(resolve(distPath, 'src'))) {
+    rmSync(resolve(distPath, 'src'), { recursive: true, force: true });
+    console.log('Cleaned up dist/src/');
   }
 
   // 5. Copy PDF.js files to dist/

@@ -8,6 +8,7 @@ const baseSettings: Settings = {
   reverseTargetLang: 'zh',
   hotkey: 'none',
   ocrShortcut: 'ctrl-space',
+  ocrModelTier: 'small',
   ttsEnabled: true,
   provider: 'google',
   deeplApiKey: '',

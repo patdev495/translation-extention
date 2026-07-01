@@ -14,8 +14,8 @@
     }
   </style>
 </head>
-<body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 text-slate-100 w-80 p-5 select-none antialiased min-h-[420px]">
-  <div class="flex flex-col gap-5">
+<body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 text-slate-100 w-[580px] p-5 select-none antialiased min-h-[300px]">
+  <div class="flex flex-col gap-4">
     <!-- Header -->
     <div class="flex items-center justify-between border-b border-slate-800 pb-3">
       <div class="flex items-center gap-2">
@@ -37,119 +37,140 @@
       </label>
     </div>
 
-    <!-- Settings Form -->
-    <div class="flex flex-col gap-4">
-      <!-- Languages Configuration -->
-      <div class="bg-slate-900/40 border border-slate-800/60 rounded-xl p-3 flex flex-col gap-3">
-        <h2 class="text-2xs font-bold text-slate-400 tracking-wider uppercase">Languages</h2>
-        
-        <div class="grid grid-cols-3 gap-2">
-          <div class="flex flex-col gap-1">
-            <label for="primary-lang" class="text-3xs font-medium text-slate-400">Primary</label>
-            <select id="primary-lang" class="bg-slate-800 border border-slate-700 rounded-lg py-1 px-1.5 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer">
-              <option value="vi" selected>VIE (Việt)</option>
-              <option value="none">None</option>
-              <option value="en">ENG (Anh)</option>
-              <option value="zh">CHI (Trung)</option>
-            </select>
-          </div>
+    <!-- Settings Form: 2 Columns -->
+    <div class="grid grid-cols-2 gap-4 items-start">
+      <!-- Left Column -->
+      <div class="flex flex-col gap-4">
+        <!-- Languages Configuration -->
+        <div class="bg-slate-900/40 border border-slate-800/60 rounded-xl p-3 flex flex-col gap-3">
+          <h2 class="text-2xs font-bold text-slate-400 tracking-wider uppercase">Languages</h2>
           
-          <div class="flex flex-col gap-1">
-            <label for="secondary-lang" class="text-3xs font-medium text-slate-400">Secondary</label>
-            <select id="secondary-lang" class="bg-slate-800 border border-slate-700 rounded-lg py-1 px-1.5 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer">
-              <option value="vi">VIE (Việt)</option>
-              <option value="none">None</option>
-              <option value="en" selected>ENG (Anh)</option>
-              <option value="zh">CHI (Trung)</option>
+          <div class="flex flex-col gap-2.5">
+            <!-- Primary -->
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-semibold">Primary Target</span>
+              <select id="primary-lang" class="bg-slate-800 border border-slate-700 rounded-lg py-0.5 px-1.5 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer w-24">
+                <option value="vi" selected>Vietnamese</option>
+                <option value="none">Disabled</option>
+                <option value="en">English</option>
+                <option value="zh">Chinese</option>
+              </select>
+            </div>
+            
+            <!-- Secondary -->
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-semibold">Secondary Target</span>
+              <select id="secondary-lang" class="bg-slate-800 border border-slate-700 rounded-lg py-0.5 px-1.5 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer w-24">
+                <option value="vi">Vietnamese</option>
+                <option value="none">Disabled</option>
+                <option value="en" selected>English</option>
+                <option value="zh">Chinese</option>
+              </select>
+            </div>
+
+            <!-- Reverse -->
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-semibold">Reverse Target</span>
+              <select id="reverse-lang" class="bg-slate-800 border border-slate-700 rounded-lg py-0.5 px-1.5 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer w-24">
+                <option value="vi">Vietnamese</option>
+                <option value="none">Disabled</option>
+                <option value="en">English</option>
+                <option value="zh" selected>Chinese</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Translation Provider Configuration -->
+        <div class="bg-slate-900/40 border border-slate-800/60 rounded-xl p-3 flex flex-col gap-3">
+          <h2 class="text-2xs font-bold text-slate-400 tracking-wider uppercase">Translation Provider</h2>
+          
+          <!-- Provider Select -->
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex flex-col">
+              <span class="text-xs font-semibold">Engine</span>
+              <span class="text-3xs text-slate-400">Select engine</span>
+            </div>
+            <select id="provider" class="bg-slate-800 border border-slate-700 rounded-lg py-1 px-2 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer w-28">
+              <option value="google" selected>Google</option>
+              <option value="deepl">DeepL API</option>
             </select>
           </div>
 
-          <div class="flex flex-col gap-1">
-            <label for="reverse-lang" class="text-3xs font-medium text-slate-400">Reverse</label>
-            <select id="reverse-lang" class="bg-slate-800 border border-slate-700 rounded-lg py-1 px-1.5 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer">
-              <option value="vi">VIE (Việt)</option>
+          <!-- DeepL API Key Input (Hidden by default) -->
+          <div id="deepl-key-container" class="hidden flex flex-col gap-1 border-t border-slate-800/40 pt-2.5">
+            <label for="deepl-api-key" class="text-3xs font-medium text-slate-400">DeepL API Key</label>
+            <div class="relative flex items-center">
+              <input type="password" id="deepl-api-key" placeholder="Enter API Key..." class="bg-slate-800 border border-slate-700 rounded-lg py-1 pl-2 pr-8 text-xs text-white focus:outline-none focus:border-blue-500 w-full">
+              <button id="toggle-deepl-key" class="absolute right-2 text-slate-400 hover:text-slate-200 cursor-pointer transition-colors focus:outline-none" title="Toggle visibility" type="button">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5" id="eye-icon">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.43 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                </svg>
+              </button>
+            </div>
+            <p id="deepl-key-status" class="text-[10px] mt-1 hidden font-medium transition-opacity duration-200"></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column -->
+      <div class="flex flex-col gap-4">
+        <!-- Behavior & Triggers Box -->
+        <div class="bg-slate-900/40 border border-slate-800/60 rounded-xl p-3 flex flex-col gap-3">
+          <h2 class="text-2xs font-bold text-slate-400 tracking-wider uppercase">Behavior & Triggers</h2>
+          
+          <!-- Hotkey Modifier -->
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex flex-col">
+              <span class="text-xs font-semibold">Hotkey Modifier</span>
+              <span class="text-3xs text-slate-400">Hold key on select</span>
+            </div>
+            <select id="hotkey" class="bg-slate-800 border border-slate-700 rounded-lg py-1 px-2 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer w-24">
               <option value="none">None</option>
-              <option value="en">ENG (Anh)</option>
-              <option value="zh" selected>CHI (Trung)</option>
+              <option value="ctrl">Ctrl</option>
+              <option value="alt">Alt</option>
+              <option value="shift">Shift</option>
+            </select>
+          </div>
+
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex flex-col">
+              <span class="text-xs font-semibold">OCR Shortcut</span>
+              <span class="text-3xs text-slate-400">Toggle webpage OCR</span>
+            </div>
+            <select id="ocr-shortcut" class="bg-slate-800 border border-slate-700 rounded-lg py-1 px-2 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer w-28">
+              <option value="ctrl-space">Ctrl+Space</option>
+              <option value="alt-o">Alt+O</option>
+              <option value="ctrl-shift-o">Ctrl+Shift+O</option>
+              <option value="disabled">Disabled</option>
+            </select>
+          </div>
+
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex flex-col">
+              <span class="text-xs font-semibold">OCR Model Size</span>
+              <span class="text-3xs text-slate-400">PP-OCRv6 model size</span>
+            </div>
+            <select id="ocr-model-tier" class="bg-slate-800 border border-slate-700 rounded-lg py-1 px-2 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer w-28">
+              <option value="tiny">Tiny (Fast/Light)</option>
+              <option value="small">Small (Balanced)</option>
+              <option value="medium">Medium (Accurate)</option>
             </select>
           </div>
         </div>
-      </div>
 
-      <!-- Trigger Configuration -->
-      <div class="bg-slate-900/40 border border-slate-800/60 rounded-xl p-3 flex flex-col gap-3">
-        <h2 class="text-2xs font-bold text-slate-400 tracking-wider uppercase">Behavior & Triggers</h2>
-        
-        <!-- Hotkey Modifier -->
-        <div class="flex items-center justify-between gap-4">
+        <!-- TTS Configuration -->
+        <div class="bg-slate-900/40 border border-slate-800/60 rounded-xl p-3 flex items-center justify-between">
           <div class="flex flex-col">
-            <span class="text-xs font-semibold">Hotkey Constraint</span>
-            <span class="text-3xs text-slate-400">Hold key while selecting text</span>
+            <span class="text-xs font-semibold">TTS Pronounce</span>
+            <span class="text-3xs text-slate-400">Show speaker button</span>
           </div>
-          <select id="hotkey" class="bg-slate-800 border border-slate-700 rounded-lg py-1 px-2 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer w-24">
-            <option value="none">None</option>
-            <option value="ctrl">Ctrl</option>
-            <option value="alt">Alt</option>
-            <option value="shift">Shift</option>
-          </select>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="tts-toggle" class="sr-only peer" checked>
+            <div class="w-8 h-4.5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[14px] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-blue-500"></div>
+          </label>
         </div>
-
-        <div class="flex items-center justify-between gap-4">
-          <div class="flex flex-col">
-            <span class="text-xs font-semibold">OCR Shortcut</span>
-            <span class="text-3xs text-slate-400">Toggle PDF region OCR</span>
-          </div>
-          <select id="ocr-shortcut" class="bg-slate-800 border border-slate-700 rounded-lg py-1 px-2 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer w-28">
-            <option value="ctrl-space">Ctrl+Space</option>
-            <option value="alt-o">Alt+O</option>
-            <option value="ctrl-shift-o">Ctrl+Shift+O</option>
-            <option value="disabled">Disabled</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Translation Provider Configuration -->
-      <div class="bg-slate-900/40 border border-slate-800/60 rounded-xl p-3 flex flex-col gap-3">
-        <h2 class="text-2xs font-bold text-slate-400 tracking-wider uppercase">Translation Provider</h2>
-        
-        <!-- Provider Select -->
-        <div class="flex items-center justify-between gap-4">
-          <div class="flex flex-col">
-            <span class="text-xs font-semibold">Engine</span>
-            <span class="text-3xs text-slate-400">Select translation engine</span>
-          </div>
-          <select id="provider" class="bg-slate-800 border border-slate-700 rounded-lg py-1 px-2 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer w-32">
-            <option value="google" selected>Google Translate</option>
-            <option value="deepl">DeepL API</option>
-          </select>
-        </div>
-
-        <!-- DeepL API Key Input (Hidden by default) -->
-        <div id="deepl-key-container" class="hidden flex flex-col gap-1 border-t border-slate-800/40 pt-2.5">
-          <label for="deepl-api-key" class="text-3xs font-medium text-slate-400">DeepL API Key</label>
-          <div class="relative flex items-center">
-            <input type="password" id="deepl-api-key" placeholder="Enter DeepL API Key..." class="bg-slate-800 border border-slate-700 rounded-lg py-1 pl-2 pr-8 text-xs text-white focus:outline-none focus:border-blue-500 w-full">
-            <button id="toggle-deepl-key" class="absolute right-2 text-slate-400 hover:text-slate-200 cursor-pointer transition-colors focus:outline-none" title="Toggle visibility" type="button">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5" id="eye-icon">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.43 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-              </svg>
-            </button>
-          </div>
-          <p id="deepl-key-status" class="text-[10px] mt-1 hidden font-medium transition-opacity duration-200"></p>
-        </div>
-      </div>
-
-      <!-- TTS Configuration -->
-      <div class="bg-slate-900/40 border border-slate-800/60 rounded-xl p-3 flex items-center justify-between">
-        <div class="flex flex-col">
-          <span class="text-xs font-semibold">Text-to-Speech (TTS)</span>
-          <span class="text-3xs text-slate-400">Show pronunciation speaker button</span>
-        </div>
-        <label class="relative inline-flex items-center cursor-pointer">
-          <input type="checkbox" id="tts-toggle" class="sr-only peer" checked>
-          <div class="w-8 h-4.5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[14px] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-blue-500"></div>
-        </label>
       </div>
     </div>
 

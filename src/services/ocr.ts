@@ -24,7 +24,7 @@ const DB_NAME = 'polytranslate-ocr-cache';
 const DB_VERSION = 1;
 const STORE_NAME = 'model-files';
 
-let servicePromise: Promise<InstanceType<PaddleOcrServiceCtor>> | null = null;
+const services = new Map<string, Promise<InstanceType<PaddleOcrServiceCtor>>>();
 
 function openModelDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -87,14 +87,25 @@ async function loadCachedModel(urls: ModelUrls, onProgress?: ProgressHandler): P
   return { detection, recognition, charactersDictionary };
 }
 
-async function createService(onProgress?: ProgressHandler): Promise<InstanceType<PaddleOcrServiceCtor>> {
+async function createService(
+  tier: 'tiny' | 'small' | 'medium',
+  onProgress?: ProgressHandler
+): Promise<InstanceType<PaddleOcrServiceCtor>> {
   ort.env.wasm.wasmPaths = chrome.runtime.getURL('onnxruntime-web/');
 
   const ocrModule = await import('ppu-paddle-ocr/web');
   const PaddleOcrService = ocrModule.PaddleOcrService as PaddleOcrServiceCtor;
-  const V6_SMALL_MODEL = ocrModule.V6_SMALL_MODEL as ModelUrls;
 
-  const model = await loadCachedModel(V6_SMALL_MODEL, onProgress);
+  let modelPreset: ModelUrls;
+  if (tier === 'tiny') {
+    modelPreset = ocrModule.V6_TINY_MODEL as ModelUrls;
+  } else if (tier === 'medium') {
+    modelPreset = ocrModule.V6_MEDIUM_MODEL as ModelUrls;
+  } else {
+    modelPreset = ocrModule.V6_SMALL_MODEL as ModelUrls;
+  }
+
+  const model = await loadCachedModel(modelPreset, onProgress);
   onProgress?.({ stage: 'loading', message: 'Loading OCR model...' });
 
   const service = new PaddleOcrService({
@@ -106,21 +117,27 @@ async function createService(onProgress?: ProgressHandler): Promise<InstanceType
   return service;
 }
 
-async function getService(onProgress?: ProgressHandler): Promise<InstanceType<PaddleOcrServiceCtor>> {
+async function getService(
+  tier: 'tiny' | 'small' | 'medium',
+  onProgress?: ProgressHandler
+): Promise<InstanceType<PaddleOcrServiceCtor>> {
+  let servicePromise = services.get(tier);
   if (!servicePromise) {
-    servicePromise = createService(onProgress).catch((err) => {
-      servicePromise = null;
+    servicePromise = createService(tier, onProgress).catch((err) => {
+      services.delete(tier);
       throw err;
     });
+    services.set(tier, servicePromise);
   }
   return servicePromise;
 }
 
 export async function recognizeImageRegion(
   canvas: HTMLCanvasElement,
+  tier: 'tiny' | 'small' | 'medium' = 'small',
   onProgress?: ProgressHandler
 ): Promise<string> {
-  const service = await getService(onProgress);
+  const service = await getService(tier, onProgress);
   onProgress?.({ stage: 'recognizing', message: 'Reading text from image...' });
   const result = await service.recognize(canvas, { flatten: false, strategy: 'per-line' });
   return result.text.trim();

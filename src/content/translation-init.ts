@@ -79,6 +79,26 @@ export function matchesHotkey(ctx: TranslationContext, event: KeyboardEvent): bo
 }
 
 /**
+ * Returns true if the keyboard event matches the configured OCR Shortcut settings.
+ */
+export function matchesOcrShortcut(ctx: TranslationContext, event: KeyboardEvent): boolean {
+  const shortcut = ctx.settings?.ocrShortcut ?? 'ctrl-space';
+  if (shortcut === 'disabled') return false;
+
+  const key = event.key.toLowerCase();
+  if (shortcut === 'ctrl-space') {
+    return event.ctrlKey && !event.altKey && !event.shiftKey && event.code === 'Space';
+  }
+  if (shortcut === 'alt-o') {
+    return event.altKey && !event.ctrlKey && !event.shiftKey && key === 'o';
+  }
+  if (shortcut === 'ctrl-shift-o') {
+    return event.ctrlKey && event.shiftKey && !event.altKey && key === 'o';
+  }
+  return false;
+}
+
+/**
  * Attaches all translation event listeners (mouseup, mousedown, keydown) to a target element.
  * Works on both `document` (web) and the PDF viewer container.
  */

@@ -9,12 +9,13 @@
   "permissions": [
     "storage",
     "webNavigation",
-    "tabs"
+    "tabs",
+    "offscreen",
+    "activeTab"
   ],
   "host_permissions": [
     "https://translate.googleapis.com/*",
-    "https://*/*",
-    "http://*/*",
+    "<all_urls>",
     "file://*/*"
   ],
   "background": {
