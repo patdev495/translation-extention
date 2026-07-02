@@ -115,6 +115,7 @@ The configuration setting determining whether the cropped Image Region is displa
 _Default_: false
 
 **Pinned Snippet Panel**:
-The draggable, persistent floating card displaying the cropped Image Region on the screen when OCR Pin Image is enabled.
+The draggable, persistent floating card displaying the cropped Image Region on the screen when OCR Pin Image is enabled, synchronized and replicated across all active browser tabs using local storage.
 _Avoid_: Screenshot float, Screenshot sticker
+
 

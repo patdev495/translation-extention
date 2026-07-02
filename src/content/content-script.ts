@@ -5,6 +5,7 @@ import {
   matchesOcrShortcut,
 } from './translation-init';
 import { toggleWebpageOcr } from './ocr-selection';
+import { initPinnedSnippetsSync } from './pinned-panel';
 
 const ctx = createTranslationContext();
 
@@ -12,6 +13,7 @@ console.log('PolyTranslate Content Script initialized!');
 
 // Load settings on startup
 loadSettings(ctx);
+initPinnedSnippetsSync(document);
 
 // Listen for updates from settings popup
 chrome.runtime.onMessage.addListener((message) => {

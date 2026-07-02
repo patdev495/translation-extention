@@ -1,4 +1,37 @@
+export interface PinnedSnippet {
+  id: string;
+  imageUrl: string;
+  x: number;
+  y: number;
+}
+
+export async function addPinnedSnippet(imageUrl: string, x: number, y: number): Promise<void> {
+  const res = await chrome.storage.local.get(['pinned_snippets', 'settings']);
+  // Only add if ocrPinImage setting is enabled
+  if (!res.settings?.ocrPinImage) return;
+
+  const current: PinnedSnippet[] = res.pinned_snippets || [];
+  const id = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  const updated = [...current, { id, imageUrl, x, y }];
+  await chrome.storage.local.set({ pinned_snippets: updated });
+}
+
+export async function updatePinnedSnippetPosition(id: string, x: number, y: number): Promise<void> {
+  const res = await chrome.storage.local.get('pinned_snippets');
+  const current: PinnedSnippet[] = res.pinned_snippets || [];
+  const updated = current.map(s => s.id === id ? { ...s, x, y } : s);
+  await chrome.storage.local.set({ pinned_snippets: updated });
+}
+
+export async function removePinnedSnippet(id: string): Promise<void> {
+  const res = await chrome.storage.local.get('pinned_snippets');
+  const current: PinnedSnippet[] = res.pinned_snippets || [];
+  const updated = current.filter(s => s.id !== id);
+  await chrome.storage.local.set({ pinned_snippets: updated });
+}
+
 export class PinnedSnippetPanel {
+  private id: string;
   private wrapper: HTMLDivElement;
   private shadow: ShadowRoot;
   private cardEl!: HTMLDivElement;
@@ -15,11 +48,13 @@ export class PinnedSnippetPanel {
   private doc: Document;
 
   constructor(
+    id: string,
     imageUrl: string,
     initialX: number,
     initialY: number,
     targetDoc: Document = document
   ) {
+    this.id = id;
     this.doc = targetDoc;
 
     // 1. Create wrapper container
@@ -101,7 +136,6 @@ export class PinnedSnippetPanel {
   }
 
   private bindEvents() {
-    // 1. Drag & Drop events
     this.dragHandle.addEventListener('mousedown', (e) => {
       this.isDragging = true;
       this.startX = e.clientX;
@@ -120,18 +154,33 @@ export class PinnedSnippetPanel {
     };
 
     const onMouseUp = () => {
-      this.isDragging = false;
+      if (this.isDragging) {
+        this.isDragging = false;
+        const currentLeft = parseFloat(this.wrapper.style.left || '0');
+        const currentTop = parseFloat(this.wrapper.style.top || '0');
+        updatePinnedSnippetPosition(this.id, currentLeft, currentTop);
+      }
     };
 
     this.doc.addEventListener('mousemove', onMouseMove);
     this.doc.addEventListener('mouseup', onMouseUp);
 
-    // 2. Close button event
     this.closeBtn.addEventListener('click', () => {
-      this.destroy();
+      removePinnedSnippet(this.id);
       this.doc.removeEventListener('mousemove', onMouseMove);
       this.doc.removeEventListener('mouseup', onMouseUp);
     });
+  }
+
+  public getIsDragging(): boolean {
+    return this.isDragging;
+  }
+
+  public updatePosition(x: number, y: number) {
+    if (this.wrapper) {
+      this.wrapper.style.left = `${x}px`;
+      this.wrapper.style.top = `${y}px`;
+    }
   }
 
   public destroy() {
@@ -139,4 +188,74 @@ export class PinnedSnippetPanel {
       this.wrapper.parentNode.removeChild(this.wrapper);
     }
   }
+}
+
+export function initPinnedSnippetsSync(targetDoc: Document = document) {
+  const activePanels = new Map<string, PinnedSnippetPanel>();
+
+  const syncSnippets = (snippets: PinnedSnippet[]) => {
+    const currentIds = new Set(snippets.map(s => s.id));
+
+    // 1. Remove deleted panels
+    activePanels.forEach((panel, id) => {
+      if (!currentIds.has(id)) {
+        panel.destroy();
+        activePanels.delete(id);
+      }
+    });
+
+    // 2. Add or update panels
+    snippets.forEach(snippet => {
+      const existing = activePanels.get(snippet.id);
+      if (!existing) {
+        const panel = new PinnedSnippetPanel(snippet.id, snippet.imageUrl, snippet.x, snippet.y, targetDoc);
+        activePanels.set(snippet.id, panel);
+      } else {
+        if (!existing.getIsDragging()) {
+          existing.updatePosition(snippet.x, snippet.y);
+        }
+      }
+    });
+  };
+
+  // Initial load
+  chrome.storage.local.get(['settings', 'pinned_snippets'], (res) => {
+    const settings = res.settings;
+    if (settings?.ocrPinImage) {
+      syncSnippets(res.pinned_snippets || []);
+    }
+  });
+
+  // Listen to storage changes
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== 'local') return;
+
+    if (changes.settings) {
+      const oldVal = changes.settings.oldValue;
+      const newVal = changes.settings.newValue;
+      if (oldVal?.ocrPinImage !== newVal?.ocrPinImage) {
+        if (!newVal?.ocrPinImage) {
+          activePanels.forEach(p => p.destroy());
+          activePanels.clear();
+          return;
+        } else {
+          chrome.storage.local.get('pinned_snippets', (res) => {
+            syncSnippets(res.pinned_snippets || []);
+          });
+        }
+      }
+    }
+
+    if (changes.pinned_snippets) {
+      chrome.storage.local.get('settings', (res) => {
+        const settings = res.settings;
+        if (settings?.ocrPinImage) {
+          syncSnippets(changes.pinned_snippets.newValue || []);
+        } else {
+          activePanels.forEach(p => p.destroy());
+          activePanels.clear();
+        }
+      });
+    }
+  });
 }

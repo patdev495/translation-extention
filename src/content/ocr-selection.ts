@@ -1,5 +1,5 @@
 import { TranslationContext, performTranslation } from './translation-init';
-import { PinnedSnippetPanel } from './pinned-panel';
+import { addPinnedSnippet } from './pinned-panel';
 
 let overlayContainer: HTMLDivElement | null = null;
 let shadowRoot: ShadowRoot | null = null;
@@ -217,7 +217,7 @@ async function finishSelection(e: MouseEvent) {
         performTranslation(currentCtx, text, docX, docY);
 
         if (currentCtx.settings?.ocrPinImage && croppedDataUrl) {
-          new PinnedSnippetPanel(croppedDataUrl, left, top);
+          addPinnedSnippet(croppedDataUrl, left, top);
         }
       } else {
         updateProgressText('No text found in this region.');

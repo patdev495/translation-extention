@@ -6,7 +6,7 @@ import {
   matchesOcrShortcut,
 } from '../content/translation-init';
 import { recognizeImageRegion } from '../services/ocr';
-import { PinnedSnippetPanel } from '../content/pinned-panel';
+import { PinnedSnippetPanel, addPinnedSnippet, initPinnedSnippetsSync } from '../content/pinned-panel';
 import { createPdfPasswordResolver } from './password';
 
 // pdfjs-dist is loaded at runtime via chrome.runtime.getURL() to avoid
@@ -407,7 +407,7 @@ async function translateOcrRegion(wrapper: HTMLElement, pageCanvas: HTMLCanvasEl
 
     if (translationCtx.settings?.ocrPinImage) {
       const croppedDataUrl = cropCanvas.toDataURL('image/png');
-      new PinnedSnippetPanel(croppedDataUrl, rect.left, rect.top);
+      addPinnedSnippet(croppedDataUrl, rect.left, rect.top);
     }
   } catch (err) {
     const textEl = progress.querySelector('span:last-child');
@@ -551,6 +551,7 @@ $btnFileAccess.addEventListener('click', () => {
 // ─── Translation init ──────────────────────────────────────────────────────
 
 loadSettings(translationCtx);
+initPinnedSnippetsSync(document);
 
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === 'SETTINGS_UPDATED') {
