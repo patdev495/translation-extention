@@ -40,18 +40,18 @@ describe('SettingsManager', () => {
     const settings = await SettingsManager.getSettings();
     expect(settings).toEqual({
       primaryTargetLang: 'vi',
-      secondaryTargetLang: 'en',
-      reverseTargetLang: 'zh',
+      secondaryTargetLang: 'zh',
+      reverseTargetLang: 'en',
       hotkey: 'none',
       ocrShortcut: 'ctrl-space',
-      ocrModelTier: 'small',
+      ocrModelTier: 'medium',
       ocrLanguage: 'ch',
       ttsEnabled: true,
       provider: 'google',
       deeplApiKey: '',
-      tooltipFontSize: '14',
+      tooltipFontSize: '16',
       ocrPinImage: false,
-      ocrCopyToClipboard: false,
+      ocrCopyToClipboard: true,
     });
   });
 
@@ -67,8 +67,8 @@ describe('SettingsManager', () => {
 
     const retrieved = await SettingsManager.getSettings();
     expect(retrieved.primaryTargetLang).toBe('en');
-    expect(retrieved.secondaryTargetLang).toBe('en');
-    expect(retrieved.reverseTargetLang).toBe('zh');
+    expect(retrieved.secondaryTargetLang).toBe('zh');
+    expect(retrieved.reverseTargetLang).toBe('en');
     expect(retrieved.hotkey).toBe('ctrl');
     expect(retrieved.ocrShortcut).toBe('alt-o');
     expect(retrieved.provider).toBe('google');

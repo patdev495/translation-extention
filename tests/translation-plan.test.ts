@@ -4,23 +4,23 @@ import type { Settings } from '../src/services/settings';
 
 const baseSettings: Settings = {
   primaryTargetLang: 'vi',
-  secondaryTargetLang: 'en',
-  reverseTargetLang: 'zh',
+  secondaryTargetLang: 'zh',
+  reverseTargetLang: 'en',
   hotkey: 'none',
   ocrShortcut: 'ctrl-space',
-  ocrModelTier: 'small',
+  ocrModelTier: 'medium',
   ocrLanguage: 'ch',
   ttsEnabled: true,
   provider: 'google',
   deeplApiKey: '',
-  tooltipFontSize: '14',
+  tooltipFontSize: '16',
   ocrPinImage: false,
-  ocrCopyToClipboard: false,
+  ocrCopyToClipboard: true,
 };
 
 describe('translation target planning', () => {
   test('uses the first enabled target for detection', () => {
-    expect(getDetectionTarget({ ...baseSettings, primaryTargetLang: 'none' })).toBe('en');
+    expect(getDetectionTarget({ ...baseSettings, primaryTargetLang: 'none' })).toBe('zh');
     expect(getDetectionTarget({
       ...baseSettings,
       primaryTargetLang: 'none',
