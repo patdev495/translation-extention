@@ -405,9 +405,18 @@ async function translateOcrRegion(wrapper: HTMLElement, pageCanvas: HTMLCanvasEl
     removeOcrProgress();
     performTranslation(translationCtx, text, x, y);
 
-    if (translationCtx.settings?.ocrPinImage) {
-      const croppedDataUrl = cropCanvas.toDataURL('image/png');
+    const croppedDataUrl = (translationCtx.settings?.ocrPinImage || translationCtx.settings?.ocrCopyToClipboard)
+      ? cropCanvas.toDataURL('image/png')
+      : null;
+
+    if (translationCtx.settings?.ocrPinImage && croppedDataUrl) {
       addPinnedSnippet(croppedDataUrl, rect.left, rect.top);
+    }
+
+    if (translationCtx.settings?.ocrCopyToClipboard && croppedDataUrl) {
+      copyImageToClipboard(croppedDataUrl).catch((err) => {
+        console.error('Failed to copy image to clipboard in PDF viewer:', err);
+      });
     }
   } catch (err) {
     const textEl = progress.querySelector('span:last-child');
@@ -592,3 +601,10 @@ initTranslationListeners(translationCtx, document);
 
   await loadPdf(url);
 })();
+
+async function copyImageToClipboard(dataUrl: string): Promise<void> {
+  const res = await fetch(dataUrl);
+  const blob = await res.blob();
+  const item = new ClipboardItem({ 'image/png': blob });
+  await navigator.clipboard.write([item]);
+}

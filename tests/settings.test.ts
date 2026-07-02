@@ -51,6 +51,7 @@ describe('SettingsManager', () => {
       deeplApiKey: '',
       tooltipFontSize: '14',
       ocrPinImage: false,
+      ocrCopyToClipboard: false,
     });
   });
 

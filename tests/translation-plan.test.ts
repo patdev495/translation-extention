@@ -15,6 +15,7 @@ const baseSettings: Settings = {
   deeplApiKey: '',
   tooltipFontSize: '14',
   ocrPinImage: false,
+  ocrCopyToClipboard: false,
 };
 
 describe('translation target planning', () => {

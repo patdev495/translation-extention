@@ -13,6 +13,7 @@ export interface Settings {
   deeplApiKey: string;
   tooltipFontSize: '12' | '14' | '16' | '18' | '20' | '24' | '28' | '32' | '36' | '40';
   ocrPinImage: boolean;
+  ocrCopyToClipboard: boolean;
 }
 
 export class SettingsManager {
@@ -29,6 +30,7 @@ export class SettingsManager {
     deeplApiKey: '',
     tooltipFontSize: '14',
     ocrPinImage: false,
+    ocrCopyToClipboard: false,
   };
 
   static async getSettings(): Promise<Settings> {

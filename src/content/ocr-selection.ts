@@ -219,6 +219,12 @@ async function finishSelection(e: MouseEvent) {
         if (currentCtx.settings?.ocrPinImage && croppedDataUrl) {
           addPinnedSnippet(croppedDataUrl, left, top);
         }
+
+        if (currentCtx.settings?.ocrCopyToClipboard && croppedDataUrl) {
+          copyImageToClipboard(croppedDataUrl).catch((err) => {
+            console.error('Failed to copy image to clipboard:', err);
+          });
+        }
       } else {
         updateProgressText('No text found in this region.');
         await new Promise((r) => setTimeout(r, 2000));
@@ -273,4 +279,11 @@ function updateProgressText(message: string) {
   if (textEl) {
     textEl.textContent = message;
   }
+}
+
+async function copyImageToClipboard(dataUrl: string): Promise<void> {
+  const res = await fetch(dataUrl);
+  const blob = await res.blob();
+  const item = new ClipboardItem({ 'image/png': blob });
+  await navigator.clipboard.write([item]);
 }

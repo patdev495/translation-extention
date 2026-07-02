@@ -12,6 +12,7 @@ const ocrLanguage = document.getElementById('ocr-language') as HTMLSelectElement
 const ttsToggle = document.getElementById('tts-toggle') as HTMLInputElement;
 const tooltipFontSizeSelect = document.getElementById('tooltip-font-size') as HTMLSelectElement;
 const ocrPinToggle = document.getElementById('ocr-pin-toggle') as HTMLInputElement;
+const ocrCopyToggle = document.getElementById('ocr-copy-toggle') as HTMLInputElement;
 const providerSelect = document.getElementById('provider') as HTMLSelectElement;
 const deeplKeyContainer = document.getElementById('deepl-key-container') as HTMLDivElement;
 const deeplApiKeyInput = document.getElementById('deepl-api-key') as HTMLInputElement;
@@ -123,6 +124,7 @@ async function loadSettings() {
     deeplApiKeyInput.value = settings.deeplApiKey;
     tooltipFontSizeSelect.value = settings.tooltipFontSize;
     ocrPinToggle.checked = settings.ocrPinImage;
+    ocrCopyToggle.checked = settings.ocrCopyToClipboard;
 
     updateDeepLContainer();
     triggerKeyValidation();
@@ -148,6 +150,7 @@ async function saveSettings() {
       deeplApiKey: deeplApiKeyInput.value,
       tooltipFontSize: tooltipFontSizeSelect.value as '12' | '14' | '16' | '18' | '20' | '24' | '28' | '32' | '36' | '40',
       ocrPinImage: ocrPinToggle.checked,
+      ocrCopyToClipboard: ocrCopyToggle.checked,
     });
 
     // Notify active tabs of settings update
@@ -184,6 +187,7 @@ ocrLanguage.addEventListener('change', saveSettings);
 ttsToggle.addEventListener('change', saveSettings);
 tooltipFontSizeSelect.addEventListener('change', saveSettings);
 ocrPinToggle.addEventListener('change', saveSettings);
+ocrCopyToggle.addEventListener('change', saveSettings);
 
 providerSelect.addEventListener('change', () => {
   updateDeepLContainer();

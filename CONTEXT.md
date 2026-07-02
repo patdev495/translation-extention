@@ -118,4 +118,8 @@ _Default_: false
 The draggable, persistent floating card displaying the cropped Image Region on the screen when OCR Pin Image is enabled, synchronized and replicated across all active browser tabs using local storage.
 _Avoid_: Screenshot float, Screenshot sticker
 
+**OCR Copy to Clipboard**:
+The configuration setting determining whether the cropped Image Region is automatically copied to the system clipboard upon successful OCR extraction.
+_Default_: false
+
 
