@@ -74,6 +74,11 @@ The pronunciation representation (IPA for English, Pinyin for Chinese) shown in 
 **Translation Tooltip**:
 The floating popup card displayed near the selected Source Text containing the translation, Phonetic Transcription, and TTS controls.
 
+**Tooltip Font Size**:
+The configuration determining the font size of the text (Source Text, translations, and phonetics) rendered inside the Translation Tooltip.
+_Default_: 14px
+
+
 **Dual Translation**:
 The execution of translating the Source Text into two distinct target languages simultaneously and displaying both in the Translation Tooltip.
 

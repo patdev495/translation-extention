@@ -11,6 +11,7 @@ export interface Settings {
   ttsEnabled: boolean;
   provider: 'google' | 'deepl';
   deeplApiKey: string;
+  tooltipFontSize: '12' | '14' | '16' | '18' | '20' | '24' | '28' | '32' | '36' | '40';
 }
 
 export class SettingsManager {
@@ -25,6 +26,7 @@ export class SettingsManager {
     ttsEnabled: true,
     provider: 'google',
     deeplApiKey: '',
+    tooltipFontSize: '14',
   };
 
   static async getSettings(): Promise<Settings> {

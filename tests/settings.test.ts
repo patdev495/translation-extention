@@ -49,6 +49,7 @@ describe('SettingsManager', () => {
       ttsEnabled: true,
       provider: 'google',
       deeplApiKey: '',
+      tooltipFontSize: '14',
     });
   });
 

@@ -13,6 +13,7 @@ const baseSettings: Settings = {
   ttsEnabled: true,
   provider: 'google',
   deeplApiKey: '',
+  tooltipFontSize: '14',
 };
 
 describe('translation target planning', () => {

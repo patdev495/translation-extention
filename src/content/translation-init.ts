@@ -28,6 +28,9 @@ export async function loadSettings(ctx: TranslationContext): Promise<void> {
     ctx.settings = await SettingsManager.getSettings();
     const res = await chrome.storage.local.get('active');
     ctx.active = res.active !== undefined ? res.active : true;
+    if (ctx.settings && ctx.settings.tooltipFontSize) {
+      ctx.tooltip.updateFontSize(ctx.settings.tooltipFontSize);
+    }
   } catch (err) {
     console.error('Failed to load settings:', err);
   }

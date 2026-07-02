@@ -42,9 +42,17 @@ export class TranslationTooltip {
     link.href = cssUrl;
     this.shadow.appendChild(link);
 
+    const style = document.createElement('style');
+    style.textContent = `
+      #tooltip { font-size: var(--tooltip-font-size, 14px) !important; }
+      #tooltip .text-xs { font-size: 0.85em !important; }
+      #tooltip .text-3xs { font-size: 0.7em !important; }
+    `;
+    this.shadow.appendChild(style);
+
     this.tooltipEl = document.createElement('div');
     this.tooltipEl.id = 'tooltip';
-    this.tooltipEl.className = 'hidden absolute bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border border-slate-200/50 dark:border-slate-800/50 rounded-2xl shadow-2xl p-4 text-sm max-w-xs transition-opacity duration-200 text-slate-800 dark:text-slate-200 font-sans z-50 cursor-move';
+    this.tooltipEl.className = 'hidden absolute bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border border-slate-200/50 dark:border-slate-800/50 rounded-2xl shadow-2xl p-4 text-sm max-w-[90vw] transition-opacity duration-200 text-slate-800 dark:text-slate-200 font-sans z-50 cursor-move';
     this.tooltipEl.style.transform = 'translate(-50%, -100%)';
     this.shadow.appendChild(this.tooltipEl);
 
@@ -182,7 +190,7 @@ export class TranslationTooltip {
     };
 
     let content = `
-      <div class="flex flex-col gap-2.5 w-60 cursor-default">
+      <div class="flex flex-col gap-2.5 w-[18em] cursor-default">
         <!-- Source Block -->
         <div class="flex flex-col gap-1">
           <div class="flex items-start justify-between gap-2">
@@ -365,6 +373,12 @@ export class TranslationTooltip {
     }
 
     window.speechSynthesis.speak(utterance);
+  }
+
+  updateFontSize(size: string) {
+    if (this.tooltipEl) {
+      this.tooltipEl.style.setProperty('--tooltip-font-size', `${size}px`);
+    }
   }
 
   private escapeHtml(str: string): string {
