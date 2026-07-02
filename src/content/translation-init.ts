@@ -142,6 +142,11 @@ export function initTranslationListeners(
     const currentSettings = ctx.settings;
     if (!ctx.active || !currentSettings) return;
 
+    const isInsidePinned = event.composedPath().some(node => 
+      node instanceof HTMLElement && node.classList.contains('polytranslate-pinned-wrapper')
+    );
+    if (isInsidePinned) return;
+
     const x = event.pageX;
     const y = event.pageY;
     const isHotkeyHeld = isHotkeyMatched(ctx, event);
@@ -177,6 +182,11 @@ export function initTranslationListeners(
     const root = document.getElementById('translation-extension-root');
     const isInsideRoot = root ? (event as any).composedPath().includes(root) : false;
     if (isInsideRoot) return;
+
+    const isInsidePinned = event.composedPath().some(node => 
+      node instanceof HTMLElement && node.classList.contains('polytranslate-pinned-wrapper')
+    );
+    if (isInsidePinned) return;
 
     ctx.tooltip.hide();
     ctx.tooltip.hideTrigger();
