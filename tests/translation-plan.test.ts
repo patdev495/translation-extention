@@ -14,6 +14,7 @@ const baseSettings: Settings = {
   provider: 'google',
   deeplApiKey: '',
   tooltipFontSize: '14',
+  ocrPinImage: false,
 };
 
 describe('translation target planning', () => {

@@ -50,6 +50,7 @@ describe('SettingsManager', () => {
       provider: 'google',
       deeplApiKey: '',
       tooltipFontSize: '14',
+      ocrPinImage: false,
     });
   });
 

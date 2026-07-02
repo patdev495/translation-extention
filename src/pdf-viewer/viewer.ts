@@ -6,6 +6,7 @@ import {
   matchesOcrShortcut,
 } from '../content/translation-init';
 import { recognizeImageRegion } from '../services/ocr';
+import { PinnedSnippetPanel } from '../content/pinned-panel';
 import { createPdfPasswordResolver } from './password';
 
 // pdfjs-dist is loaded at runtime via chrome.runtime.getURL() to avoid
@@ -403,6 +404,11 @@ async function translateOcrRegion(wrapper: HTMLElement, pageCanvas: HTMLCanvasEl
     const y = wrapperRect.top + window.scrollY + rect.top;
     removeOcrProgress();
     performTranslation(translationCtx, text, x, y);
+
+    if (translationCtx.settings?.ocrPinImage) {
+      const croppedDataUrl = cropCanvas.toDataURL('image/png');
+      new PinnedSnippetPanel(croppedDataUrl, rect.left, rect.top);
+    }
   } catch (err) {
     const textEl = progress.querySelector('span:last-child');
     if (textEl) textEl.textContent = err instanceof Error ? err.message : 'OCR failed.';

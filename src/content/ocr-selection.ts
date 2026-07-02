@@ -1,4 +1,5 @@
 import { TranslationContext, performTranslation } from './translation-init';
+import { PinnedSnippetPanel } from './pinned-panel';
 
 let overlayContainer: HTMLDivElement | null = null;
 let shadowRoot: ShadowRoot | null = null;
@@ -209,11 +210,15 @@ async function finishSelection(e: MouseEvent) {
 
     if (response && response.success) {
       if (response.data && response.data.text && currentCtx) {
-        const { text } = response.data;
+        const { text, croppedDataUrl } = response.data;
         // Document-relative coords for tooltip placement
         const docX = left + window.scrollX + width / 2;
         const docY = top + window.scrollY;
         performTranslation(currentCtx, text, docX, docY);
+
+        if (currentCtx.settings?.ocrPinImage && croppedDataUrl) {
+          new PinnedSnippetPanel(croppedDataUrl, left, top);
+        }
       } else {
         updateProgressText('No text found in this region.');
         await new Promise((r) => setTimeout(r, 2000));

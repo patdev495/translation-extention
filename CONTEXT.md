@@ -110,10 +110,11 @@ The user interaction capability enabling the Translation Tooltip to be dragged a
 The quick-copy action button in the Tooltip allowing the user to copy the source text or translation to their clipboard.
 
 **TTS Voice Diagnostics**:
-The logging system in the console that outputs warning diagnostics if no matching system voice is found for the required locale during text-to-speech playback.
+The logging system in the console that outputs warning diagnostics if no matching system voice is found for the required locale during text-to-speech playback.**OCR Pin Image**:
+The configuration setting determining whether the cropped Image Region is displayed as a pinned floating card on the screen.
+_Default_: false
 
-
-
-
-
+**Pinned Snippet Panel**:
+The draggable, persistent floating card displaying the cropped Image Region on the screen when OCR Pin Image is enabled.
+_Avoid_: Screenshot float, Screenshot sticker
 

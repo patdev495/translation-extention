@@ -12,6 +12,7 @@ export interface Settings {
   provider: 'google' | 'deepl';
   deeplApiKey: string;
   tooltipFontSize: '12' | '14' | '16' | '18' | '20' | '24' | '28' | '32' | '36' | '40';
+  ocrPinImage: boolean;
 }
 
 export class SettingsManager {
@@ -27,6 +28,7 @@ export class SettingsManager {
     provider: 'google',
     deeplApiKey: '',
     tooltipFontSize: '14',
+    ocrPinImage: false,
   };
 
   static async getSettings(): Promise<Settings> {

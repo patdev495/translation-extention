@@ -6,8 +6,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     (async () => {
       try {
-        const text = await processOcr(dataUrl, rect, tier, language);
-        sendResponse({ success: true, text });
+        const result = await processOcr(dataUrl, rect, tier, language);
+        sendResponse({ success: true, text: result.text, croppedDataUrl: result.croppedDataUrl });
       } catch (err: any) {
         console.error('OCR Error in offscreen document:', err);
         sendResponse({ success: false, error: err?.message || String(err) });
@@ -23,14 +23,14 @@ async function processOcr(
   rect: { x: number; y: number; width: number; height: number; devicePixelRatio?: number },
   tier: 'tiny' | 'small' | 'medium' = 'small',
   language: 'ch' | 'latin' = 'ch'
-): Promise<string> {
+): Promise<{ text: string; croppedDataUrl: string }> {
   const dpr = rect.devicePixelRatio || 1;
   const sx = rect.x * dpr;
   const sy = rect.y * dpr;
   const sw = rect.width * dpr;
   const sh = rect.height * dpr;
 
-  return new Promise((resolve, reject) => {
+  return new Promise<{ text: string; croppedDataUrl: string }>((resolve, reject) => {
     const img = new Image();
     img.onload = async () => {
       try {
@@ -66,7 +66,8 @@ async function processOcr(
           });
         });
 
-        resolve(text);
+        const croppedDataUrl = canvas.toDataURL('image/png');
+        resolve({ text, croppedDataUrl });
       } catch (err) {
         reject(err);
       }

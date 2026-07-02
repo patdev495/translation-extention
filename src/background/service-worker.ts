@@ -201,6 +201,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
 
         const text = ocrResponse.text;
+        const croppedDataUrl = ocrResponse.croppedDataUrl;
         if (!text) {
           sendResponse({ success: true, data: null });
           return;
@@ -213,6 +214,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           success: true,
           data: {
             text,
+            croppedDataUrl,
             ...data
           }
         });
