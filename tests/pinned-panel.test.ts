@@ -49,12 +49,14 @@ describe('PinnedSnippet storage helpers', () => {
   });
 
   test('should add a pinned snippet when setting is enabled', async () => {
-    await addPinnedSnippet('data:image/png;base64,abc', 100, 200);
+    await addPinnedSnippet('data:image/png;base64,abc', 100, 200, 300, 400);
     const snippets: PinnedSnippet[] = mockStorage.pinned_snippets;
     expect(snippets.length).toBe(1);
     expect(snippets[0].imageUrl).toBe('data:image/png;base64,abc');
     expect(snippets[0].x).toBe(100);
     expect(snippets[0].y).toBe(200);
+    expect(snippets[0].width).toBe(300);
+    expect(snippets[0].height).toBe(400);
     expect(snippets[0].id).toBeDefined();
   });
 

@@ -232,7 +232,7 @@ async function finishSelection(e: MouseEvent) {
         }
 
         if (currentCtx.settings?.ocrPinImage && croppedDataUrl) {
-          addPinnedSnippet(croppedDataUrl, left, top);
+          addPinnedSnippet(croppedDataUrl, left, top, width, height);
         }
 
         if (currentCtx.settings?.ocrCopyToClipboard && croppedDataUrl) {

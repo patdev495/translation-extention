@@ -399,7 +399,7 @@ async function translateOcrRegion(wrapper: HTMLElement, pageCanvas: HTMLCanvasEl
 
     if (!translationCtx.settings?.autoTranslate) {
       if (translationCtx.settings?.ocrPinImage && croppedDataUrl) {
-        addPinnedSnippet(croppedDataUrl, rect.left, rect.top);
+        addPinnedSnippet(croppedDataUrl, rect.left, rect.top, rect.width, rect.height);
       }
 
       if (translationCtx.settings?.ocrCopyToClipboard && croppedDataUrl) {
@@ -432,7 +432,7 @@ async function translateOcrRegion(wrapper: HTMLElement, pageCanvas: HTMLCanvasEl
     performTranslation(translationCtx, text, x, y);
 
     if (translationCtx.settings?.ocrPinImage && croppedDataUrl) {
-      addPinnedSnippet(croppedDataUrl, rect.left, rect.top);
+      addPinnedSnippet(croppedDataUrl, rect.left, rect.top, rect.width, rect.height);
     }
 
     if (translationCtx.settings?.ocrCopyToClipboard && croppedDataUrl) {

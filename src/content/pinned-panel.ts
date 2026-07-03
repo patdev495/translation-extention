@@ -3,16 +3,24 @@ export interface PinnedSnippet {
   imageUrl: string;
   x: number;
   y: number;
+  width?: number;
+  height?: number;
 }
 
-export async function addPinnedSnippet(imageUrl: string, x: number, y: number): Promise<void> {
+export async function addPinnedSnippet(
+  imageUrl: string,
+  x: number,
+  y: number,
+  width?: number,
+  height?: number
+): Promise<void> {
   const res = await chrome.storage.local.get(['pinned_snippets', 'settings']);
   // Only add if ocrPinImage setting is enabled
   if (!res.settings?.ocrPinImage) return;
 
   const current: PinnedSnippet[] = res.pinned_snippets || [];
   const id = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-  const updated = [...current, { id, imageUrl, x, y }];
+  const updated = [...current, { id, imageUrl, x, y, width, height }];
   await chrome.storage.local.set({ pinned_snippets: updated });
 }
 
@@ -38,6 +46,8 @@ export class PinnedSnippetPanel {
   private dragHandle!: HTMLDivElement;
   private closeBtn!: HTMLButtonElement;
   private imgEl!: HTMLImageElement;
+  private width?: number;
+  private height?: number;
 
   private isDragging = false;
   private startX = 0;
@@ -52,9 +62,13 @@ export class PinnedSnippetPanel {
     imageUrl: string,
     initialX: number,
     initialY: number,
+    width?: number,
+    height?: number,
     targetDoc: Document = document
   ) {
     this.id = id;
+    this.width = width;
+    this.height = height;
     this.doc = targetDoc;
 
     // 1. Create wrapper container
@@ -103,7 +117,7 @@ export class PinnedSnippetPanel {
 
   private render(imageUrl: string) {
     const content = `
-      <div class="pinned-card flex flex-col bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/50 dark:border-slate-800/50 rounded-2xl shadow-2xl overflow-hidden p-2.5 w-max max-w-sm transition-opacity duration-200 text-slate-800 dark:text-slate-200 font-sans">
+      <div class="pinned-card flex flex-col bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/50 dark:border-slate-800/50 rounded-2xl shadow-2xl overflow-hidden p-2.5 w-max max-w-none transition-opacity duration-200 text-slate-800 dark:text-slate-200 font-sans">
         <!-- Header / Drag Handle -->
         <div class="drag-handle flex items-center justify-between gap-4 px-1.5 py-1 select-none border-b border-slate-200/30 dark:border-slate-800/30 mb-2">
           <div class="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
@@ -119,8 +133,8 @@ export class PinnedSnippetPanel {
           </button>
         </div>
         <!-- Cropped Image -->
-        <div class="rounded-xl overflow-hidden border border-slate-200/30 dark:border-slate-800/30 bg-slate-50 dark:bg-slate-950/30 flex items-center justify-center">
-          <img src="${imageUrl}" class="max-h-52 object-contain block pointer-events-none" alt="OCR Snippet" />
+        <div class="rounded-xl overflow-hidden border border-slate-200/30 dark:border-slate-800/30 bg-slate-50 dark:bg-slate-950/30 flex items-center justify-center" style="${this.width ? `width: ${this.width}px; height: ${this.height}px;` : ''}">
+          <img src="${imageUrl}" class="object-contain block pointer-events-none" style="${this.width ? `width: ${this.width}px; height: ${this.height}px;` : 'max-h-52'}" alt="OCR Snippet" />
         </div>
       </div>
     `;
@@ -208,7 +222,15 @@ export function initPinnedSnippetsSync(targetDoc: Document = document) {
     snippets.forEach(snippet => {
       const existing = activePanels.get(snippet.id);
       if (!existing) {
-        const panel = new PinnedSnippetPanel(snippet.id, snippet.imageUrl, snippet.x, snippet.y, targetDoc);
+        const panel = new PinnedSnippetPanel(
+          snippet.id,
+          snippet.imageUrl,
+          snippet.x,
+          snippet.y,
+          snippet.width,
+          snippet.height,
+          targetDoc
+        );
         activePanels.set(snippet.id, panel);
       } else {
         if (!existing.getIsDragging()) {
