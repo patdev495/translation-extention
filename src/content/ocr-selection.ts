@@ -181,10 +181,9 @@ async function finishSelection(e: MouseEvent) {
     return;
   }
 
-  // Hide the shadow overlay styling but keep elements to prevent double clicks/selection changes
-  overlayEl.style.background = 'transparent';
-  overlayEl.style.cursor = 'wait';
-  selectionBox.style.boxShadow = 'none'; // Clear the dark cutout
+  // Hide selection box and overlay backdrop to prevent them from appearing in the screenshot
+  if (selectionBox) selectionBox.style.display = 'none';
+  if (overlayEl) overlayEl.style.display = 'none';
 
   // Show progress indicator
   if (currentCtx?.settings?.autoTranslate) {
@@ -196,6 +195,9 @@ async function finishSelection(e: MouseEvent) {
   }
 
   ocrBusy = true;
+
+  // Wait for browser repaint before capturing
+  await new Promise((r) => setTimeout(r, 50));
 
   try {
     const response: any = await new Promise((resolve) => {
