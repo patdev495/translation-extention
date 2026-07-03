@@ -93,6 +93,62 @@ async function ensureOffscreenDocument(): Promise<void> {
   creatingOffscreen = null;
 }
 
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  const len = bytes.byteLength;
+  const chunk = 8192;
+  for (let i = 0; i < len; i += chunk) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk) as any);
+  }
+  return btoa(binary);
+}
+
+async function cropScreenshot(
+  dataUrl: string,
+  rect: { x: number; y: number; width: number; height: number },
+  viewport: { width: number; height: number }
+): Promise<string> {
+  const response = await fetch(dataUrl);
+  const blob = await response.blob();
+  const imgBitmap = await createImageBitmap(blob);
+
+  const scaleX = imgBitmap.width / viewport.width;
+  const scaleY = imgBitmap.height / viewport.height;
+  const sx = rect.x * scaleX;
+  const sy = rect.y * scaleY;
+  const sw = rect.width * scaleX;
+  const sh = rect.height * scaleY;
+
+  const cropW = Math.max(1, Math.round(sw));
+  const cropH = Math.max(1, Math.round(sh));
+
+  const canvas = new OffscreenCanvas(cropW, cropH);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    throw new Error('Failed to get 2d context for OffscreenCanvas');
+  }
+
+  ctx.drawImage(
+    imgBitmap,
+    sx,
+    sy,
+    sw,
+    sh,
+    0,
+    0,
+    cropW,
+    cropH
+  );
+
+  imgBitmap.close();
+
+  const croppedBlob = await canvas.convertToBlob({ type: 'image/png' });
+  const arrayBuffer = await croppedBlob.arrayBuffer();
+  const base64 = arrayBufferToBase64(arrayBuffer);
+  return `data:image/png;base64,${base64}`;
+}
+
 // ─── Translation Helper ─────────────────────────────────────────────────────
 
 async function translateText(text: string) {
@@ -182,18 +238,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         // 1. Capture the screen viewport of the current active tab
         const dataUrl = await chrome.tabs.captureVisibleTab(chrome.windows.WINDOW_ID_CURRENT, { format: 'png' });
 
+        // Crop screenshot in service worker first using OffscreenCanvas
+        const croppedDataUrl = await cropScreenshot(dataUrl, rect, viewport);
+
         // 2. Ensure Offscreen Document is opened
         await ensureOffscreenDocument();
         resetOffscreenTimeout();
 
-        // 3. Request OCR/cropping from the Offscreen Document
+        // 3. Request OCR from the Offscreen Document on the pre-cropped image
         const settings = await SettingsManager.getSettings();
         const autoTranslate = settings.autoTranslate;
         const ocrResponse = await chrome.runtime.sendMessage({
           type: 'RUN_OCR',
-          dataUrl,
-          rect,
-          viewport,
+          dataUrl: croppedDataUrl,
+          rect: null,
+          viewport: null,
           tier: settings.ocrModelTier ?? 'small',
           language: settings.ocrLanguage ?? 'ch',
           skipOcr: !autoTranslate
@@ -204,7 +263,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
 
         const text = ocrResponse.text;
-        const croppedDataUrl = ocrResponse.croppedDataUrl;
 
         if (!autoTranslate) {
           sendResponse({

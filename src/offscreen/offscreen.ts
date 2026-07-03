@@ -20,8 +20,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 async function processOcr(
   dataUrl: string,
-  rect: { x: number; y: number; width: number; height: number; devicePixelRatio?: number },
-  viewport?: { width: number; height: number },
+  rect: { x: number; y: number; width: number; height: number; devicePixelRatio?: number } | null,
+  viewport?: { width: number; height: number } | null,
   tier: 'tiny' | 'small' | 'medium' = 'small',
   language: 'ch' | 'latin' = 'ch',
   skipOcr = false
@@ -30,38 +30,46 @@ async function processOcr(
     const img = new Image();
     img.onload = async () => {
       try {
-        let scaleX = rect.devicePixelRatio || 1;
-        let scaleY = rect.devicePixelRatio || 1;
-        if (viewport && viewport.width && viewport.height) {
-          scaleX = img.width / viewport.width;
-          scaleY = img.height / viewport.height;
-        }
-
-        const sx = rect.x * scaleX;
-        const sy = rect.y * scaleY;
-        const sw = rect.width * scaleX;
-        const sh = rect.height * scaleY;
-
         const canvas = document.createElement('canvas');
-        canvas.width = sw;
-        canvas.height = sh;
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
         if (!ctx) {
           throw new Error('Failed to get 2D context for offscreen canvas');
         }
 
-        // Draw cropped area with correct scaling
-        ctx.drawImage(
-          img,
-          sx,
-          sy,
-          sw,
-          sh,
-          0,
-          0,
-          sw,
-          sh
-        );
+        if (!rect) {
+          // If already cropped in background, use it directly
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+        } else {
+          let scaleX = rect.devicePixelRatio || 1;
+          let scaleY = rect.devicePixelRatio || 1;
+          if (viewport && viewport.width && viewport.height) {
+            scaleX = img.width / viewport.width;
+            scaleY = img.height / viewport.height;
+          }
+
+          const sx = rect.x * scaleX;
+          const sy = rect.y * scaleY;
+          const sw = rect.width * scaleX;
+          const sh = rect.height * scaleY;
+
+          canvas.width = sw;
+          canvas.height = sh;
+
+          // Draw cropped area with correct scaling
+          ctx.drawImage(
+            img,
+            sx,
+            sy,
+            sw,
+            sh,
+            0,
+            0,
+            sw,
+            sh
+          );
+        }
 
         // Run local OCR
         let text = '';
@@ -77,14 +85,14 @@ async function processOcr(
           });
         }
 
-        const croppedDataUrl = canvas.toDataURL('image/png');
+        const croppedDataUrl = rect ? canvas.toDataURL('image/png') : dataUrl;
         resolve({ text, croppedDataUrl });
       } catch (err) {
         reject(err);
       }
     };
     img.onerror = () => {
-      reject(new Error('Failed to load captured viewport image'));
+      reject(new Error('Failed to load image in offscreen document'));
     };
     img.src = dataUrl;
   });
