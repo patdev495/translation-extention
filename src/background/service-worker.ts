@@ -175,7 +175,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === 'CAPTURE_TAB') {
-    const { rect } = message;
+    const { rect, viewport } = message;
 
     (async () => {
       try {
@@ -193,6 +193,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           type: 'RUN_OCR',
           dataUrl,
           rect,
+          viewport,
           tier: settings.ocrModelTier ?? 'small',
           language: settings.ocrLanguage ?? 'ch',
           skipOcr: !autoTranslate

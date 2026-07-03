@@ -2,11 +2,11 @@ import { recognizeImageRegion } from '../services/ocr';
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'RUN_OCR') {
-    const { dataUrl, rect, tier, language, skipOcr } = message;
+    const { dataUrl, rect, viewport, tier, language, skipOcr } = message;
 
     (async () => {
       try {
-        const result = await processOcr(dataUrl, rect, tier, language, skipOcr);
+        const result = await processOcr(dataUrl, rect, viewport, tier, language, skipOcr);
         sendResponse({ success: true, text: result.text, croppedDataUrl: result.croppedDataUrl });
       } catch (err: any) {
         console.error('OCR Error in offscreen document:', err);
@@ -21,20 +21,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 async function processOcr(
   dataUrl: string,
   rect: { x: number; y: number; width: number; height: number; devicePixelRatio?: number },
+  viewport?: { width: number; height: number },
   tier: 'tiny' | 'small' | 'medium' = 'small',
   language: 'ch' | 'latin' = 'ch',
   skipOcr = false
 ): Promise<{ text: string; croppedDataUrl: string }> {
-  const dpr = rect.devicePixelRatio || 1;
-  const sx = rect.x * dpr;
-  const sy = rect.y * dpr;
-  const sw = rect.width * dpr;
-  const sh = rect.height * dpr;
-
   return new Promise<{ text: string; croppedDataUrl: string }>((resolve, reject) => {
     const img = new Image();
     img.onload = async () => {
       try {
+        let scaleX = rect.devicePixelRatio || 1;
+        let scaleY = rect.devicePixelRatio || 1;
+        if (viewport && viewport.width && viewport.height) {
+          scaleX = img.width / viewport.width;
+          scaleY = img.height / viewport.height;
+        }
+
+        const sx = rect.x * scaleX;
+        const sy = rect.y * scaleY;
+        const sw = rect.width * scaleX;
+        const sh = rect.height * scaleY;
+
         const canvas = document.createElement('canvas');
         canvas.width = sw;
         canvas.height = sh;

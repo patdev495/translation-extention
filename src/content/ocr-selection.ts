@@ -208,6 +208,10 @@ async function finishSelection(e: MouseEvent) {
             width: width,
             height: height,
             devicePixelRatio: window.devicePixelRatio
+          },
+          viewport: {
+            width: window.innerWidth,
+            height: window.innerHeight
           }
         },
         (res) => resolve(res)
