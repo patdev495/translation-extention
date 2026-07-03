@@ -6,7 +6,6 @@ const baseSettings: Settings = {
   primaryTargetLang: 'vi',
   secondaryTargetLang: 'zh',
   reverseTargetLang: 'en',
-  hotkey: 'none',
   ocrShortcut: 'ctrl-space',
   ocrModelTier: 'medium',
   ocrLanguage: 'ch',
@@ -16,6 +15,7 @@ const baseSettings: Settings = {
   tooltipFontSize: '16',
   ocrPinImage: false,
   ocrCopyToClipboard: true,
+  autoTranslate: true,
 };
 
 describe('translation target planning', () => {

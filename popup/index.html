@@ -31,10 +31,13 @@
       </div>
       
       <!-- Active Switch -->
-      <label class="relative inline-flex items-center cursor-pointer">
-        <input type="checkbox" id="active-toggle" class="sr-only peer" checked>
-        <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
-      </label>
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-semibold text-slate-300">Bật Extension</span>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" id="active-toggle" class="sr-only peer" checked>
+          <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
+        </label>
+      </div>
     </div>
 
     <!-- Settings Form: 2 Columns -->
@@ -120,18 +123,16 @@
         <div class="bg-slate-900/40 border border-slate-800/60 rounded-xl p-3 flex flex-col gap-3">
           <h2 class="text-2xs font-bold text-slate-400 tracking-wider uppercase">Behavior & Triggers</h2>
           
-          <!-- Hotkey Modifier -->
+          <!-- Auto Translate Toggle -->
           <div class="flex items-center justify-between gap-4">
             <div class="flex flex-col">
-              <span class="text-xs font-semibold">Hotkey Modifier</span>
-              <span class="text-3xs text-slate-400">Hold key on select</span>
+              <span class="text-xs font-semibold">Dịch tự động</span>
+              <span class="text-3xs text-slate-400">Tự động dịch khi bôi đen</span>
             </div>
-            <select id="hotkey" class="bg-slate-800 border border-slate-700 rounded-lg py-1 px-2 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer w-24">
-              <option value="none">None</option>
-              <option value="ctrl">Ctrl</option>
-              <option value="alt">Alt</option>
-              <option value="shift">Shift</option>
-            </select>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="auto-translate" class="sr-only peer" checked>
+              <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
+            </label>
           </div>
 
           <div class="flex items-center justify-between gap-4">

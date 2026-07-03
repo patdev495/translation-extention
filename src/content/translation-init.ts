@@ -55,33 +55,6 @@ export function performTranslation(ctx: TranslationContext, text: string, x: num
 }
 
 /**
- * Returns true if the configured hotkey modifier is held during a mouse event.
- */
-export function isHotkeyMatched(ctx: TranslationContext, event: MouseEvent): boolean {
-  if (!ctx.settings) return true;
-  switch (ctx.settings.hotkey) {
-    case 'ctrl':  return event.ctrlKey;
-    case 'alt':   return event.altKey;
-    case 'shift': return event.shiftKey;
-    case 'none':
-    default:      return true;
-  }
-}
-
-/**
- * Returns true if the keyboard event matches the configured hotkey.
- */
-export function matchesHotkey(ctx: TranslationContext, event: KeyboardEvent): boolean {
-  if (!ctx.settings) return false;
-  switch (ctx.settings.hotkey) {
-    case 'ctrl':  return event.key === 'Control';
-    case 'alt':   return event.key === 'Alt';
-    case 'shift': return event.key === 'Shift';
-    default:      return false;
-  }
-}
-
-/**
  * Returns true if the keyboard event matches the configured OCR Shortcut settings.
  */
 export function matchesOcrShortcut(ctx: TranslationContext, event: KeyboardEvent): boolean {
@@ -102,45 +75,18 @@ export function matchesOcrShortcut(ctx: TranslationContext, event: KeyboardEvent
 }
 
 /**
- * Attaches all translation event listeners (mouseup, mousedown, keydown) to a target element.
+ * Attaches all translation event listeners (mouseup, mousedown) to a target element.
  * Works on both `document` (web) and the PDF viewer container.
  */
 export function initTranslationListeners(
   ctx: TranslationContext,
   target: EventTarget = document
 ): void {
-  // Keydown: trigger via hotkey press on existing selection
-  target.addEventListener('keydown', (e) => {
-    const event = e as KeyboardEvent;
-    if (!ctx.active || !ctx.settings || event.repeat) return;
-
-    if (matchesHotkey(ctx, event)) {
-      const selection = window.getSelection();
-      if (!selection || selection.rangeCount === 0) return;
-
-      const selectedText = selection.toString().trim();
-      if (selectedText.length === 0) return;
-
-      const activeEl = document.activeElement;
-      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || (activeEl as HTMLElement).isContentEditable)) {
-        return;
-      }
-
-      const range = selection.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
-      const x = rect.left + window.scrollX + (rect.width / 2);
-      const y = rect.top + window.scrollY;
-
-      ctx.lastSelection = { text: selectedText, x, y };
-      performTranslation(ctx, selectedText, x, y);
-    }
-  });
-
-  // Mouseup: selection tracking + trigger mode logic
+  // Mouseup: selection tracking + auto translation logic
   target.addEventListener('mouseup', (e) => {
     const event = e as MouseEvent;
     const currentSettings = ctx.settings;
-    if (!ctx.active || !currentSettings) return;
+    if (!ctx.active || !currentSettings || !currentSettings.autoTranslate) return;
 
     const isInsidePinned = event.composedPath().some(node => 
       node instanceof HTMLElement && node.classList.contains('polytranslate-pinned-wrapper')
@@ -149,7 +95,6 @@ export function initTranslationListeners(
 
     const x = event.pageX;
     const y = event.pageY;
-    const isHotkeyHeld = isHotkeyMatched(ctx, event);
     const root = document.getElementById('translation-extension-root');
     const isInsideRoot = root ? (event as any).composedPath().includes(root) : false;
 
@@ -163,16 +108,7 @@ export function initTranslationListeners(
       if (isInsideRoot) return;
 
       ctx.lastSelection = { text: selectedText, x, y };
-
-      if (currentSettings.hotkey === 'none') {
-        performTranslation(ctx, selectedText, x, y);
-      } else {
-        if (isHotkeyHeld) {
-          performTranslation(ctx, selectedText, x, y);
-        } else {
-          ctx.tooltip.showTrigger(x, y - 8);
-        }
-      }
+      performTranslation(ctx, selectedText, x, y);
     }, 10);
   });
 
@@ -191,10 +127,5 @@ export function initTranslationListeners(
     ctx.tooltip.hide();
     ctx.tooltip.hideTrigger();
   });
-
-  // Trigger button click handler
-  ctx.tooltip.onTriggerClick = () => {
-    if (!ctx.settings) return;
-    performTranslation(ctx, ctx.lastSelection.text, ctx.lastSelection.x, ctx.lastSelection.y);
-  };
 }
+

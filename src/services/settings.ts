@@ -4,7 +4,6 @@ export interface Settings {
   primaryTargetLang: TargetLanguage;
   secondaryTargetLang: TargetLanguage;
   reverseTargetLang: TargetLanguage;
-  hotkey: 'none' | 'ctrl' | 'alt' | 'shift';
   ocrShortcut: 'disabled' | 'ctrl-space' | 'alt-o' | 'ctrl-shift-o';
   ocrModelTier: 'tiny' | 'small' | 'medium';
   ocrLanguage: 'ch' | 'latin';
@@ -14,6 +13,7 @@ export interface Settings {
   tooltipFontSize: '12' | '14' | '16' | '18' | '20' | '24' | '28' | '32' | '36' | '40';
   ocrPinImage: boolean;
   ocrCopyToClipboard: boolean;
+  autoTranslate: boolean;
 }
 
 export class SettingsManager {
@@ -21,7 +21,6 @@ export class SettingsManager {
     primaryTargetLang: 'vi',
     secondaryTargetLang: 'zh',
     reverseTargetLang: 'en',
-    hotkey: 'none',
     ocrShortcut: 'ctrl-space',
     ocrModelTier: 'medium',
     ocrLanguage: 'ch',
@@ -31,6 +30,7 @@ export class SettingsManager {
     tooltipFontSize: '16',
     ocrPinImage: false,
     ocrCopyToClipboard: true,
+    autoTranslate: true,
   };
 
   static async getSettings(): Promise<Settings> {

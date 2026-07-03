@@ -24,17 +24,9 @@ _Avoid_: Screenshot translation mode, Area translate mode
 The visible feedback shown after an Image Region is selected while OCR and translation are running.
 _Avoid_: Loading spinner, Processing badge
 
-**Trigger Mode**:
-The configuration determining how the translation popup is activated upon text selection.
+**Translation Active State**:
+The enabled or disabled status of the translation feature. When enabled, text selections are automatically translated and displayed in the Translation Tooltip. When disabled, webpage text translation is skipped.
 
-**Auto Mode**:
-A Trigger Mode where the translation popup appears immediately after the user selects text.
-
-**Icon Mode**:
-A Trigger Mode where a small icon button appears near the selected text, which the user must click to show the translation popup.
-
-**Hotkey**:
-A modifier key (e.g., Ctrl, Alt, Shift) that the user must hold while selecting text to trigger the translation.
 
 **OCR Shortcut**:
 The configurable keyboard shortcut that toggles OCR Selection Mode.

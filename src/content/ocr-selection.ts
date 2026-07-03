@@ -187,7 +187,13 @@ async function finishSelection(e: MouseEvent) {
   selectionBox.style.boxShadow = 'none'; // Clear the dark cutout
 
   // Show progress indicator
-  showProgress(left, top + height, 'Preparing OCR...');
+  if (currentCtx?.settings?.autoTranslate) {
+    showProgress(left, top + height, 'Preparing OCR...');
+  } else if (currentCtx?.settings?.ocrPinImage) {
+    showProgress(left, top + height, 'Pinning image...');
+  } else {
+    showProgress(left, top + height, 'Copying image...');
+  }
 
   ocrBusy = true;
 
@@ -209,12 +215,15 @@ async function finishSelection(e: MouseEvent) {
     });
 
     if (response && response.success) {
-      if (response.data && response.data.text && currentCtx) {
+      if (response.data && currentCtx) {
         const { text, croppedDataUrl } = response.data;
         // Document-relative coords for tooltip placement
         const docX = left + window.scrollX + width / 2;
         const docY = top + window.scrollY;
-        performTranslation(currentCtx, text, docX, docY);
+
+        if (currentCtx.settings?.autoTranslate && text) {
+          performTranslation(currentCtx, text, docX, docY);
+        }
 
         if (currentCtx.settings?.ocrPinImage && croppedDataUrl) {
           addPinnedSnippet(croppedDataUrl, left, top);
@@ -224,6 +233,16 @@ async function finishSelection(e: MouseEvent) {
           copyImageToClipboard(croppedDataUrl).catch((err) => {
             console.error('Failed to copy image to clipboard:', err);
           });
+        }
+
+        if (!currentCtx.settings?.autoTranslate) {
+          cleanupOverlay();
+          return;
+        }
+
+        if (!text) {
+          updateProgressText('No text found in this region.');
+          await new Promise((r) => setTimeout(r, 2000));
         }
       } else {
         updateProgressText('No text found in this region.');

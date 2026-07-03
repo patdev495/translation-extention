@@ -382,18 +382,44 @@ async function translateOcrRegion(wrapper: HTMLElement, pageCanvas: HTMLCanvasEl
   if (ocrBusy || rect.width < 8 || rect.height < 8) return;
   ocrBusy = true;
 
-  const progress = showOcrProgress(wrapper, rect, 'Preparing OCR...');
+  let progress: HTMLElement | null = null;
+  if (translationCtx.settings?.autoTranslate) {
+    progress = showOcrProgress(wrapper, rect, 'Preparing OCR...');
+  } else if (translationCtx.settings?.ocrPinImage) {
+    progress = showOcrProgress(wrapper, rect, 'Pinning image...');
+  } else {
+    progress = showOcrProgress(wrapper, rect, 'Copying image...');
+  }
+
   try {
     const cropCanvas = cropPageCanvas(pageCanvas, wrapper, rect);
+    const croppedDataUrl = (translationCtx.settings?.ocrPinImage || translationCtx.settings?.ocrCopyToClipboard)
+      ? cropCanvas.toDataURL('image/png')
+      : null;
+
+    if (!translationCtx.settings?.autoTranslate) {
+      if (translationCtx.settings?.ocrPinImage && croppedDataUrl) {
+        addPinnedSnippet(croppedDataUrl, rect.left, rect.top);
+      }
+
+      if (translationCtx.settings?.ocrCopyToClipboard && croppedDataUrl) {
+        await copyImageToClipboard(croppedDataUrl).catch((err) => {
+          console.error('Failed to copy image to clipboard in PDF viewer:', err);
+        });
+      }
+      removeOcrProgress();
+      return;
+    }
+
     const tier = translationCtx.settings?.ocrModelTier ?? 'small';
     const lang = translationCtx.settings?.ocrLanguage ?? 'ch';
     const text = await recognizeImageRegion(cropCanvas, tier, lang, (state) => {
-      const textEl = progress.querySelector('span:last-child');
+      const textEl = progress?.querySelector('span:last-child');
       if (textEl) textEl.textContent = state.message;
     });
 
     if (!text) {
-      const textEl = progress.querySelector('span:last-child');
+      const textEl = progress?.querySelector('span:last-child');
       if (textEl) textEl.textContent = 'No text found in this region.';
       window.setTimeout(removeOcrProgress, 1800);
       return;
@@ -405,10 +431,6 @@ async function translateOcrRegion(wrapper: HTMLElement, pageCanvas: HTMLCanvasEl
     removeOcrProgress();
     performTranslation(translationCtx, text, x, y);
 
-    const croppedDataUrl = (translationCtx.settings?.ocrPinImage || translationCtx.settings?.ocrCopyToClipboard)
-      ? cropCanvas.toDataURL('image/png')
-      : null;
-
     if (translationCtx.settings?.ocrPinImage && croppedDataUrl) {
       addPinnedSnippet(croppedDataUrl, rect.left, rect.top);
     }
@@ -419,8 +441,10 @@ async function translateOcrRegion(wrapper: HTMLElement, pageCanvas: HTMLCanvasEl
       });
     }
   } catch (err) {
-    const textEl = progress.querySelector('span:last-child');
-    if (textEl) textEl.textContent = err instanceof Error ? err.message : 'OCR failed.';
+    if (progress) {
+      const textEl = progress.querySelector('span:last-child');
+      if (textEl) textEl.textContent = err instanceof Error ? err.message : 'OCR failed.';
+    }
     window.setTimeout(removeOcrProgress, 3000);
   } finally {
     ocrBusy = false;
@@ -527,21 +551,30 @@ $btnZoomFit.addEventListener('click', async () => {
 
 $btnOcrRegion.addEventListener('click', () => {
   if (ocrBusy) return;
+  if (!translationCtx.active || !translationCtx.settings) return;
+  const isOcrNeeded = translationCtx.settings.autoTranslate || translationCtx.settings.ocrPinImage || translationCtx.settings.ocrCopyToClipboard;
+  if (!isOcrNeeded) return;
+
   setOcrSelectionMode(!ocrSelectionMode);
 });
 
 document.addEventListener('keydown', (event) => {
-  if (matchesOcrShortcut(translationCtx, event)) {
-    event.preventDefault();
-    if (!ocrBusy) setOcrSelectionMode(!ocrSelectionMode);
-    return;
-  }
-
   if (event.key === 'Escape' && ocrSelectionMode) {
     event.preventDefault();
     ocrSelection?.boxEl.remove();
     ocrSelection = null;
     setOcrSelectionMode(false);
+    return;
+  }
+
+  if (!translationCtx.active || !translationCtx.settings) return;
+  const isOcrNeeded = translationCtx.settings.autoTranslate || translationCtx.settings.ocrPinImage || translationCtx.settings.ocrCopyToClipboard;
+  if (!isOcrNeeded) return;
+
+  if (matchesOcrShortcut(translationCtx, event)) {
+    event.preventDefault();
+    if (!ocrBusy) setOcrSelectionMode(!ocrSelectionMode);
+    return;
   }
 });
 

@@ -5,7 +5,6 @@ const activeToggle = document.getElementById('active-toggle') as HTMLInputElemen
 const primaryLang = document.getElementById('primary-lang') as HTMLSelectElement;
 const secondaryLang = document.getElementById('secondary-lang') as HTMLSelectElement;
 const reverseLang = document.getElementById('reverse-lang') as HTMLSelectElement;
-const hotkey = document.getElementById('hotkey') as HTMLSelectElement;
 const ocrShortcut = document.getElementById('ocr-shortcut') as HTMLSelectElement;
 const ocrModelTier = document.getElementById('ocr-model-tier') as HTMLSelectElement;
 const ocrLanguage = document.getElementById('ocr-language') as HTMLSelectElement;
@@ -13,6 +12,7 @@ const ttsToggle = document.getElementById('tts-toggle') as HTMLInputElement;
 const tooltipFontSizeSelect = document.getElementById('tooltip-font-size') as HTMLSelectElement;
 const ocrPinToggle = document.getElementById('ocr-pin-toggle') as HTMLInputElement;
 const ocrCopyToggle = document.getElementById('ocr-copy-toggle') as HTMLInputElement;
+const autoTranslateToggle = document.getElementById('auto-translate') as HTMLInputElement;
 const providerSelect = document.getElementById('provider') as HTMLSelectElement;
 const deeplKeyContainer = document.getElementById('deepl-key-container') as HTMLDivElement;
 const deeplApiKeyInput = document.getElementById('deepl-api-key') as HTMLInputElement;
@@ -115,7 +115,6 @@ async function loadSettings() {
     primaryLang.value = settings.primaryTargetLang;
     secondaryLang.value = settings.secondaryTargetLang;
     reverseLang.value = settings.reverseTargetLang;
-    hotkey.value = settings.hotkey;
     ocrShortcut.value = settings.ocrShortcut;
     ocrModelTier.value = settings.ocrModelTier;
     ocrLanguage.value = settings.ocrLanguage;
@@ -125,6 +124,7 @@ async function loadSettings() {
     tooltipFontSizeSelect.value = settings.tooltipFontSize;
     ocrPinToggle.checked = settings.ocrPinImage;
     ocrCopyToggle.checked = settings.ocrCopyToClipboard;
+    autoTranslateToggle.checked = settings.autoTranslate;
 
     updateDeepLContainer();
     triggerKeyValidation();
@@ -141,7 +141,6 @@ async function saveSettings() {
       primaryTargetLang: primaryLang.value as TargetLanguage,
       secondaryTargetLang: secondaryLang.value as TargetLanguage,
       reverseTargetLang: reverseLang.value as TargetLanguage,
-      hotkey: hotkey.value as 'none' | 'ctrl' | 'alt' | 'shift',
       ocrShortcut: ocrShortcut.value as 'disabled' | 'ctrl-space' | 'alt-o' | 'ctrl-shift-o',
       ocrModelTier: ocrModelTier.value as 'tiny' | 'small' | 'medium',
       ocrLanguage: ocrLanguage.value as 'ch' | 'latin',
@@ -151,6 +150,7 @@ async function saveSettings() {
       tooltipFontSize: tooltipFontSizeSelect.value as '12' | '14' | '16' | '18' | '20' | '24' | '28' | '32' | '36' | '40',
       ocrPinImage: ocrPinToggle.checked,
       ocrCopyToClipboard: ocrCopyToggle.checked,
+      autoTranslate: autoTranslateToggle.checked,
     });
 
     // Notify active tabs of settings update
@@ -180,12 +180,12 @@ activeToggle.addEventListener('change', saveSettings);
 primaryLang.addEventListener('change', saveSettings);
 secondaryLang.addEventListener('change', saveSettings);
 reverseLang.addEventListener('change', saveSettings);
-hotkey.addEventListener('change', saveSettings);
 ocrShortcut.addEventListener('change', saveSettings);
 ocrModelTier.addEventListener('change', saveSettings);
 ocrLanguage.addEventListener('change', saveSettings);
 ttsToggle.addEventListener('change', saveSettings);
 tooltipFontSizeSelect.addEventListener('change', saveSettings);
+autoTranslateToggle.addEventListener('change', saveSettings);
 ocrPinToggle.addEventListener('change', saveSettings);
 ocrCopyToggle.addEventListener('change', saveSettings);
 

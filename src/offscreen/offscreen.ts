@@ -2,11 +2,11 @@ import { recognizeImageRegion } from '../services/ocr';
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'RUN_OCR') {
-    const { dataUrl, rect, tier, language } = message;
+    const { dataUrl, rect, tier, language, skipOcr } = message;
 
     (async () => {
       try {
-        const result = await processOcr(dataUrl, rect, tier, language);
+        const result = await processOcr(dataUrl, rect, tier, language, skipOcr);
         sendResponse({ success: true, text: result.text, croppedDataUrl: result.croppedDataUrl });
       } catch (err: any) {
         console.error('OCR Error in offscreen document:', err);
@@ -22,7 +22,8 @@ async function processOcr(
   dataUrl: string,
   rect: { x: number; y: number; width: number; height: number; devicePixelRatio?: number },
   tier: 'tiny' | 'small' | 'medium' = 'small',
-  language: 'ch' | 'latin' = 'ch'
+  language: 'ch' | 'latin' = 'ch',
+  skipOcr = false
 ): Promise<{ text: string; croppedDataUrl: string }> {
   const dpr = rect.devicePixelRatio || 1;
   const sx = rect.x * dpr;
@@ -56,15 +57,18 @@ async function processOcr(
         );
 
         // Run local OCR
-        const text = await recognizeImageRegion(canvas, tier, language, (progress) => {
-          // Send progress back to background (which will relay it to content script)
-          chrome.runtime.sendMessage({
-            type: 'OCR_PROGRESS',
-            progress
-          }).catch(() => {
-            // Ignore channel closed errors if background is not listening
+        let text = '';
+        if (!skipOcr) {
+          text = await recognizeImageRegion(canvas, tier, language, (progress) => {
+            // Send progress back to background (which will relay it to content script)
+            chrome.runtime.sendMessage({
+              type: 'OCR_PROGRESS',
+              progress
+            }).catch(() => {
+              // Ignore channel closed errors if background is not listening
+            });
           });
-        });
+        }
 
         const croppedDataUrl = canvas.toDataURL('image/png');
         resolve({ text, croppedDataUrl });

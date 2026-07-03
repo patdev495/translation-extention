@@ -29,6 +29,9 @@ initTranslationListeners(ctx, document);
 document.addEventListener('keydown', (event) => {
   if (!ctx.active || !ctx.settings) return;
 
+  const isOcrNeeded = ctx.settings.autoTranslate || ctx.settings.ocrPinImage || ctx.settings.ocrCopyToClipboard;
+  if (!isOcrNeeded) return;
+
   if (matchesOcrShortcut(ctx, event)) {
     // If the active element is an input, textarea, or contenteditable, don't trigger the shortcut
     const activeEl = document.activeElement;
