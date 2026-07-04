@@ -65,7 +65,7 @@ export class TranslationTooltip {
 
     this.tooltipEl = document.createElement('div');
     this.tooltipEl.id = 'tooltip';
-    this.tooltipEl.className = 'hidden absolute bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border border-slate-200/50 dark:border-slate-800/50 rounded-2xl shadow-2xl p-4 text-sm max-w-[90vw] transition-opacity duration-200 text-slate-800 dark:text-slate-200 font-sans z-50 cursor-move';
+    this.tooltipEl.className = 'hidden absolute bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border border-slate-200/50 dark:border-slate-800/50 rounded-2xl shadow-2xl p-4 text-sm max-w-[90vw] max-h-[90vh] overflow-y-auto transition-opacity duration-200 text-slate-800 dark:text-slate-200 font-sans z-50 cursor-move';
     this.tooltipEl.style.transform = 'translate(-50%, -50%)';
     this.shadow.appendChild(this.tooltipEl);
 
