@@ -234,8 +234,8 @@ export class TranslationTooltip {
       <div class="flex flex-col gap-2.5 cursor-default" style="width: ${widthStyle}; min-width: 18em; max-width: 90vw;">
         <!-- Source Block -->
         <div class="flex flex-col gap-1">
-          <div class="flex items-start justify-between gap-2">
-            <span class="font-bold text-slate-900 dark:text-white leading-tight break-words flex-1 whitespace-pre-wrap">${this.escapeHtml(sourceText)}</span>
+          <div class="flex items-center justify-between gap-2 pb-1.5 border-b border-slate-150 dark:border-slate-800/80 mb-1">
+            <span class="text-3xs font-bold text-slate-400 dark:text-slate-500 tracking-wider uppercase">${getLangLabel(detectedLang)} (Gốc)</span>
             <div class="flex items-center gap-1.5 shrink-0">
               <!-- Phonetics Toggle Button -->
               <button class="phonetics-toggle-button p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors cursor-pointer shrink-0" title="Toggle phonetics (IPA/Pinyin)">
@@ -259,6 +259,7 @@ export class TranslationTooltip {
               ` : ''}
             </div>
           </div>
+          <span class="font-bold text-slate-900 dark:text-white leading-tight break-words whitespace-pre-wrap mb-1">${this.escapeHtml(sourceText)}</span>
           ${sourcePhonetics ? `
             <span class="phonetics-container text-xs font-mono text-blue-500 dark:text-blue-400 font-semibold break-words leading-none ${phoneticsVisible ? '' : 'hidden'}">${sourcePhonetics}</span>
           ` : ''}
