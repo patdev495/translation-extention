@@ -10,7 +10,7 @@ export interface Settings {
   ttsEnabled: boolean;
   provider: 'google' | 'deepl';
   deeplApiKey: string;
-  tooltipFontSize: '12' | '14' | '16' | '18' | '20' | '24' | '28' | '32' | '36' | '40';
+  tooltipFontSize: '12' | '14' | '16' | '18' | '20' | '24' | '28' | '32' | '36' | '40' | '48' | '56' | '64' | '72' | '80';
   ocrPinImage: boolean;
   ocrCopyToClipboard: boolean;
   autoTranslate: boolean;
