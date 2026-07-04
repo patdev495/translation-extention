@@ -18,10 +18,14 @@ async function getCmuDict(): Promise<Record<string, string>> {
 
 export class PhoneticEngine {
   static getPinyin(text: string): string {
-    const rawPinyin = pinyin(text, { nonZh: 'consecutive' });
-    const cleanSpaces = rawPinyin.replace(/\s+/g, ' ').trim();
-    // Remove space before common full-width and half-width punctuation marks
-    return cleanSpaces.replace(/\s([。，、；：？！…“”‘’（）[\]{}.,;:?!])/g, '$1');
+    const lines = text.split('\n');
+    const processedLines = lines.map(line => {
+      const rawPinyin = pinyin(line, { nonZh: 'consecutive' });
+      const cleanSpaces = rawPinyin.replace(/\s+/g, ' ').trim();
+      // Remove space before common full-width and half-width punctuation marks
+      return cleanSpaces.replace(/\s([。，、；：？！…“”‘’（）[\]{}.,;:?!])/g, '$1');
+    });
+    return processedLines.join('\n');
   }
 
   static async getEnglishIPA(text: string): Promise<string> {

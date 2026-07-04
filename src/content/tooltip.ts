@@ -261,7 +261,7 @@ export class TranslationTooltip {
           </div>
           <span class="font-bold text-slate-900 dark:text-white leading-tight break-words whitespace-pre-wrap mb-1">${this.escapeHtml(sourceText)}</span>
           ${sourcePhonetics ? `
-            <span class="phonetics-container text-xs font-mono text-blue-500 dark:text-blue-400 font-semibold break-words leading-none ${phoneticsVisible ? '' : 'hidden'}">${sourcePhonetics}</span>
+            <span class="phonetics-container text-xs font-mono text-blue-500 dark:text-blue-400 font-semibold break-words leading-normal whitespace-pre-wrap ${phoneticsVisible ? '' : 'hidden'}">${sourcePhonetics}</span>
           ` : ''}
         </div>
 
@@ -295,7 +295,7 @@ export class TranslationTooltip {
           </div>
           <span class="text-slate-800 dark:text-slate-200 font-medium leading-normal break-words whitespace-pre-wrap">${this.escapeHtml(translation1.text)}</span>
           ${translation1.phonetics ? `
-            <span class="phonetics-container text-xs font-mono text-teal-600 dark:text-teal-400 font-medium break-words leading-none ${phoneticsVisible ? '' : 'hidden'}">${translation1.phonetics}</span>
+            <span class="phonetics-container text-xs font-mono text-teal-600 dark:text-teal-400 font-medium break-words leading-normal whitespace-pre-wrap ${phoneticsVisible ? '' : 'hidden'}">${translation1.phonetics}</span>
           ` : ''}
         </div>
         ` : ''}
@@ -330,7 +330,7 @@ export class TranslationTooltip {
           </div>
           <span class="text-slate-800 dark:text-slate-200 font-medium leading-normal break-words whitespace-pre-wrap">${this.escapeHtml(translation2.text)}</span>
           ${translation2.phonetics ? `
-            <span class="phonetics-container text-xs font-mono text-teal-600 dark:text-teal-400 font-medium break-words leading-none ${phoneticsVisible ? '' : 'hidden'}">${translation2.phonetics}</span>
+            <span class="phonetics-container text-xs font-mono text-teal-600 dark:text-teal-400 font-medium break-words leading-normal whitespace-pre-wrap ${phoneticsVisible ? '' : 'hidden'}">${translation2.phonetics}</span>
           ` : ''}
         </div>
         ` : ''}
