@@ -84,7 +84,7 @@ function initOverlay() {
             const docY = top + window.scrollY;
 
             if (currentCtx.settings?.autoTranslate && text) {
-              performTranslation(currentCtx, text, docX, docY);
+              performTranslation(currentCtx, text, docX, docY, width);
             }
 
             if (currentCtx.settings?.ocrPinImage && croppedDataUrl) {

@@ -196,7 +196,7 @@ export class TranslationTooltip {
     });
   }
 
-  show(x: number, y: number, sourceText: string, data: any, ttsEnabled: boolean = true, phoneticsVisible: boolean = true) {
+  show(x: number, y: number, sourceText: string, data: any, ttsEnabled: boolean = true, phoneticsVisible: boolean = true, ocrWidth?: number) {
     if (!this.tooltipEl || !this.shadow) return;
 
     const { detectedLang, sourcePhonetics } = data;
@@ -229,12 +229,13 @@ export class TranslationTooltip {
       `;
     };
 
+    const widthStyle = ocrWidth ? `${ocrWidth}px` : '18em';
     let content = `
-      <div class="flex flex-col gap-2.5 w-[18em] cursor-default">
+      <div class="flex flex-col gap-2.5 cursor-default" style="width: ${widthStyle}; min-width: 18em; max-width: 90vw;">
         <!-- Source Block -->
         <div class="flex flex-col gap-1">
           <div class="flex items-start justify-between gap-2">
-            <span class="font-bold text-slate-900 dark:text-white leading-tight break-words flex-1">${this.escapeHtml(sourceText)}</span>
+            <span class="font-bold text-slate-900 dark:text-white leading-tight break-words flex-1 whitespace-pre-wrap">${this.escapeHtml(sourceText)}</span>
             <div class="flex items-center gap-1.5 shrink-0">
               <!-- Phonetics Toggle Button -->
               <button class="phonetics-toggle-button p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors cursor-pointer shrink-0" title="Toggle phonetics (IPA/Pinyin)">
@@ -291,7 +292,7 @@ export class TranslationTooltip {
               ` : ''}
             </div>
           </div>
-          <span class="text-slate-800 dark:text-slate-200 font-medium leading-normal break-words">${this.escapeHtml(translation1.text)}</span>
+          <span class="text-slate-800 dark:text-slate-200 font-medium leading-normal break-words whitespace-pre-wrap">${this.escapeHtml(translation1.text)}</span>
           ${translation1.phonetics ? `
             <span class="phonetics-container text-xs font-mono text-teal-600 dark:text-teal-400 font-medium break-words leading-none ${phoneticsVisible ? '' : 'hidden'}">${translation1.phonetics}</span>
           ` : ''}
@@ -326,7 +327,7 @@ export class TranslationTooltip {
               ` : ''}
             </div>
           </div>
-          <span class="text-slate-800 dark:text-slate-200 font-medium leading-normal break-words">${this.escapeHtml(translation2.text)}</span>
+          <span class="text-slate-800 dark:text-slate-200 font-medium leading-normal break-words whitespace-pre-wrap">${this.escapeHtml(translation2.text)}</span>
           ${translation2.phonetics ? `
             <span class="phonetics-container text-xs font-mono text-teal-600 dark:text-teal-400 font-medium break-words leading-none ${phoneticsVisible ? '' : 'hidden'}">${translation2.phonetics}</span>
           ` : ''}

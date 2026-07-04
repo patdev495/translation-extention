@@ -42,7 +42,7 @@ export async function loadSettings(ctx: TranslationContext): Promise<void> {
 /**
  * Sends a translation request to the service worker and shows the tooltip.
  */
-export function performTranslation(ctx: TranslationContext, text: string, x: number, y: number): void {
+export function performTranslation(ctx: TranslationContext, text: string, x: number, y: number, ocrWidth?: number): void {
   if (!ctx.settings) return;
 
   chrome.runtime.sendMessage(
@@ -55,7 +55,8 @@ export function performTranslation(ctx: TranslationContext, text: string, x: num
           text,
           response.data,
           ctx.settings?.ttsEnabled ?? true,
-          ctx.settings?.phoneticsVisible ?? true
+          ctx.settings?.phoneticsVisible ?? true,
+          ocrWidth
         );
       } else {
         console.error('Translation error:', response?.error);
