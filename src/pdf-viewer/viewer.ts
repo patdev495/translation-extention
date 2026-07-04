@@ -406,7 +406,7 @@ async function translateOcrRegion(wrapper: HTMLElement, pageCanvas: HTMLCanvasEl
     const x = wrapperRect.left + window.scrollX + rect.left + rect.width / 2;
     const y = wrapperRect.top + window.scrollY + rect.top;
     ocrSelectionOverlay?.removeProgress();
-    performTranslation(translationCtx, text, x, y);
+    performTranslation(translationCtx, text, x, y, rect.width);
 
     if (translationCtx.settings?.ocrPinImage && croppedDataUrl) {
       addPinnedSnippet(croppedDataUrl, rect.left, rect.top, rect.width, rect.height);
