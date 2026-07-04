@@ -209,6 +209,17 @@
 
           <div class="flex items-center justify-between gap-4 pt-1.5 border-t border-slate-800/40">
             <div class="flex flex-col">
+              <span class="text-xs font-semibold">Hiện phiên âm (Phonetics)</span>
+              <span class="text-3xs text-slate-400">Hiển thị IPA và Pinyin trong tooltip</span>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="phonetics-toggle" class="sr-only peer" checked>
+              <div class="w-8 h-4.5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[14px] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-blue-500"></div>
+            </label>
+          </div>
+
+          <div class="flex items-center justify-between gap-4 pt-1.5 border-t border-slate-800/40">
+            <div class="flex flex-col">
               <span class="text-xs font-semibold">Pin OCR Image</span>
               <span class="text-3xs text-slate-400">Keep cropped screenshot on screen</span>
             </div>

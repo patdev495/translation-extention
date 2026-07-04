@@ -52,6 +52,7 @@ describe('SettingsManager', () => {
       ocrPinImage: false,
       ocrCopyToClipboard: true,
       autoTranslate: true,
+      phoneticsVisible: true,
     });
   });
 

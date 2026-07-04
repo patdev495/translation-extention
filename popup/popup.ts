@@ -13,6 +13,7 @@ const tooltipFontSizeSelect = document.getElementById('tooltip-font-size') as HT
 const ocrPinToggle = document.getElementById('ocr-pin-toggle') as HTMLInputElement;
 const ocrCopyToggle = document.getElementById('ocr-copy-toggle') as HTMLInputElement;
 const autoTranslateToggle = document.getElementById('auto-translate') as HTMLInputElement;
+const phoneticsToggle = document.getElementById('phonetics-toggle') as HTMLInputElement;
 const providerSelect = document.getElementById('provider') as HTMLSelectElement;
 const deeplKeyContainer = document.getElementById('deepl-key-container') as HTMLDivElement;
 const deeplApiKeyInput = document.getElementById('deepl-api-key') as HTMLInputElement;
@@ -125,6 +126,7 @@ async function loadSettings() {
     ocrPinToggle.checked = settings.ocrPinImage;
     ocrCopyToggle.checked = settings.ocrCopyToClipboard;
     autoTranslateToggle.checked = settings.autoTranslate;
+    phoneticsToggle.checked = settings.phoneticsVisible;
 
     updateDeepLContainer();
     triggerKeyValidation();
@@ -151,6 +153,7 @@ async function saveSettings() {
       ocrPinImage: ocrPinToggle.checked,
       ocrCopyToClipboard: ocrCopyToggle.checked,
       autoTranslate: autoTranslateToggle.checked,
+      phoneticsVisible: phoneticsToggle.checked,
     });
 
     // Notify active tabs of settings update
@@ -188,6 +191,7 @@ tooltipFontSizeSelect.addEventListener('change', saveSettings);
 autoTranslateToggle.addEventListener('change', saveSettings);
 ocrPinToggle.addEventListener('change', saveSettings);
 ocrCopyToggle.addEventListener('change', saveSettings);
+phoneticsToggle.addEventListener('change', saveSettings);
 
 providerSelect.addEventListener('change', () => {
   updateDeepLContainer();
@@ -223,3 +227,15 @@ toggleDeeplKeyBtn.addEventListener('click', () => {
 // Load on startup
 document.addEventListener('DOMContentLoaded', loadSettings);
 loadSettings();
+
+// Listen for storage changes to sync settings dynamically
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === 'local' && changes.settings) {
+    const newSettings = changes.settings.newValue;
+    if (newSettings && newSettings.phoneticsVisible !== undefined) {
+      if (phoneticsToggle.checked !== newSettings.phoneticsVisible) {
+        phoneticsToggle.checked = newSettings.phoneticsVisible;
+      }
+    }
+  }
+});

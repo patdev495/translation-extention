@@ -16,6 +16,7 @@ const baseSettings: Settings = {
   ocrPinImage: false,
   ocrCopyToClipboard: true,
   autoTranslate: true,
+  phoneticsVisible: true,
 };
 
 describe('translation target planning', () => {

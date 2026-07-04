@@ -22,6 +22,13 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 });
 
+// Listen for storage changes to sync settings dynamically
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === 'local' && (changes.settings || changes.active)) {
+    loadSettings(ctx);
+  }
+});
+
 // Attach all translation event listeners to the document
 initTranslationListeners(ctx, document);
 

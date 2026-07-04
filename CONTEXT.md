@@ -63,6 +63,12 @@ The text-to-speech capability (audio button) that reads aloud the Source Text.
 **Phonetic Transcription**:
 The pronunciation representation (IPA for English, Pinyin for Chinese) shown in the Translation Tooltip.
 
+**Phonetics Visibility State**:
+The configuration setting determining whether Phonetic Transcription is displayed inside the Translation Tooltip.
+_Default_: true
+_Avoid_: Pronunciation toggle, Phonetics switch
+
+
 **Translation Tooltip**:
 The floating popup card displayed near the selected Source Text containing the translation, Phonetic Transcription, and TTS controls.
 

@@ -31,6 +31,9 @@ export async function loadSettings(ctx: TranslationContext): Promise<void> {
     if (ctx.settings && ctx.settings.tooltipFontSize) {
       ctx.tooltip.updateFontSize(ctx.settings.tooltipFontSize);
     }
+    if (ctx.settings && ctx.settings.phoneticsVisible !== undefined) {
+      ctx.tooltip.updatePhoneticsVisibility(ctx.settings.phoneticsVisible);
+    }
   } catch (err) {
     console.error('Failed to load settings:', err);
   }
@@ -46,7 +49,14 @@ export function performTranslation(ctx: TranslationContext, text: string, x: num
     { type: 'TRANSLATE', text },
     (response) => {
       if (response && response.success) {
-        ctx.tooltip.show(x, y - 8, text, response.data, ctx.settings?.ttsEnabled ?? true);
+        ctx.tooltip.show(
+          x,
+          y - 8,
+          text,
+          response.data,
+          ctx.settings?.ttsEnabled ?? true,
+          ctx.settings?.phoneticsVisible ?? true
+        );
       } else {
         console.error('Translation error:', response?.error);
       }

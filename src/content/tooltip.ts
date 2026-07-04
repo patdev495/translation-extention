@@ -1,3 +1,16 @@
+const EYE_OPEN_SVG = `
+<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5">
+  <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.43 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+  <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+</svg>
+`;
+
+const EYE_SLASH_SVG = `
+<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5 opacity-60">
+  <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.893 7.893 3 3m-3-3a8.959 8.959 0 0 1-4.563 1.258m-.54-2.11a3 3 0 0 1-3.72-3.72m1.04-1.04 3.72 3.72M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9" />
+</svg>
+`;
+
 export class TranslationTooltip {
   private container: HTMLDivElement | null = null;
   private shadow: ShadowRoot | null = null;
@@ -81,6 +94,33 @@ export class TranslationTooltip {
         return;
       }
 
+      // Handle Phonetics Toggle click
+      const phoneticsToggleBtn = target.closest('.phonetics-toggle-button') as HTMLButtonElement | null;
+      if (phoneticsToggleBtn) {
+        const containers = this.shadow!.querySelectorAll('.phonetics-container');
+        const currentlyVisible = containers.length > 0 ? !containers[0].classList.contains('hidden') : true;
+        const newVisibleState = !currentlyVisible;
+
+        containers.forEach(container => {
+          if (newVisibleState) {
+            container.classList.remove('hidden');
+          } else {
+            container.classList.add('hidden');
+          }
+        });
+
+        // Update the button icon
+        phoneticsToggleBtn.innerHTML = newVisibleState ? EYE_OPEN_SVG : EYE_SLASH_SVG;
+
+        // Persist to chrome.storage.local
+        chrome.storage.local.get('settings', (res) => {
+          const settings = res.settings || {};
+          settings.phoneticsVisible = newVisibleState;
+          chrome.storage.local.set({ settings });
+        });
+        return;
+      }
+
       // Handle Copy Button click
       const copyBtn = target.closest('.copy-button');
       if (copyBtn) {
@@ -156,7 +196,7 @@ export class TranslationTooltip {
     });
   }
 
-  show(x: number, y: number, sourceText: string, data: any, ttsEnabled: boolean = true) {
+  show(x: number, y: number, sourceText: string, data: any, ttsEnabled: boolean = true, phoneticsVisible: boolean = true) {
     if (!this.tooltipEl || !this.shadow) return;
 
     const { detectedLang, sourcePhonetics } = data;
@@ -196,6 +236,10 @@ export class TranslationTooltip {
           <div class="flex items-start justify-between gap-2">
             <span class="font-bold text-slate-900 dark:text-white leading-tight break-words flex-1">${this.escapeHtml(sourceText)}</span>
             <div class="flex items-center gap-1.5 shrink-0">
+              <!-- Phonetics Toggle Button -->
+              <button class="phonetics-toggle-button p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors cursor-pointer shrink-0" title="Toggle phonetics (IPA/Pinyin)">
+                ${phoneticsVisible ? EYE_OPEN_SVG : EYE_SLASH_SVG}
+              </button>
               <!-- Copy Button -->
               <button class="copy-button p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors cursor-pointer shrink-0" data-text="${this.escapeHtml(sourceText)}" title="Copy text">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5">
@@ -215,7 +259,7 @@ export class TranslationTooltip {
             </div>
           </div>
           ${sourcePhonetics ? `
-            <span class="text-xs font-mono text-blue-500 dark:text-blue-400 font-semibold break-words leading-none">${sourcePhonetics}</span>
+            <span class="phonetics-container text-xs font-mono text-blue-500 dark:text-blue-400 font-semibold break-words leading-none ${phoneticsVisible ? '' : 'hidden'}">${sourcePhonetics}</span>
           ` : ''}
         </div>
 
@@ -249,7 +293,7 @@ export class TranslationTooltip {
           </div>
           <span class="text-slate-800 dark:text-slate-200 font-medium leading-normal break-words">${this.escapeHtml(translation1.text)}</span>
           ${translation1.phonetics ? `
-            <span class="text-xs font-mono text-teal-600 dark:text-teal-400 font-medium break-words leading-none">${translation1.phonetics}</span>
+            <span class="phonetics-container text-xs font-mono text-teal-600 dark:text-teal-400 font-medium break-words leading-none ${phoneticsVisible ? '' : 'hidden'}">${translation1.phonetics}</span>
           ` : ''}
         </div>
         ` : ''}
@@ -284,7 +328,7 @@ export class TranslationTooltip {
           </div>
           <span class="text-slate-800 dark:text-slate-200 font-medium leading-normal break-words">${this.escapeHtml(translation2.text)}</span>
           ${translation2.phonetics ? `
-            <span class="text-xs font-mono text-teal-600 dark:text-teal-400 font-medium break-words leading-none">${translation2.phonetics}</span>
+            <span class="phonetics-container text-xs font-mono text-teal-600 dark:text-teal-400 font-medium break-words leading-none ${phoneticsVisible ? '' : 'hidden'}">${translation2.phonetics}</span>
           ` : ''}
         </div>
         ` : ''}
@@ -381,6 +425,22 @@ export class TranslationTooltip {
   updateFontSize(size: string) {
     if (this.tooltipEl) {
       this.tooltipEl.style.setProperty('--tooltip-font-size', `${size}px`);
+    }
+  }
+
+  updatePhoneticsVisibility(visible: boolean) {
+    if (!this.tooltipEl || !this.shadow) return;
+    const containers = this.shadow.querySelectorAll('.phonetics-container');
+    containers.forEach(container => {
+      if (visible) {
+        container.classList.remove('hidden');
+      } else {
+        container.classList.add('hidden');
+      }
+    });
+    const phoneticsToggleBtn = this.shadow.querySelector('.phonetics-toggle-button');
+    if (phoneticsToggleBtn) {
+      phoneticsToggleBtn.innerHTML = visible ? EYE_OPEN_SVG : EYE_SLASH_SVG;
     }
   }
 

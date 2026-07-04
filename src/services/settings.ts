@@ -14,6 +14,7 @@ export interface Settings {
   ocrPinImage: boolean;
   ocrCopyToClipboard: boolean;
   autoTranslate: boolean;
+  phoneticsVisible: boolean;
 }
 
 export class SettingsManager {
@@ -31,6 +32,7 @@ export class SettingsManager {
     ocrPinImage: false,
     ocrCopyToClipboard: true,
     autoTranslate: true,
+    phoneticsVisible: true,
   };
 
   static async getSettings(): Promise<Settings> {

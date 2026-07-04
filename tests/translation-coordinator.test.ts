@@ -41,6 +41,7 @@ const mockSettings: Settings = {
   ocrPinImage: false,
   ocrCopyToClipboard: true,
   autoTranslate: true,
+  phoneticsVisible: true,
 };
 
 describe('detectLanguageOffline', () => {
