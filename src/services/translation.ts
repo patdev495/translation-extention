@@ -8,53 +8,12 @@ export interface TranslationSettings {
   deeplApiKey: string;
 }
 
-export class TranslationEngine {
-  // Original translation method preserved for tests & compatibility
-  static async translate(
-    text: string,
-    primaryTarget: string,
-    secondaryTarget: string
-  ): Promise<TranslationResult> {
-    const runTranslation = async (target: string) => {
-      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${target}&dt=t&q=${encodeURIComponent(text)}`;
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch translation: ${response.statusText}`);
-      }
-      const data = await response.json();
-      
-      let translation = '';
-      if (data && data[0]) {
-        translation = data[0]
-          .map((x: any) => x[0])
-          .filter((x: any) => typeof x === 'string')
-          .join('');
-      }
-      
-      const detectedLang = data && data[2] ? data[2] : 'auto';
-      return { translation, detectedLang };
-    };
+export interface TranslationProvider {
+  translate(text: string, targetLang: string): Promise<TranslationResult>;
+}
 
-    const result = await runTranslation(primaryTarget);
-    if (result.detectedLang === primaryTarget) {
-      return await runTranslation(secondaryTarget);
-    }
-    return result;
-  }
-
-  // Unified translation method using settings provider
-  static async translateWithSettings(
-    text: string,
-    targetLang: string,
-    settings: TranslationSettings
-  ): Promise<TranslationResult> {
-    if (settings.provider === 'deepl') {
-      return this.translateDeepL(text, targetLang, settings.deeplApiKey);
-    }
-    return this.translateGoogle(text, targetLang);
-  }
-
-  static async translateGoogle(text: string, targetLang: string): Promise<TranslationResult> {
+export class GoogleTranslationProvider implements TranslationProvider {
+  async translate(text: string, targetLang: string): Promise<TranslationResult> {
     const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
     const response = await fetch(url);
     if (!response.ok) {
@@ -73,13 +32,17 @@ export class TranslationEngine {
     const detectedLang = data && data[2] ? data[2] : 'auto';
     return { translation, detectedLang };
   }
+}
 
-  static async translateDeepL(text: string, targetLang: string, apiKey: string): Promise<TranslationResult> {
-    if (!apiKey) {
+export class DeepLTranslationProvider implements TranslationProvider {
+  constructor(private apiKey: string) {}
+
+  async translate(text: string, targetLang: string): Promise<TranslationResult> {
+    if (!this.apiKey) {
       throw new Error('DeepL API Key is missing. Please configure it in settings.');
     }
 
-    const isFreeKey = apiKey.endsWith(':fx');
+    const isFreeKey = this.apiKey.endsWith(':fx');
     const baseUrl = isFreeKey
       ? 'https://api-free.deepl.com/v2/translate'
       : 'https://api.deepl.com/v2/translate';
@@ -94,7 +57,7 @@ export class TranslationEngine {
     const response = await fetch(baseUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `DeepL-Auth-Key ${apiKey}`,
+        'Authorization': `DeepL-Auth-Key ${this.apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -121,5 +84,47 @@ export class TranslationEngine {
     }
 
     throw new Error('DeepL translation returned empty result.');
+  }
+}
+
+export class TranslationEngine {
+  // Original translation method preserved for tests & compatibility
+  static async translate(
+    text: string,
+    primaryTarget: string,
+    secondaryTarget: string
+  ): Promise<TranslationResult> {
+    const google = new GoogleTranslationProvider();
+    const result = await google.translate(text, primaryTarget);
+    if (result.detectedLang === primaryTarget) {
+      return await google.translate(text, secondaryTarget);
+    }
+    return result;
+  }
+
+  // Unified translation method using settings provider
+  static async translateWithSettings(
+    text: string,
+    targetLang: string,
+    settings: TranslationSettings
+  ): Promise<TranslationResult> {
+    let provider: TranslationProvider;
+    if (settings.provider === 'deepl') {
+      provider = new DeepLTranslationProvider(settings.deeplApiKey);
+    } else {
+      provider = new GoogleTranslationProvider();
+    }
+    return provider.translate(text, targetLang);
+  }
+
+  // Preserved static compatibility methods
+  static async translateGoogle(text: string, targetLang: string): Promise<TranslationResult> {
+    const google = new GoogleTranslationProvider();
+    return google.translate(text, targetLang);
+  }
+
+  static async translateDeepL(text: string, targetLang: string, apiKey: string): Promise<TranslationResult> {
+    const deepl = new DeepLTranslationProvider(apiKey);
+    return deepl.translate(text, targetLang);
   }
 }

@@ -1,8 +1,6 @@
-import { TranslationEngine } from '../services/translation';
 import { SettingsManager } from '../services/settings';
-import { PhoneticEngine } from '../services/phonetics';
 import { PDF_VIEWER_PATH, shouldUseExtensionPdfViewer } from './pdf-redirect';
-import { getDetectionTarget, getTranslationTargets } from '../services/translation-plan';
+import { TranslationCoordinator } from '../services/translation-coordinator';
 
 // ─── PDF Redirect Logic ────────────────────────────────────────────────────
 
@@ -149,89 +147,11 @@ async function cropScreenshot(
   return `data:image/png;base64,${base64}`;
 }
 
-function detectLanguageOffline(text: string): 'en' | 'vi' | 'zh' | null {
-  const clean = text.trim();
-  if (!clean) return null;
-
-  // 1. Check Chinese characters (CJK Unified Ideographs)
-  if (/[\u4e00-\u9fff]/.test(clean)) {
-    return 'zh';
-  }
-
-  // 2. Check Vietnamese specific accented characters
-  const viPattern = /[áàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ]/;
-  if (viPattern.test(clean)) {
-    return 'vi';
-  }
-
-  // 3. Check English (strictly standard characters, numbers, common punctuation, spaces)
-  if (/^[a-zA-Z0-9\s.,;:?!'’"\-()\[\]{}]+$/.test(clean)) {
-    return 'en';
-  }
-
-  return null;
-}
-
 // ─── Translation Helper ─────────────────────────────────────────────────────
 
 async function translateText(text: string) {
   const settings = await SettingsManager.getSettings();
-
-  let detectedLang: string;
-  let firstRes = null;
-  let targetLangs;
-
-  const offlineLang = detectLanguageOffline(text);
-  if (offlineLang) {
-    detectedLang = offlineLang;
-    targetLangs = getTranslationTargets(settings, detectedLang);
-  } else {
-    // Fallback: Use the first enabled target to detect the source language.
-    const detectionTarget = getDetectionTarget(settings);
-    firstRes = detectionTarget
-      ? await TranslationEngine.translateWithSettings(text, detectionTarget, settings)
-      : null;
-    detectedLang = firstRes?.detectedLang ?? 'auto';
-    targetLangs = getTranslationTargets(settings, detectedLang);
-  }
-
-  const translations = await Promise.all(
-    targetLangs.map(async ({ lang }) => {
-      const result = firstRes && lang === getDetectionTarget(settings)
-        ? firstRes
-        : await TranslationEngine.translateWithSettings(text, lang, settings);
-
-      let phonetics = '';
-      if (lang === 'en') {
-        phonetics = await PhoneticEngine.getEnglishIPA(result.translation);
-      } else if (lang === 'zh') {
-        phonetics = PhoneticEngine.getPinyin(result.translation);
-      }
-
-      return {
-        lang,
-        text: result.translation,
-        phonetics
-      };
-    })
-  );
-
-  // 3. Generate Phonetics (IPA/Pinyin)
-  let sourcePhonetics = '';
-  const isSourceChinese = ['zh', 'zh-CN', 'zh-TW', 'zh-cn', 'zh-tw'].includes(detectedLang);
-  const isSourceEnglish = detectedLang === 'en';
-
-  if (isSourceEnglish) {
-    sourcePhonetics = await PhoneticEngine.getEnglishIPA(text);
-  } else if (isSourceChinese) {
-    sourcePhonetics = PhoneticEngine.getPinyin(text);
-  }
-
-  return {
-    detectedLang,
-    sourcePhonetics,
-    translations
-  };
+  return TranslationCoordinator.translate(text, settings);
 }
 
 // ─── Message Handlers ──────────────────────────────────────────────────────
