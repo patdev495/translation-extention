@@ -36,6 +36,77 @@ export function detectLanguageOffline(text: string): 'en' | 'vi' | 'zh' | null {
   return null;
 }
 
+function splitBySourceLineShape(sourceText: string, translatedText: string): string {
+  const sourceLines = sourceText.split(/\r?\n/);
+  if (sourceLines.length < 2 || translatedText.includes('\n')) {
+    return translatedText;
+  }
+
+  const nonEmptySourceLines = sourceLines.map(line => line.trim()).filter(Boolean);
+  if (nonEmptySourceLines.length < 2) {
+    return translatedText;
+  }
+
+  const totalSourceLength = nonEmptySourceLines.reduce((sum, line) => sum + line.length, 0);
+  if (totalSourceLength === 0) {
+    return translatedText;
+  }
+
+  const words = translatedText.trim().split(/\s+/).filter(Boolean);
+  if (words.length >= nonEmptySourceLines.length) {
+    const totalWordLength = words.reduce((sum, word) => sum + word.length, 0);
+    const output: string[] = [];
+    let wordIndex = 0;
+
+    for (let i = 0; i < nonEmptySourceLines.length; i++) {
+      const remainingLines = nonEmptySourceLines.length - i;
+      const remainingWords = words.length - wordIndex;
+      const isLastLine = i === nonEmptySourceLines.length - 1;
+      const targetLength = (nonEmptySourceLines[i].length / totalSourceLength) * totalWordLength;
+      let lineLength = 0;
+      const lineWords: string[] = [];
+
+      while (
+        wordIndex < words.length &&
+        (isLastLine ||
+          lineWords.length === 0 ||
+          (lineLength < targetLength && remainingWords - lineWords.length > remainingLines - 1))
+      ) {
+        const word = words[wordIndex++];
+        lineWords.push(word);
+        lineLength += word.length;
+      }
+
+      output.push(lineWords.join(' '));
+    }
+
+    return output.join('\n');
+  }
+
+  const chars = Array.from(translatedText.trim());
+  if (chars.length < nonEmptySourceLines.length) {
+    return translatedText;
+  }
+
+  const output: string[] = [];
+  let charIndex = 0;
+  for (let i = 0; i < nonEmptySourceLines.length; i++) {
+    const isLastLine = i === nonEmptySourceLines.length - 1;
+    if (isLastLine) {
+      output.push(chars.slice(charIndex).join(''));
+    } else {
+      const nextIndex = Math.max(
+        charIndex + 1,
+        Math.round((nonEmptySourceLines.slice(0, i + 1).reduce((sum, line) => sum + line.length, 0) / totalSourceLength) * chars.length)
+      );
+      output.push(chars.slice(charIndex, nextIndex).join(''));
+      charIndex = nextIndex;
+    }
+  }
+
+  return output.join('\n');
+}
+
 export class TranslationCoordinator {
   static async translate(text: string, settings: Settings): Promise<TranslationCoordinatorResult> {
     let detectedLang: string;
@@ -71,7 +142,7 @@ export class TranslationCoordinator {
 
         return {
           lang,
-          text: result.translation,
+          text: splitBySourceLineShape(text, result.translation),
           phonetics
         };
       })

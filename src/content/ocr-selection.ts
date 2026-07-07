@@ -31,6 +31,7 @@ export function toggleWebpageOcr(ctx: TranslationContext): void {
 function initOverlay() {
   if (!currentCtx) return;
 
+  currentCtx.tooltip.setPointerPassthrough(true);
   chrome.runtime.onMessage.addListener(chromeMessageListener);
 
   overlay = new OcrSelectionOverlay(document.body, {
@@ -133,6 +134,7 @@ function initOverlay() {
 
 function cleanupOverlay() {
   chrome.runtime.onMessage.removeListener(chromeMessageListener);
+  currentCtx?.tooltip.setPointerPassthrough(false);
 
   if (overlay) {
     overlay.stop();

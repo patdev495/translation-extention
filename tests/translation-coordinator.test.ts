@@ -121,4 +121,22 @@ describe('TranslationCoordinator', () => {
     expect(result.detectedLang).toBe('en');
     expect(translateSpy).toHaveBeenCalled();
   });
+
+  test('preserves OCR line shape when translation provider flattens newlines', async () => {
+    vi.spyOn(TranslationEngine, 'translateWithSettings')
+      .mockResolvedValue({
+        translation: 'One two three four five six seven eight nine ten eleven twelve',
+        detectedLang: 'en',
+      });
+
+    const result = await TranslationCoordinator.translate(
+      'source line one\nsource line two is longer\nsource line three\nlast',
+      { ...mockSettings, secondaryTargetLang: 'disabled' as any }
+    );
+
+    expect(result.translations[0].text.split('\n')).toHaveLength(4);
+    expect(result.translations[0].text).toBe(
+      'One two three four\nfive six seven eight nine\nten eleven\ntwelve'
+    );
+  });
 });

@@ -44,7 +44,7 @@ describe('SettingsManager', () => {
       reverseTargetLang: 'en',
       ocrShortcut: 'ctrl-space',
       ocrModelTier: 'medium',
-      ocrLanguage: 'ch',
+      ocrLanguage: 'latin',
       ttsEnabled: true,
       provider: 'google',
       deeplApiKey: '',

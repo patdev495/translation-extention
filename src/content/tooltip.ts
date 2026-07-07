@@ -65,7 +65,7 @@ export class TranslationTooltip {
 
     this.tooltipEl = document.createElement('div');
     this.tooltipEl.id = 'tooltip';
-    this.tooltipEl.className = 'hidden absolute bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border border-slate-200/50 dark:border-slate-800/50 rounded-2xl shadow-2xl p-4 text-sm max-w-[90vw] max-h-[90vh] overflow-y-auto transition-opacity duration-200 text-slate-800 dark:text-slate-200 font-sans z-50 cursor-move';
+    this.tooltipEl.className = 'hidden absolute bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border border-slate-200/50 dark:border-slate-800/50 rounded-2xl shadow-2xl p-4 text-sm max-w-[calc(100vw-16px)] max-h-[90vh] overflow-auto transition-opacity duration-200 text-slate-800 dark:text-slate-200 font-sans z-50 cursor-move';
     this.tooltipEl.style.transform = 'translate(-50%, -50%)';
     this.shadow.appendChild(this.tooltipEl);
 
@@ -229,9 +229,17 @@ export class TranslationTooltip {
       `;
     };
 
-    const widthStyle = ocrWidth ? `${ocrWidth}px` : '18em';
+    const isOcrTooltip = typeof ocrWidth === 'number' && ocrWidth > 0;
+    const tooltipChromeWidth = 34;
+    const viewportMargin = 16;
+    const contentMaxWidth = `calc(100vw - ${tooltipChromeWidth + viewportMargin}px)`;
+    const tooltipMaxWidth = `calc(100vw - ${viewportMargin}px)`;
+    const widthStyle = isOcrTooltip ? 'max-content' : '18em';
+    const minWidthStyle = isOcrTooltip ? `min(${ocrWidth}px, ${contentMaxWidth})` : '18em';
+    const tooltipWidthStyle = isOcrTooltip ? 'max-content' : '';
+    const textWrapClass = isOcrTooltip ? 'break-normal whitespace-pre' : 'break-words whitespace-pre-wrap';
     let content = `
-      <div class="flex flex-col gap-2.5 cursor-default" style="width: ${widthStyle}; min-width: 18em; max-width: 90vw;">
+      <div class="flex flex-col gap-2.5 cursor-default" style="width: ${widthStyle}; min-width: ${minWidthStyle}; max-width: ${contentMaxWidth};">
         <!-- Source Block -->
         <div class="flex flex-col gap-1">
           <div class="flex items-center justify-between gap-2 pb-1.5 border-b border-slate-150 dark:border-slate-800/80 mb-1">
@@ -259,7 +267,7 @@ export class TranslationTooltip {
               ` : ''}
             </div>
           </div>
-          <span class="font-bold text-slate-900 dark:text-white leading-tight break-words whitespace-pre-wrap mb-1">${this.escapeHtml(sourceText)}</span>
+          <span class="font-bold text-slate-900 dark:text-white leading-tight ${textWrapClass} mb-1">${this.escapeHtml(sourceText)}</span>
           ${sourcePhonetics ? `
             <span class="phonetics-container text-xs font-mono text-blue-500 dark:text-blue-400 font-semibold break-words leading-normal whitespace-pre-wrap ${phoneticsVisible ? '' : 'hidden'}">${sourcePhonetics}</span>
           ` : ''}
@@ -293,7 +301,7 @@ export class TranslationTooltip {
               ` : ''}
             </div>
           </div>
-          <span class="text-slate-800 dark:text-slate-200 font-medium leading-normal break-words whitespace-pre-wrap">${this.escapeHtml(translation1.text)}</span>
+          <span class="text-slate-800 dark:text-slate-200 font-medium leading-normal ${textWrapClass}">${this.escapeHtml(translation1.text)}</span>
           ${translation1.phonetics ? `
             <span class="phonetics-container text-xs font-mono text-teal-600 dark:text-teal-400 font-medium break-words leading-normal whitespace-pre-wrap ${phoneticsVisible ? '' : 'hidden'}">${translation1.phonetics}</span>
           ` : ''}
@@ -328,7 +336,7 @@ export class TranslationTooltip {
               ` : ''}
             </div>
           </div>
-          <span class="text-slate-800 dark:text-slate-200 font-medium leading-normal break-words whitespace-pre-wrap">${this.escapeHtml(translation2.text)}</span>
+          <span class="text-slate-800 dark:text-slate-200 font-medium leading-normal ${textWrapClass}">${this.escapeHtml(translation2.text)}</span>
           ${translation2.phonetics ? `
             <span class="phonetics-container text-xs font-mono text-teal-600 dark:text-teal-400 font-medium break-words leading-normal whitespace-pre-wrap ${phoneticsVisible ? '' : 'hidden'}">${translation2.phonetics}</span>
           ` : ''}
@@ -338,6 +346,8 @@ export class TranslationTooltip {
     `;
 
     this.tooltipEl.innerHTML = '';
+    this.tooltipEl.style.width = tooltipWidthStyle;
+    this.tooltipEl.style.maxWidth = tooltipMaxWidth;
 
     if (!this.shadow.querySelector('link[href="' + cssUrl + '"]')) {
       const link = document.createElement('link');
@@ -427,6 +437,12 @@ export class TranslationTooltip {
   updateFontSize(size: string) {
     if (this.tooltipEl) {
       this.tooltipEl.style.setProperty('--tooltip-font-size', `${size}px`);
+    }
+  }
+
+  setPointerPassthrough(enabled: boolean) {
+    if (this.container) {
+      this.container.style.pointerEvents = enabled ? 'none' : '';
     }
   }
 

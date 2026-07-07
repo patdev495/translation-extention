@@ -313,6 +313,7 @@ function updateCurrentPageFromScroll() {
 
 function setOcrSelectionMode(enabled: boolean) {
   ocrSelectionMode = enabled;
+  translationCtx.tooltip.setPointerPassthrough(enabled);
   document.body.classList.toggle('ocr-selection-mode', enabled);
   $btnOcrRegion.classList.toggle('active', enabled);
   $btnOcrRegion.setAttribute('aria-pressed', String(enabled));

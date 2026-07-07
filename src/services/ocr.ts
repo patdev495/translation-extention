@@ -1,4 +1,6 @@
 import * as ort from 'onnxruntime-web';
+import { assembleOcrLayoutText } from './ocr-layout';
+import { normalizeLatinOcrText } from './ocr-postprocess';
 
 export type OcrProgressStage = 'downloading' | 'loading' | 'recognizing';
 
@@ -19,6 +21,13 @@ type PaddleOcrServiceCtor = new (options?: unknown) => {
   initialize(): Promise<void>;
   recognize(image: HTMLCanvasElement, options?: { flatten?: false; strategy?: 'per-box' | 'per-line' | 'cross-line' }): Promise<{ text: string }>;
 };
+
+type OcrBox = { x: number; y: number; width: number; height: number };
+type OcrTextResult = { text: string; box: OcrBox };
+
+const MAX_VIET_OCR_SEGMENT_ASPECT_RATIO = 18;
+const MIN_VIET_OCR_SEGMENT_WIDTH = 120;
+const MIN_VERTICAL_GAP_WIDTH = 3;
 
 const DB_NAME = 'polytranslate-ocr-cache';
 const DB_VERSION = 1;
@@ -208,6 +217,81 @@ function cropCanvas(source: HTMLCanvasElement, box: { x: number; y: number; widt
   return crop;
 }
 
+function findVerticalWhitespaceSplit(canvas: HTMLCanvasElement): number | null {
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return null;
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const columnInkCounts: number[] = [];
+
+  for (let x = 0; x < canvas.width; x++) {
+    let inkCount = 0;
+    for (let y = 0; y < canvas.height; y++) {
+      const offset = (y * canvas.width + x) * 4;
+      const r = imageData.data[offset];
+      const g = imageData.data[offset + 1];
+      const b = imageData.data[offset + 2];
+      const a = imageData.data[offset + 3];
+      if (a > 30 && r + g + b < 650) {
+        inkCount++;
+      }
+    }
+    columnInkCounts.push(inkCount);
+  }
+
+  const target = canvas.width / 2;
+  let bestSplit: number | null = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  let gapStart: number | null = null;
+
+  for (let x = 0; x <= columnInkCounts.length; x++) {
+    const isWhitespace = x < columnInkCounts.length && columnInkCounts[x] <= 1;
+    if (isWhitespace && gapStart === null) {
+      gapStart = x;
+      continue;
+    }
+
+    if (!isWhitespace && gapStart !== null) {
+      const gapEnd = x - 1;
+      const gapWidth = gapEnd - gapStart + 1;
+      const split = Math.floor((gapStart + gapEnd) / 2);
+      const leftWidth = split;
+      const rightWidth = canvas.width - split;
+
+      if (
+        gapWidth >= MIN_VERTICAL_GAP_WIDTH &&
+        leftWidth >= MIN_VIET_OCR_SEGMENT_WIDTH &&
+        rightWidth >= MIN_VIET_OCR_SEGMENT_WIDTH
+      ) {
+        const distance = Math.abs(split - target);
+        if (distance < bestDistance) {
+          bestSplit = split;
+          bestDistance = distance;
+        }
+      }
+
+      gapStart = null;
+    }
+  }
+
+  return bestSplit;
+}
+
+function splitWideTextCanvas(canvas: HTMLCanvasElement): HTMLCanvasElement[] {
+  if (canvas.width / Math.max(1, canvas.height) <= MAX_VIET_OCR_SEGMENT_ASPECT_RATIO) {
+    return [canvas];
+  }
+
+  const split = findVerticalWhitespaceSplit(canvas);
+  if (!split) {
+    return [canvas];
+  }
+
+  const left = cropCanvas(canvas, { x: 0, y: 0, width: split, height: canvas.height });
+  const right = cropCanvas(canvas, { x: split, y: 0, width: canvas.width - split, height: canvas.height });
+  return [...splitWideTextCanvas(left), ...splitWideTextCanvas(right)];
+}
+
 function hasRepetitiveSuffix(text: string): boolean {
   const words = text.trim().split(/\s+/);
   if (words.length < 3) return false;
@@ -366,47 +450,84 @@ async function runVietOcrInference(
   return decodedText.trim();
 }
 
-function sortByReadingOrder<T extends { box: { x: number; y: number; height: number } }>(results: T[]): T[] {
-  return [...results].sort((a, b) => {
-    if (Math.abs(a.box.y - b.box.y) < (a.box.height + b.box.height) / 4) {
-      return a.box.x - b.box.x;
+async function recognizeWithVietOcr(
+  canvas: HTMLCanvasElement,
+  tier: 'tiny' | 'small' | 'medium',
+  onProgress?: ProgressHandler
+): Promise<string> {
+  const service = await getService(tier, 'ch', onProgress);
+  const sessions = await getVietOcrSessions(onProgress);
+
+  onProgress?.({ stage: 'recognizing', message: 'Detecting text boxes...' });
+  const boxes = await (service as any).detector.run(canvas) as OcrBox[];
+
+  if (boxes.length === 0) {
+    return '';
+  }
+
+  onProgress?.({ stage: 'recognizing', message: 'Reading text with VietOCR...' });
+
+  const results: OcrTextResult[] = [];
+  for (let i = 0; i < boxes.length; i++) {
+    const box = boxes[i];
+
+    // Expand the box vertically and horizontally to prevent cutting off accents/descenders/edge chars.
+    const verticalPadding = Math.max(6, Math.round(box.height * 0.3));
+    const horizontalPadding = Math.max(4, Math.round(box.width * 0.01));
+    const x = Math.max(0, box.x - horizontalPadding);
+    const y = Math.max(0, box.y - verticalPadding);
+    const expandedBox = {
+      x,
+      y,
+      width: Math.min(canvas.width - x, box.width + horizontalPadding * 2),
+      height: Math.min(canvas.height - y, box.height + verticalPadding * 2)
+    };
+
+    const crop = cropCanvas(canvas, expandedBox);
+    try {
+      const textParts: string[] = [];
+      for (const segment of splitWideTextCanvas(crop)) {
+        const segmentText = await runVietOcrInference(segment, sessions);
+        if (segmentText) {
+          textParts.push(segmentText);
+        }
+      }
+      const text = textParts.join(' ');
+      results.push({ text, box });
+    } catch (err) {
+      console.error(`VietOCR failed to recognize box ${i}:`, err);
+      results.push({ text: '', box });
     }
-    return a.box.y - b.box.y;
-  });
+  }
+
+  const fullText = assembleOcrLayoutText(results);
+  return normalizeLatinOcrText(fullText).trim();
 }
 
-function groupResultsIntoLines<T extends { box: { x: number; y: number; height: number } }>(results: T[]): T[][] {
-  if (results.length === 0) return [];
-  const lines: T[][] = [];
-  let currentLine: T[] = [results[0]];
-  let currentLineHeightSum = results[0].box.height;
-  let avgHeight = results[0].box.height;
+async function recognizeWithPaddleOcrLayout(
+  canvas: HTMLCanvasElement,
+  tier: 'tiny' | 'small' | 'medium',
+  language: 'ch' | 'latin' = 'ch',
+  onProgress?: ProgressHandler
+): Promise<string> {
+  const service = await getService(tier, language, onProgress);
+  const serviceInternals = service as any;
 
-  for (let i = 1; i < results.length; i++) {
-    const current = results[i];
-    const previous = results[i - 1];
-    const verticalGap = Math.abs(current.box.y - previous.box.y);
-    const threshold = avgHeight * 0.5;
-
-    if (verticalGap <= threshold) {
-      currentLine.push(current);
-      currentLineHeightSum += current.box.height;
-      avgHeight = currentLineHeightSum / currentLine.length;
-    } else {
-      currentLine.sort((a, b) => a.box.x - b.box.x);
-      lines.push(currentLine);
-      currentLine = [current];
-      currentLineHeightSum = current.box.height;
-      avgHeight = current.box.height;
+  if (serviceInternals.detector?.run && serviceInternals.recognitor?.run) {
+    onProgress?.({ stage: 'recognizing', message: 'Detecting text boxes...' });
+    const boxes = await serviceInternals.detector.run(canvas) as OcrBox[];
+    if (boxes.length === 0) {
+      return '';
     }
+
+    onProgress?.({ stage: 'recognizing', message: 'Reading text from image...' });
+    const results = await serviceInternals.recognitor.run(canvas, boxes, undefined, 'per-line') as OcrTextResult[];
+    return assembleOcrLayoutText(results);
   }
 
-  if (currentLine.length > 0) {
-    currentLine.sort((a, b) => a.box.x - b.box.x);
-    lines.push(currentLine);
-  }
-
-  return lines;
+  onProgress?.({ stage: 'recognizing', message: 'Reading text from image...' });
+  const result = await service.recognize(canvas, { flatten: false, strategy: 'per-line' });
+  return result.text.trim();
 }
 
 export async function recognizeImageRegion(
@@ -416,50 +537,8 @@ export async function recognizeImageRegion(
   onProgress?: ProgressHandler
 ): Promise<string> {
   if (language === 'latin') {
-    const service = await getService(tier, 'ch', onProgress);
-    const sessions = await getVietOcrSessions(onProgress);
-
-    onProgress?.({ stage: 'recognizing', message: 'Detecting text boxes...' });
-    const boxes = await (service as any).detector.run(canvas);
-
-    if (boxes.length === 0) {
-      return '';
-    }
-
-    onProgress?.({ stage: 'recognizing', message: 'Reading text with VietOCR...' });
-
-    const results: { text: string; box: any }[] = [];
-    for (let i = 0; i < boxes.length; i++) {
-      const box = boxes[i];
-      
-      // Expand the box vertically and horizontally to prevent cutting off accents/descenders/edge chars
-      const verticalPadding = Math.max(6, Math.round(box.height * 0.3));
-      const horizontalPadding = Math.max(4, Math.round(box.width * 0.01));
-      const expandedBox = {
-        x: Math.max(0, box.x - horizontalPadding),
-        y: Math.max(0, box.y - verticalPadding),
-        width: Math.min(canvas.width - Math.max(0, box.x - horizontalPadding), box.width + horizontalPadding * 2),
-        height: Math.min(canvas.height - Math.max(0, box.y - verticalPadding), box.height + verticalPadding * 2)
-      };
-
-      const crop = cropCanvas(canvas, expandedBox);
-      try {
-        const text = await runVietOcrInference(crop, sessions);
-        results.push({ text, box });
-      } catch (err) {
-        console.error(`VietOCR failed to recognize box ${i}:`, err);
-        results.push({ text: '', box });
-      }
-    }
-
-    const sorted = sortByReadingOrder(results);
-    const lines = groupResultsIntoLines(sorted);
-    const fullText = lines.map(line => line.map(r => r.text).join(' ')).join('\n');
-    return fullText.trim();
+    return recognizeWithVietOcr(canvas, tier, onProgress);
   } else {
-    const service = await getService(tier, language, onProgress);
-    onProgress?.({ stage: 'recognizing', message: 'Reading text from image...' });
-    const result = await service.recognize(canvas, { flatten: false, strategy: 'per-line' });
-    return result.text.trim();
+    return recognizeWithPaddleOcrLayout(canvas, tier, language, onProgress);
   }
 }
