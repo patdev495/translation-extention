@@ -17,15 +17,15 @@ export function detectLanguageOffline(text: string): 'en' | 'vi' | 'zh' | null {
   const clean = text.trim();
   if (!clean) return null;
 
-  // 1. Check Chinese characters (CJK Unified Ideographs)
-  if (/[\u4e00-\u9fff]/.test(clean)) {
-    return 'zh';
-  }
-
-  // 2. Check Vietnamese specific accented characters
+  // 1. Check Vietnamese specific accented characters (highest priority)
   const viPattern = /[áàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ]/;
   if (viPattern.test(clean)) {
     return 'vi';
+  }
+
+  // 2. Check Chinese characters (CJK Unified Ideographs)
+  if (/[\u4e00-\u9fff]/.test(clean)) {
+    return 'zh';
   }
 
   // 3. Check English (strictly standard characters, numbers, common punctuation, spaces)

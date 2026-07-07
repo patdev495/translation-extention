@@ -60,6 +60,18 @@ describe('detectLanguageOffline', () => {
     expect(detectLanguageOffline('This is a test.')).toBe('en');
   });
 
+  test('should prioritize Vietnamese over Chinese and English', () => {
+    // Contains both Vietnamese and Chinese: should be detected as Vietnamese
+    expect(detectLanguageOffline('Tiếng Việt 你好')).toBe('vi');
+    // Contains both Vietnamese and English: should be detected as Vietnamese
+    expect(detectLanguageOffline('Hello Tiếng Việt')).toBe('vi');
+  });
+
+  test('should prioritize Chinese over English', () => {
+    // Contains both Chinese and English: should be detected as Chinese
+    expect(detectLanguageOffline('Hello 你好')).toBe('zh');
+  });
+
   test('should return null for mixed/unknown characters or numbers only', () => {
     expect(detectLanguageOffline('12345')).toBe('en'); // Matches regex
     expect(detectLanguageOffline('   ')).toBeNull();
