@@ -97,11 +97,11 @@ describe('TranslationCoordinator', () => {
     const result = await TranslationCoordinator.translate('hello', mockSettings);
 
     expect(result.detectedLang).toBe('en');
-    // hello -> həˈɫoʊ
-    expect(result.sourcePhonetics).toBe('həˈɫoʊ');
+    // hello -> hello həˈɫoʊ
+    expect(result.sourcePhonetics).toBe('hello həˈɫoʊ');
     expect(result.translations).toEqual([
       { lang: 'vi', text: 'Xin chào', phonetics: '' },
-      { lang: 'zh', text: '你好', phonetics: 'nǐ hǎo' },
+      { lang: 'zh', text: '你好', phonetics: '你好 nǐ hǎo' },
     ]);
 
     expect(translateSpy).toHaveBeenCalledTimes(2);

@@ -6,7 +6,6 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Mock chrome.runtime.getURL and fetch to return the local cmu-dict.json contents in test environment
 global.chrome = {
   runtime: {
     getURL: (path: string) => path,
@@ -26,28 +25,26 @@ global.fetch = async (url: any) => {
 import { PhoneticEngine } from '../src/services/phonetics';
 
 describe('PhoneticEngine - Chinese Pinyin', () => {
-  test('should convert Chinese characters to Pinyin with tone marks', () => {
-    const result = PhoneticEngine.getPinyin('我喜欢学习汉语');
-    expect(result).toBe('wǒ xǐ huan xué xí hàn yǔ');
+  test('should convert Chinese words to grouped Pinyin with tone marks', () => {
+    const result = PhoneticEngine.getPinyin('\u6211\u559c\u6b22\u5b66\u4e60\u6c49\u8bed');
+    expect(result).toBe('\u6211 w\u01d2 \u00b7 \u559c\u6b22 x\u01d0 huan \u00b7 \u5b66\u4e60 xu\u00e9 x\u00ed \u00b7 \u6c49\u8bed h\u00e0n y\u01d4');
   });
 
   test('should handle punctuation and English words in Chinese sentences gracefully', () => {
-    const result = PhoneticEngine.getPinyin('Hello, 我喜欢学习汉语！');
-    // Non-chinese parts and punctuation should be preserved.
-    // pinyin-pro usually preserves non-Chinese when called with the right options or we can handle it.
-    expect(result).toBe('Hello, wǒ xǐ huan xué xí hàn yǔ！');
+    const result = PhoneticEngine.getPinyin('Hello, \u6211\u559c\u6b22\u5b66\u4e60\u6c49\u8bed\uff01');
+    expect(result).toBe('Hello, \u6211 w\u01d2 \u00b7 \u559c\u6b22 x\u01d0 huan \u00b7 \u5b66\u4e60 xu\u00e9 x\u00ed \u00b7 \u6c49\u8bed h\u00e0n y\u01d4\uff01');
   });
 });
 
 describe('PhoneticEngine - English IPA', () => {
-  test('should convert English words to IPA', async () => {
+  test('should convert English words to grouped IPA', async () => {
     const result = await PhoneticEngine.getEnglishIPA('hello');
-    expect(result).toBe('həˈɫoʊ');
+    expect(result).toBe('hello h\u0259\u02c8\u026bo\u028a');
   });
 
   test('should convert full sentences preserving punctuation and casing', async () => {
     const result = await PhoneticEngine.getEnglishIPA('Hello, world!');
-    expect(result).toBe('həˈɫoʊ, ˈwɝɫd!');
+    expect(result).toBe('Hello h\u0259\u02c8\u026bo\u028a, \u00b7 world \u02c8w\u025d\u026bd!');
   });
 
   test('should degrade gracefully for unknown words', async () => {
@@ -55,4 +52,3 @@ describe('PhoneticEngine - English IPA', () => {
     expect(result).toBe('xyzabc');
   });
 });
-
