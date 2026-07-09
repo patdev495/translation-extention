@@ -4,6 +4,7 @@ import { OcrSelectionOverlay } from '../src/content/ocr-selection-overlay';
 // Mock DOM environment minimally
 const mockDocumentListeners: Record<string, Function[]> = {};
 const mockWindowListeners: Record<string, Function[]> = {};
+let createdElements: any[] = [];
 
 global.document = {
   addEventListener: vi.fn((event: string, callback: any) => {
@@ -16,18 +17,44 @@ global.document = {
     }
   }),
   createElement: vi.fn((tagName: string) => {
-    return {
+    const element = {
       tagName,
+      className: '',
       style: {},
-      attachShadow: vi.fn(() => ({
-        appendChild: vi.fn(),
-        querySelector: vi.fn(),
+      children: [] as any[],
+      getBoundingClientRect: vi.fn(() => ({
+        left: 0,
+        top: 0,
+        width: 1024,
+        height: 768,
       })),
-      appendChild: vi.fn(),
+      clientWidth: 1024,
+      clientHeight: 768,
+      attachShadow: vi.fn(() => {
+        const shadow: {
+          children: any[];
+          appendChild: any;
+          querySelector: any;
+        } = {
+          children: [] as any[],
+          appendChild: vi.fn((child: any) => {
+            shadow.children.push(child);
+          }),
+          querySelector: vi.fn((selector: string) => shadow.children.find((child: any) => child.className === selector.slice(1)) ?? null),
+        };
+        return shadow;
+      }),
+      appendChild: vi.fn((child: any) => {
+        element.children.push(child);
+      }),
       remove: vi.fn(),
-      addEventListener: vi.fn(),
+      addEventListener: vi.fn((event: string, callback: Function) => {
+        element[`on${event}`] = callback;
+      }),
       removeEventListener: vi.fn(),
     } as any;
+    createdElements.push(element);
+    return element;
   }),
   body: {
     appendChild: vi.fn(),
@@ -55,6 +82,7 @@ global.window = {
 describe('OcrSelectionOverlay', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    createdElements = [];
     Object.keys(mockDocumentListeners).forEach(key => delete mockDocumentListeners[key]);
     Object.keys(mockWindowListeners).forEach(key => delete mockWindowListeners[key]);
   });
@@ -82,5 +110,43 @@ describe('OcrSelectionOverlay', () => {
     overlay.stop();
     // Verify that stop cleans up resources
     expect(overlay['overlayContainer']).toBeNull();
+  });
+
+  test('draws webpage OCR selection in overlay-local coordinates when overlay root is offset', () => {
+    const root = document.createElement('div');
+    const onSelectionComplete = vi.fn();
+    const overlay = new OcrSelectionOverlay(root, { shadowMode: true, onSelectionComplete });
+
+    overlay.start();
+
+    const overlayContainer = createdElements.find((element) => element.id === 'polytranslate-ocr-overlay-root');
+    overlayContainer.getBoundingClientRect.mockReturnValue({
+      left: 100,
+      top: 50,
+      width: 400,
+      height: 300,
+    });
+    overlayContainer.clientWidth = 400;
+    overlayContainer.clientHeight = 300;
+
+    const overlayElement = (overlay['shadow'] as any).children.find((child: any) => child.className === 'overlay');
+    overlayElement.onmousedown({
+      button: 0,
+      clientX: 150,
+      clientY: 90,
+      preventDefault: vi.fn(),
+      stopPropagation: vi.fn(),
+    });
+    overlayElement.onmousemove({
+      clientX: 250,
+      clientY: 170,
+      preventDefault: vi.fn(),
+    });
+
+    const selectionBox = overlay['selectionBox']!;
+    expect(selectionBox.style.left).toBe('50px');
+    expect(selectionBox.style.top).toBe('40px');
+    expect(selectionBox.style.width).toBe('100px');
+    expect(selectionBox.style.height).toBe('80px');
   });
 });

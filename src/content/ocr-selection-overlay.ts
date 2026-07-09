@@ -201,7 +201,8 @@ export class OcrSelectionOverlay {
       this.selectionBox.className = 'selection-box';
       this.shadow.appendChild(this.selectionBox);
 
-      this.updateSelectionBoxSize(this.startX, this.startY, this.startX, this.startY);
+      const point = this.getPointInShadowOverlay(this.startX, this.startY);
+      this.updateSelectionBoxSize(point.x, point.y, point.x, point.y);
       this.isSelecting = true;
     }
   }
@@ -215,7 +216,9 @@ export class OcrSelectionOverlay {
       this.updateSelectionBoxSize(this.startX, this.startY, point.x, point.y);
     } else if (this.options.shadowMode) {
       e.preventDefault();
-      this.updateSelectionBoxSize(this.startX, this.startY, e.clientX, e.clientY);
+      const startPoint = this.getPointInShadowOverlay(this.startX, this.startY);
+      const currentPoint = this.getPointInShadowOverlay(e.clientX, e.clientY);
+      this.updateSelectionBoxSize(startPoint.x, startPoint.y, currentPoint.x, currentPoint.y);
     }
   }
 
@@ -295,8 +298,9 @@ export class OcrSelectionOverlay {
       this.progressIndicator.style.top = `${Math.max(8, position.top - 34)}px`;
       this.activePageWrapper.appendChild(this.progressIndicator);
     } else if (this.options.shadowMode && this.shadow) {
-      this.progressIndicator.style.left = `${Math.max(8, position.left)}px`;
-      this.progressIndicator.style.top = `${position.top + 8}px`;
+      const point = this.getPointInShadowOverlay(position.left, position.top + 8);
+      this.progressIndicator.style.left = `${Math.max(8, point.x)}px`;
+      this.progressIndicator.style.top = `${point.y}px`;
       this.shadow.appendChild(this.progressIndicator);
     }
   }
@@ -345,6 +349,21 @@ export class OcrSelectionOverlay {
     return {
       x: Math.max(0, Math.min(event.clientX - rect.left, rect.width)),
       y: Math.max(0, Math.min(event.clientY - rect.top, rect.height)),
+    };
+  }
+
+  private getPointInShadowOverlay(clientX: number, clientY: number): { x: number; y: number } {
+    if (!this.overlayContainer) {
+      return { x: clientX, y: clientY };
+    }
+
+    const rect = this.overlayContainer.getBoundingClientRect();
+    const scaleX = rect.width > 0 ? this.overlayContainer.clientWidth / rect.width : 1;
+    const scaleY = rect.height > 0 ? this.overlayContainer.clientHeight / rect.height : 1;
+
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
     };
   }
 }
