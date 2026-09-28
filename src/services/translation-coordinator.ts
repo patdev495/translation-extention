@@ -108,6 +108,17 @@ function splitBySourceLineShape(sourceText: string, translatedText: string): str
 }
 
 export class TranslationCoordinator {
+  /**
+   * Translates to the user's configured Primary Target Language without
+   * applying the tooltip's source-language fallback rules.
+   */
+  static async translateDirectToPrimary(text: string, settings: Settings) {
+    if (settings.primaryTargetLang === 'none') {
+      throw new Error('Primary Target Language is disabled.');
+    }
+    return TranslationEngine.translateWithSettings(text, settings.primaryTargetLang, settings);
+  }
+
   static async translate(text: string, settings: Settings): Promise<TranslationCoordinatorResult> {
     let detectedLang: string;
     let firstRes = null;

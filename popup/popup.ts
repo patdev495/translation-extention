@@ -1,10 +1,14 @@
 import { SettingsManager } from '../src/services/settings';
 import type { TargetLanguage } from '../src/services/translation-plan';
+import { shortcutConflictsWithOcr, shortcutFromKeyboardEvent } from '../src/content/input-replacement-shortcut';
 
 const activeToggle = document.getElementById('active-toggle') as HTMLInputElement;
 const primaryLang = document.getElementById('primary-lang') as HTMLSelectElement;
 const secondaryLang = document.getElementById('secondary-lang') as HTMLSelectElement;
 const reverseLang = document.getElementById('reverse-lang') as HTMLSelectElement;
+const inputReplacementEnabled = document.getElementById('input-replacement-enabled') as HTMLInputElement;
+const inputReplacementShortcut = document.getElementById('input-replacement-shortcut') as HTMLInputElement;
+const inputReplacementError = document.getElementById('input-replacement-error') as HTMLParagraphElement;
 const ocrShortcut = document.getElementById('ocr-shortcut') as HTMLSelectElement;
 const ocrModelTier = document.getElementById('ocr-model-tier') as HTMLSelectElement;
 const ocrLanguage = document.getElementById('ocr-language') as HTMLSelectElement;
@@ -23,6 +27,29 @@ const statusMsg = document.getElementById('status-msg') as HTMLDivElement;
 
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;
 let validationTimeout: ReturnType<typeof setTimeout> | null = null;
+let lastValidInputShortcut = 'ControlLeft';
+let lastValidOcrShortcut = 'ctrl-space';
+
+function formatShortcut(shortcut: string): string {
+  const labels: Record<string, string> = {
+    ControlLeft: 'Ctrl trái', ControlRight: 'Ctrl phải',
+    ShiftLeft: 'Shift trái', ShiftRight: 'Shift phải',
+    AltLeft: 'Alt trái', AltRight: 'Alt phải',
+    MetaLeft: 'Meta trái', MetaRight: 'Meta phải',
+    Ctrl: 'Ctrl', Alt: 'Alt', Shift: 'Shift', Meta: 'Meta', Space: 'Space',
+  };
+  return shortcut.split('+').map((part) => {
+    if (labels[part]) return labels[part];
+    if (part.startsWith('Key')) return part.slice(3);
+    if (part.startsWith('Digit')) return part.slice(5);
+    return part.replace(/^Arrow/, '← ').replace(/^Numpad/, 'Num ');
+  }).join(' + ');
+}
+
+function showInputShortcutError(message: string): void {
+  inputReplacementError.textContent = message;
+  inputReplacementError.classList.toggle('visible', Boolean(message));
+}
 
 function showStatus() {
   if (statusMsg) {
@@ -116,7 +143,12 @@ async function loadSettings() {
     primaryLang.value = settings.primaryTargetLang;
     secondaryLang.value = settings.secondaryTargetLang;
     reverseLang.value = settings.reverseTargetLang;
+    inputReplacementEnabled.checked = settings.inputReplacementEnabled;
+    inputReplacementShortcut.value = formatShortcut(settings.inputReplacementShortcut);
+    inputReplacementShortcut.disabled = !settings.inputReplacementEnabled;
+    lastValidInputShortcut = settings.inputReplacementShortcut;
     ocrShortcut.value = settings.ocrShortcut;
+    lastValidOcrShortcut = settings.ocrShortcut;
     ocrModelTier.value = settings.ocrModelTier;
     ocrLanguage.value = settings.ocrLanguage;
     ttsToggle.checked = settings.ttsEnabled;
@@ -137,12 +169,26 @@ async function loadSettings() {
 
 async function saveSettings() {
   try {
+    if (inputReplacementEnabled.checked && primaryLang.value === 'none') {
+      inputReplacementEnabled.checked = false;
+      inputReplacementShortcut.disabled = true;
+      showInputShortcutError('Chọn Primary Target trước khi bật dịch trong ô nhập.');
+    }
+
+    if (inputReplacementEnabled.checked && shortcutConflictsWithOcr(lastValidInputShortcut, ocrShortcut.value)) {
+      ocrShortcut.value = lastValidOcrShortcut;
+      showInputShortcutError('Phím dịch trong ô nhập trùng phím OCR. Hãy chọn phím khác.');
+      return;
+    }
+
     await chrome.storage.local.set({ active: activeToggle.checked });
     
     await SettingsManager.updateSettings({
       primaryTargetLang: primaryLang.value as TargetLanguage,
       secondaryTargetLang: secondaryLang.value as TargetLanguage,
       reverseTargetLang: reverseLang.value as TargetLanguage,
+      inputReplacementEnabled: inputReplacementEnabled.checked,
+      inputReplacementShortcut: lastValidInputShortcut,
       ocrShortcut: ocrShortcut.value as 'disabled' | 'ctrl-space' | 'alt-o' | 'ctrl-shift-o',
       ocrModelTier: ocrModelTier.value as 'tiny' | 'small' | 'medium',
       ocrLanguage: ocrLanguage.value as 'ch' | 'latin',
@@ -155,6 +201,8 @@ async function saveSettings() {
       autoTranslate: autoTranslateToggle.checked,
       phoneticsVisible: phoneticsToggle.checked,
     });
+
+    lastValidOcrShortcut = ocrShortcut.value;
 
     // Notify active tabs of settings update
     chrome.tabs.query({}, (tabs) => {
@@ -180,7 +228,10 @@ async function saveSettings() {
 
 // Bind change events
 activeToggle.addEventListener('change', saveSettings);
-primaryLang.addEventListener('change', saveSettings);
+primaryLang.addEventListener('change', () => {
+  showInputShortcutError('');
+  saveSettings();
+});
 secondaryLang.addEventListener('change', saveSettings);
 reverseLang.addEventListener('change', saveSettings);
 ocrShortcut.addEventListener('change', saveSettings);
@@ -192,6 +243,27 @@ autoTranslateToggle.addEventListener('change', saveSettings);
 ocrPinToggle.addEventListener('change', saveSettings);
 ocrCopyToggle.addEventListener('change', saveSettings);
 phoneticsToggle.addEventListener('change', saveSettings);
+inputReplacementEnabled.addEventListener('change', () => {
+  inputReplacementShortcut.disabled = !inputReplacementEnabled.checked;
+  showInputShortcutError('');
+  saveSettings();
+});
+
+inputReplacementShortcut.addEventListener('keydown', (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  const shortcut = shortcutFromKeyboardEvent(event);
+  if (shortcutConflictsWithOcr(shortcut, ocrShortcut.value)) {
+    showInputShortcutError('Phím này trùng phím OCR. Hãy chọn phím khác.');
+    inputReplacementShortcut.value = formatShortcut(lastValidInputShortcut);
+    return;
+  }
+
+  lastValidInputShortcut = shortcut;
+  inputReplacementShortcut.value = formatShortcut(shortcut);
+  showInputShortcutError('');
+  saveSettings();
+});
 
 providerSelect.addEventListener('change', () => {
   updateDeepLContainer();

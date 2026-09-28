@@ -1,258 +1,769 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Translation Extension Settings</title>
+  <title>PolyTranslate — Settings</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../src/index.css">
   <style>
-    body {
-      font-family: 'Outfit', sans-serif;
+    /* ─────────────── RESET & BASE ─────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:              #07090f;
+      --surface:         rgba(255,255,255,0.038);
+      --surface-hover:   rgba(255,255,255,0.065);
+      --border:          rgba(255,255,255,0.08);
+      --border-focus:    rgba(13,148,136,0.7);
+
+      --primary:         #0d9488;
+      --primary-dim:     rgba(13,148,136,0.18);
+      --primary-glow:    rgba(13,148,136,0.28);
+      --secondary:       #14b8a6;
+      --accent:          #f97316;
+
+      --text-1:  #f0f4f8;
+      --text-2:  #8fa3b8;
+      --text-3:  #546070;
+
+      --success:  #22c55e;
+      --success-bg: rgba(34,197,94,0.1);
+      --error:    #ef4444;
+      --error-bg: rgba(239,68,68,0.1);
+
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 13px;
+
+      --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
     }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text-1);
+      width: 540px;
+      min-height: 320px;
+      padding: 14px 16px 12px;
+      user-select: none;
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Ambient background glow */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        radial-gradient(ellipse 340px 200px at 8% -5%, rgba(13,148,136,0.13) 0%, transparent 70%),
+        radial-gradient(ellipse 220px 180px at 92% 105%, rgba(249,115,22,0.08) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .popup-root {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+    }
+
+    /* ─────────────── HEADER ─────────────── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 11px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .brand { display: flex; align-items: center; gap: 9px; }
+
+    .brand-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, rgba(13,148,136,0.28) 0%, rgba(13,148,136,0.07) 100%);
+      border: 1px solid rgba(13,148,136,0.32);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--primary);
+      flex-shrink: 0;
+    }
+
+    .brand-text h1 {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      background: linear-gradient(90deg, #0d9488 0%, #14b8a6 55%, #5eead4 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1.2;
+    }
+
+    .brand-text p {
+      font-size: 9.5px;
+      font-weight: 400;
+      color: var(--text-3);
+      margin-top: 1px;
+      letter-spacing: 0.015em;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .power-label {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-2);
+    }
+
+    /* ─────────────── GRID ─────────────── */
+    .settings-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 9px;
+      align-items: start;
+    }
+
+    .col { display: flex; flex-direction: column; gap: 9px; }
+
+    /* ─────────────── CARD ─────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 11px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      transition: border-color 0.18s ease;
+    }
+
+    .card:hover { border-color: rgba(255,255,255,0.12); }
+
+    .card-title {
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: var(--text-3);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .card-title svg { color: var(--primary); flex-shrink: 0; }
+
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 0 -12px;
+    }
+
+    /* ─────────────── SETTING ROW ─────────────── */
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      min-height: 30px;
+    }
+
+    .setting-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+
+    .setting-label {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-1);
+      white-space: nowrap;
+      line-height: 1.3;
+    }
+
+    .setting-desc {
+      font-size: 9.5px;
+      font-weight: 400;
+      color: var(--text-3);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.3;
+    }
+
+    /* ─────────────── PREMIUM TOGGLE ─────────────── */
+    .toggle-wrap {
+      position: relative;
+      width: 36px;
+      height: 20px;
+      flex-shrink: 0;
+      cursor: pointer;
+      display: block;
+    }
+
+    .toggle-wrap input[type="checkbox"] {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-track {
+      display: block;
+      width: 36px;
+      height: 20px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 100px;
+      transition: background 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+      position: relative;
+    }
+
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 14px;
+      height: 14px;
+      background: var(--text-3);
+      border-radius: 50%;
+      transition: transform 0.22s var(--ease-spring), background 0.22s ease;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+    }
+
+    input[type="checkbox"]:checked + .toggle-track {
+      background: var(--primary);
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-glow);
+    }
+
+    input[type="checkbox"]:checked + .toggle-track::after {
+      transform: translateX(16px);
+      background: #fff;
+    }
+
+    input[type="checkbox"]:focus-visible + .toggle-track {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+    }
+
+    /* ─────────────── SELECT ─────────────── */
+    .select-wrap {
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .select-wrap::after {
+      content: '';
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 0; height: 0;
+      border-left: 3.5px solid transparent;
+      border-right: 3.5px solid transparent;
+      border-top: 4px solid var(--text-3);
+      pointer-events: none;
+      transition: border-top-color 0.15s ease;
+    }
+
+    .select-wrap:focus-within::after { border-top-color: var(--primary); }
+
+    select {
+      appearance: none;
+      -webkit-appearance: none;
+      background: rgba(255,255,255,0.055);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 5px 22px 5px 8px;
+      font-family: var(--font);
+      font-size: 10.5px;
+      font-weight: 500;
+      color: var(--text-1);
+      cursor: pointer;
+      outline: none;
+      transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+      width: 106px;
+    }
+
+    select:hover {
+      background: rgba(255,255,255,0.09);
+      border-color: rgba(255,255,255,0.14);
+    }
+
+    select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-glow);
+    }
+
+    select option {
+      background: #111827;
+      color: var(--text-1);
+    }
+
+    /* ─────────────── API KEY INPUT ─────────────── */
+    .deepl-section {
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      padding-top: 9px;
+      border-top: 1px solid var(--border);
+    }
+
+    .deepl-section.open { display: flex; }
+
+    .input-label {
+      font-size: 9.5px;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--text-3);
+    }
+
+    .input-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    input[type="password"],
+    input[type="text"] {
+      width: 100%;
+      background: rgba(255,255,255,0.055);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 6px 28px 6px 9px;
+      font-family: var(--font);
+      font-size: 11px;
+      color: var(--text-1);
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    input[type="password"]:focus,
+    input[type="text"]:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-glow);
+    }
+
+    input::placeholder { color: var(--text-3); }
+
+    .shortcut-capture {
+      width: 106px !important;
+      padding-right: 9px !important;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    .shortcut-capture:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .shortcut-error {
+      display: none;
+      color: var(--error);
+      font-size: 9px;
+      line-height: 1.3;
+    }
+
+    .shortcut-error.visible { display: block; }
+
+    .eye-btn {
+      position: absolute;
+      right: 7px;
+      background: none;
+      border: none;
+      color: var(--text-3);
+      cursor: pointer;
+      padding: 2px;
+      display: flex;
+      align-items: center;
+      transition: color 0.15s ease;
+    }
+
+    .eye-btn:hover { color: var(--text-1); }
+
+    /* key status badge */
+    #deepl-key-status {
+      display: none;
+      font-size: 9.5px;
+      font-weight: 500;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+      width: fit-content;
+    }
+
+    #deepl-key-status.visible { display: flex; }
+    #deepl-key-status.success { color: var(--success); background: var(--success-bg); }
+    #deepl-key-status.error   { color: var(--error);   background: var(--error-bg); }
+    #deepl-key-status.info    { color: var(--text-2);  background: rgba(255,255,255,0.05); }
+
+    /* ─────────────── STATUS TOAST ─────────────── */
+    .status-toast {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--success);
+      opacity: 0;
+      transform: translateY(3px);
+      transition: opacity 0.22s ease, transform 0.22s ease;
+      padding: 2px 0 0;
+    }
+
+    .status-toast.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ── Classes used by popup.ts (no changes to logic) ── */
+
+    /* DeepL key container: hidden by default, shown when .hidden removed */
+    #deepl-key-container { display: flex; }
+    #deepl-key-container.hidden { display: none; }
+
+    /* Status toast: opacity controlled by opacity-0/opacity-100 classes */
+    #status-msg.opacity-0 { opacity: 0; transform: translateY(3px); }
+    #status-msg.opacity-100 { opacity: 1; transform: translateY(0); }
+
+    /* DeepL key status: hidden by default via .hidden, colored by type classes */
+    #deepl-key-status { display: none; }
+    #deepl-key-status:not(.hidden) { display: flex; }
+    #deepl-key-status.text-rose-500   { color: var(--error);   background: var(--error-bg);   padding: 2px 6px; border-radius: var(--radius-sm); }
+    #deepl-key-status.text-emerald-400 { color: var(--success); background: var(--success-bg); padding: 2px 6px; border-radius: var(--radius-sm); }
+    #deepl-key-status.text-slate-400  { color: var(--text-2);  background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: var(--radius-sm); }
   </style>
 </head>
-<body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 text-slate-100 w-[580px] p-5 select-none antialiased min-h-[300px]">
-  <div class="flex flex-col gap-4">
-    <!-- Header -->
-    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-      <div class="flex items-center gap-2">
-        <div class="p-2 bg-blue-600/20 text-blue-400 rounded-xl border border-blue-500/10">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 21l5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 0 1 6-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138c.896.061 1.785.147 2.666.257m-2.666-2.621a9 9 0 0 1 3.224 5.29" />
-          </svg>
-        </div>
-        <div>
-          <h1 class="text-sm font-bold bg-gradient-to-r from-blue-400 to-teal-400 bg-clip-text text-transparent">PolyTranslate</h1>
-          <p class="text-[10px] text-slate-400">Multi-language Learning Tool</p>
-        </div>
+<body>
+<div class="popup-root">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+          <path d="M10.5 21l5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 0 1 6-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138c.896.061 1.785.147 2.666.257m-2.666-2.621a9 9 0 0 1 3.224 5.29"/>
+        </svg>
       </div>
-      
-      <!-- Active Switch -->
-      <div class="flex items-center gap-2">
-        <span class="text-xs font-semibold text-slate-300">Bật Extension</span>
-        <label class="relative inline-flex items-center cursor-pointer">
-          <input type="checkbox" id="active-toggle" class="sr-only peer" checked>
-          <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
-        </label>
+      <div class="brand-text">
+        <h1>PolyTranslate</h1>
+        <p>Multi-language Learning Tool</p>
       </div>
     </div>
+    <div class="header-right">
+      <span class="power-label">Extension</span>
+      <label class="toggle-wrap" title="Enable or disable translation">
+        <input type="checkbox" id="active-toggle" checked>
+        <span class="toggle-track"></span>
+      </label>
+    </div>
+  </div>
 
-    <!-- Settings Form: 2 Columns -->
-    <div class="grid grid-cols-2 gap-4 items-start">
-      <!-- Left Column -->
-      <div class="flex flex-col gap-4">
-        <!-- Languages Configuration -->
-        <div class="bg-slate-900/40 border border-slate-800/60 rounded-xl p-3 flex flex-col gap-3">
-          <h2 class="text-2xs font-bold text-slate-400 tracking-wider uppercase">Languages</h2>
-          
-          <div class="flex flex-col gap-2.5">
-            <!-- Primary -->
-            <div class="flex items-center justify-between gap-2">
-              <span class="text-xs font-semibold">Primary Target</span>
-              <select id="primary-lang" class="bg-slate-800 border border-slate-700 rounded-lg py-0.5 px-1.5 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer w-24">
-                <option value="vi" selected>Vietnamese</option>
-                <option value="none">Disabled</option>
-                <option value="en">English</option>
-                <option value="zh">Chinese</option>
-              </select>
-            </div>
-            
-            <!-- Secondary -->
-            <div class="flex items-center justify-between gap-2">
-              <span class="text-xs font-semibold">Secondary Target</span>
-              <select id="secondary-lang" class="bg-slate-800 border border-slate-700 rounded-lg py-0.5 px-1.5 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer w-24">
-                <option value="vi">Vietnamese</option>
-                <option value="none">Disabled</option>
-                <option value="en" selected>English</option>
-                <option value="zh">Chinese</option>
-              </select>
-            </div>
+  <!-- MAIN GRID -->
+  <div class="settings-grid">
 
-            <!-- Reverse -->
-            <div class="flex items-center justify-between gap-2">
-              <span class="text-xs font-semibold">Reverse Target</span>
-              <select id="reverse-lang" class="bg-slate-800 border border-slate-700 rounded-lg py-0.5 px-1.5 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer w-24">
-                <option value="vi">Vietnamese</option>
-                <option value="none">Disabled</option>
-                <option value="en">English</option>
-                <option value="zh" selected>Chinese</option>
-              </select>
-            </div>
+    <!-- LEFT COLUMN -->
+    <div class="col">
+
+      <!-- Languages -->
+      <div class="card">
+        <div class="card-title">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          Languages
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">Primary Target</span>
+            <span class="setting-desc">Main output language</span>
+          </div>
+          <div class="select-wrap">
+            <select id="primary-lang">
+              <option value="vi" selected>Vietnamese</option>
+              <option value="none">Disabled</option>
+              <option value="en">English</option>
+              <option value="zh">Chinese</option>
+            </select>
           </div>
         </div>
 
-        <!-- Translation Provider Configuration -->
-        <div class="bg-slate-900/40 border border-slate-800/60 rounded-xl p-3 flex flex-col gap-3">
-          <h2 class="text-2xs font-bold text-slate-400 tracking-wider uppercase">Translation Provider</h2>
-          
-          <!-- Provider Select -->
-          <div class="flex items-center justify-between gap-4">
-            <div class="flex flex-col">
-              <span class="text-xs font-semibold">Engine</span>
-              <span class="text-3xs text-slate-400">Select engine</span>
-            </div>
-            <select id="provider" class="bg-slate-800 border border-slate-700 rounded-lg py-1 px-2 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer w-28">
+        <div class="divider"></div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">Secondary Target</span>
+            <span class="setting-desc">Fallback language</span>
+          </div>
+          <div class="select-wrap">
+            <select id="secondary-lang">
+              <option value="vi">Vietnamese</option>
+              <option value="none">Disabled</option>
+              <option value="en" selected>English</option>
+              <option value="zh">Chinese</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">Reverse Target</span>
+            <span class="setting-desc">Smart swap fallback</span>
+          </div>
+          <div class="select-wrap">
+            <select id="reverse-lang">
+              <option value="vi">Vietnamese</option>
+              <option value="none">Disabled</option>
+              <option value="en">English</option>
+              <option value="zh" selected>Chinese</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Translation Engine -->
+      <div class="card">
+        <div class="card-title">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          Translation Engine
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">Provider</span>
+            <span class="setting-desc">Active engine service</span>
+          </div>
+          <div class="select-wrap">
+            <select id="provider">
               <option value="google" selected>Google</option>
               <option value="deepl">DeepL API</option>
             </select>
           </div>
+        </div>
 
-          <!-- DeepL API Key Input (Hidden by default) -->
-          <div id="deepl-key-container" class="hidden flex flex-col gap-1 border-t border-slate-800/40 pt-2.5">
-            <label for="deepl-api-key" class="text-3xs font-medium text-slate-400">DeepL API Key</label>
-            <div class="relative flex items-center">
-              <input type="password" id="deepl-api-key" placeholder="Enter API Key..." class="bg-slate-800 border border-slate-700 rounded-lg py-1 pl-2 pr-8 text-xs text-white focus:outline-none focus:border-blue-500 w-full">
-              <button id="toggle-deepl-key" class="absolute right-2 text-slate-400 hover:text-slate-200 cursor-pointer transition-colors focus:outline-none" title="Toggle visibility" type="button">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5" id="eye-icon">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.43 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                </svg>
-              </button>
-            </div>
-            <p id="deepl-key-status" class="text-[10px] mt-1 hidden font-medium transition-opacity duration-200"></p>
+        <!-- DeepL key section (shown when deepl selected) -->
+        <div id="deepl-key-container" class="deepl-section">
+          <label class="input-label" for="deepl-api-key">DeepL API Key</label>
+          <div class="input-wrap">
+            <input type="password" id="deepl-api-key" placeholder="Paste your API key…" autocomplete="off" spellcheck="false">
+            <button class="eye-btn" id="toggle-deepl-key" type="button" aria-label="Toggle API key visibility">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" id="eye-icon">
+                <path d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.43 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/>
+                <path d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/>
+              </svg>
+            </button>
           </div>
+          <div id="deepl-key-status"></div>
         </div>
       </div>
 
-      <!-- Right Column -->
-      <div class="flex flex-col gap-4">
-        <!-- Behavior & Triggers Box -->
-        <div class="bg-slate-900/40 border border-slate-800/60 rounded-xl p-3 flex flex-col gap-3">
-          <h2 class="text-2xs font-bold text-slate-400 tracking-wider uppercase">Behavior & Triggers</h2>
-          
-          <!-- Auto Translate Toggle -->
-          <div class="flex items-center justify-between gap-4">
-            <div class="flex flex-col">
-              <span class="text-xs font-semibold">Dịch tự động</span>
-              <span class="text-3xs text-slate-400">Tự động dịch khi bôi đen</span>
-            </div>
-            <label class="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" id="auto-translate" class="sr-only peer" checked>
-              <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
-            </label>
-          </div>
+    </div><!-- /LEFT -->
 
-          <div class="flex items-center justify-between gap-4">
-            <div class="flex flex-col">
-              <span class="text-xs font-semibold">OCR Shortcut</span>
-              <span class="text-3xs text-slate-400">Toggle webpage OCR</span>
-            </div>
-            <select id="ocr-shortcut" class="bg-slate-800 border border-slate-700 rounded-lg py-1 px-2 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer w-28">
+    <!-- RIGHT COLUMN -->
+    <div class="col">
+
+      <!-- Behavior & OCR -->
+      <div class="card">
+        <div class="card-title">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          Behavior &amp; OCR
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">Auto Translate</span>
+            <span class="setting-desc">On text selection</span>
+          </div>
+          <label class="toggle-wrap" title="Auto translate on select">
+            <input type="checkbox" id="auto-translate" checked>
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">Translate in inputs</span>
+            <span class="setting-desc">Replace selected text</span>
+          </div>
+          <label class="toggle-wrap" title="Translate selected text in editable fields">
+            <input type="checkbox" id="input-replacement-enabled" checked>
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">Input shortcut</span>
+            <span class="setting-desc">Click, then press a key</span>
+          </div>
+          <input class="shortcut-capture" type="text" id="input-replacement-shortcut" readonly aria-label="Input translation shortcut">
+        </div>
+        <p id="input-replacement-error" class="shortcut-error" role="alert"></p>
+
+        <div class="divider"></div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">OCR Shortcut</span>
+            <span class="setting-desc">Toggle OCR mode</span>
+          </div>
+          <div class="select-wrap">
+            <select id="ocr-shortcut">
               <option value="ctrl-space">Ctrl+Space</option>
               <option value="alt-o">Alt+O</option>
               <option value="ctrl-shift-o">Ctrl+Shift+O</option>
               <option value="disabled">Disabled</option>
             </select>
           </div>
+        </div>
 
-          <div class="flex items-center justify-between gap-4">
-            <div class="flex flex-col">
-              <span class="text-xs font-semibold">OCR Model Size</span>
-              <span class="text-3xs text-slate-400">PP-OCRv6 model size</span>
-            </div>
-            <select id="ocr-model-tier" class="bg-slate-800 border border-slate-700 rounded-lg py-1 px-2 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer w-28">
-              <option value="tiny">Tiny (Fast/Light)</option>
-              <option value="small">Small (Balanced)</option>
-              <option value="medium">Medium (Accurate)</option>
-            </select>
+        <div class="divider"></div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">OCR Model</span>
+            <span class="setting-desc">PP-OCRv6 tier</span>
           </div>
-
-          <div class="flex items-center justify-between gap-4">
-            <div class="flex flex-col">
-              <span class="text-xs font-semibold">OCR Language</span>
-              <span class="text-3xs text-slate-400">Language engine mode</span>
-            </div>
-            <select id="ocr-language" class="bg-slate-800 border border-slate-700 rounded-lg py-1 px-2 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer w-28">
-              <option value="ch">Chinese / English</option>
-              <option value="latin">Latin / Multilingual</option>
+          <div class="select-wrap">
+            <select id="ocr-model-tier">
+              <option value="tiny">Tiny · Fast</option>
+              <option value="small" selected>Small · Balanced</option>
+              <option value="medium">Medium · Accurate</option>
             </select>
           </div>
         </div>
 
-        <!-- TTS Configuration -->
-        <div class="bg-slate-900/40 border border-slate-800/60 rounded-xl p-3 flex items-center justify-between">
-          <div class="flex flex-col">
-            <span class="text-xs font-semibold">TTS Pronounce</span>
-            <span class="text-3xs text-slate-400">Show speaker button</span>
-          </div>
-          <label class="relative inline-flex items-center cursor-pointer">
-            <input type="checkbox" id="tts-toggle" class="sr-only peer" checked>
-            <div class="w-8 h-4.5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[14px] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-blue-500"></div>
-          </label>
-        </div>
+        <div class="divider"></div>
 
-        <!-- Tooltip Settings -->
-        <div class="bg-slate-900/40 border border-slate-800/60 rounded-xl p-3 flex flex-col gap-3">
-          <h2 class="text-2xs font-bold text-slate-400 tracking-wider uppercase">Tooltip settings</h2>
-          
-          <div class="flex items-center justify-between gap-4">
-            <div class="flex flex-col">
-              <span class="text-xs font-semibold">Font Size</span>
-              <span class="text-3xs text-slate-400">Set tooltip text size</span>
-            </div>
-            <select id="tooltip-font-size" class="bg-slate-800 border border-slate-700 rounded-lg py-1 px-2 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer w-28">
-              <option value="12">Small (12px)</option>
-              <option value="14" selected>Normal (14px)</option>
-              <option value="16">Large (16px)</option>
-              <option value="18">Extra Large (18px)</option>
-              <option value="20">Huge (20px)</option>
-              <option value="24">2XL (24px)</option>
-              <option value="28">3XL (28px)</option>
-              <option value="32">4XL (32px)</option>
-              <option value="36">5XL (36px)</option>
-              <option value="40">6XL (40px)</option>
-              <option value="48">7XL (48px)</option>
-              <option value="56">8XL (56px)</option>
-              <option value="64">9XL (64px)</option>
-              <option value="72">10XL (72px)</option>
-              <option value="80">11XL (80px)</option>
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">OCR Language</span>
+            <span class="setting-desc">Character set mode</span>
+          </div>
+          <div class="select-wrap">
+            <select id="ocr-language">
+              <option value="ch">CJK / English</option>
+              <option value="latin">Latin / Multi</option>
             </select>
-          </div>
-
-          <div class="flex items-center justify-between gap-4 pt-1.5 border-t border-slate-800/40">
-            <div class="flex flex-col">
-              <span class="text-xs font-semibold">Hiện phiên âm (Phonetics)</span>
-              <span class="text-3xs text-slate-400">Hiển thị IPA và Pinyin trong tooltip</span>
-            </div>
-            <label class="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" id="phonetics-toggle" class="sr-only peer" checked>
-              <div class="w-8 h-4.5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[14px] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-blue-500"></div>
-            </label>
-          </div>
-
-          <div class="flex items-center justify-between gap-4 pt-1.5 border-t border-slate-800/40">
-            <div class="flex flex-col">
-              <span class="text-xs font-semibold">Pin OCR Image</span>
-              <span class="text-3xs text-slate-400">Keep cropped screenshot on screen</span>
-            </div>
-            <label class="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" id="ocr-pin-toggle" class="sr-only peer">
-              <div class="w-8 h-4.5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[14px] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-blue-500"></div>
-            </label>
-          </div>
-
-          <div class="flex items-center justify-between gap-4 pt-1.5 border-t border-slate-800/40">
-            <div class="flex flex-col">
-              <span class="text-xs font-semibold">Copy OCR to Clipboard</span>
-              <span class="text-3xs text-slate-400">Copy cropped image to clipboard</span>
-            </div>
-            <label class="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" id="ocr-copy-toggle" class="sr-only peer">
-              <div class="w-8 h-4.5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[14px] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-blue-500"></div>
-            </label>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- Status Message -->
-    <div id="status-msg" class="text-center text-[10px] text-emerald-400 font-medium opacity-0 transition-opacity duration-300">
-      Settings saved automatically
-    </div>
+      <!-- Tooltip & Display -->
+      <div class="card">
+        <div class="card-title">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Tooltip &amp; Display
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">Font Size</span>
+            <span class="setting-desc">Tooltip text size</span>
+          </div>
+          <div class="select-wrap">
+            <select id="tooltip-font-size">
+              <option value="12">12px · Small</option>
+              <option value="14" selected>14px · Normal</option>
+              <option value="16">16px · Large</option>
+              <option value="18">18px · XL</option>
+              <option value="20">20px · 2XL</option>
+              <option value="24">24px · 3XL</option>
+              <option value="28">28px</option>
+              <option value="32">32px</option>
+              <option value="36">36px</option>
+              <option value="40">40px</option>
+              <option value="48">48px</option>
+              <option value="56">56px</option>
+              <option value="64">64px</option>
+              <option value="72">72px</option>
+              <option value="80">80px</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">TTS Pronounce</span>
+            <span class="setting-desc">Speaker button</span>
+          </div>
+          <label class="toggle-wrap" title="Show TTS speaker button">
+            <input type="checkbox" id="tts-toggle" checked>
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">Phonetics</span>
+            <span class="setting-desc">IPA · Pinyin display</span>
+          </div>
+          <label class="toggle-wrap" title="Show phonetic transcription">
+            <input type="checkbox" id="phonetics-toggle" checked>
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">Pin OCR Image</span>
+            <span class="setting-desc">Float cropped region</span>
+          </div>
+          <label class="toggle-wrap" title="Pin OCR image on screen">
+            <input type="checkbox" id="ocr-pin-toggle">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">Copy OCR Image</span>
+            <span class="setting-desc">Auto-copy to clipboard</span>
+          </div>
+          <label class="toggle-wrap" title="Copy OCR image to clipboard">
+            <input type="checkbox" id="ocr-copy-toggle">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+      </div>
+
+    </div><!-- /RIGHT -->
+
+  </div><!-- /GRID -->
+
+  <!-- STATUS TOAST -->
+  <div id="status-msg" class="status-toast" role="status" aria-live="polite">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><polyline points="20 6 9 17 4 12"/></svg>
+    Settings saved
   </div>
-  <script type="module" src="popup.ts"></script>
+
+</div><!-- /popup-root -->
+
+<script type="module" src="popup.ts"></script>
 </body>
 </html>

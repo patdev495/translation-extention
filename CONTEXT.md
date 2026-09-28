@@ -51,6 +51,42 @@ _Avoid_: Bundled OCR model, Temporary model download
 **Primary Target Language**:
 The user's preferred language for receiving translations (typically Vietnamese).
 
+**Direct Primary Translation**:
+Translation explicitly requested into the Primary Target Language, without changing the target according to the detected Source Language. It requires an enabled Primary Target Language.
+_Avoid_: Automatic target selection, Fallback translation
+
+**Input Replacement Translation**:
+The translation of a selected text segment directly inside an editable field, replacing only that selected segment with text in the Primary Target Language.
+_Avoid_: Input translation, Inline translation, Replace all text
+
+**Editable Field**:
+A text input, textarea, or contenteditable region in which Input Replacement Translation may replace a selected text segment. Password fields are excluded.
+_Avoid_: Input box, Text box, Password field
+
+**Eligible Input Selection**:
+A non-empty text selection inside an Editable Field that can be replaced by Input Replacement Translation.
+_Avoid_: Empty selection, Cursor position
+
+**Input Replacement Shortcut**:
+The configurable key combination that triggers Input Replacement Translation. When Input Replacement Translation is enabled, a shortcut is mandatory; selecting Disabled turns off the feature.
+_Avoid_: Auto-translate shortcut, Optional shortcut
+
+**Left-Control Tap**:
+The default Input Replacement Shortcut: pressing and releasing the left Control key without pressing another key while it is held.
+_Avoid_: Ctrl+Left Arrow, Control-key combination
+
+**Stale Input Translation**:
+An Input Replacement Translation result whose original Editable Field, focus, or selected text has changed before the result is ready. It is discarded without modifying the field.
+_Avoid_: Delayed translation, Pending replacement
+
+**Input Translation Status**:
+The short visual feedback displayed beside an Editable Field while Input Replacement Translation is in progress or when it fails.
+_Avoid_: Translation tooltip, Persistent notification
+
+**Undoable Input Replacement**:
+An Input Replacement Translation applied as one editable operation that the user can reverse to restore the original selected text.
+_Avoid_: Permanent replacement, Multi-step edit
+
 **Secondary Target Language**:
 The fallback language used for translation when the detected Source Language is the same as the Primary Target Language (typically English or Chinese).
 

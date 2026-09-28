@@ -42,6 +42,8 @@ describe('SettingsManager', () => {
       primaryTargetLang: 'vi',
       secondaryTargetLang: 'zh',
       reverseTargetLang: 'en',
+      inputReplacementEnabled: true,
+      inputReplacementShortcut: 'ControlLeft',
       ocrShortcut: 'ctrl-space',
       ocrModelTier: 'medium',
       ocrLanguage: 'latin',
@@ -86,5 +88,16 @@ describe('SettingsManager', () => {
     expect(updated.primaryTargetLang).toBe('none');
     expect(updated.secondaryTargetLang).toBe('none');
     expect(updated.reverseTargetLang).toBe('none');
+  });
+
+  test('persists the Input Replacement Translation setting and shortcut', async () => {
+    const updated = await SettingsManager.updateSettings({
+      inputReplacementEnabled: false,
+      inputReplacementShortcut: 'KeyQ',
+    });
+
+    expect(updated.inputReplacementEnabled).toBe(false);
+    expect(updated.inputReplacementShortcut).toBe('KeyQ');
+    expect((await SettingsManager.getSettings()).inputReplacementShortcut).toBe('KeyQ');
   });
 });

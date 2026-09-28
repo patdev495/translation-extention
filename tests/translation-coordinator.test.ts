@@ -31,6 +31,8 @@ const mockSettings: Settings = {
   primaryTargetLang: 'vi',
   secondaryTargetLang: 'zh',
   reverseTargetLang: 'en',
+  inputReplacementEnabled: true,
+  inputReplacementShortcut: 'ControlLeft',
   ocrShortcut: 'ctrl-space',
   ocrModelTier: 'medium',
   ocrLanguage: 'ch',

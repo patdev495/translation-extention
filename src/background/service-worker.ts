@@ -181,6 +181,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // Keep message channel open for async response
   }
 
+  if (message.type === 'TRANSLATE_DIRECT_PRIMARY') {
+    const { text } = message;
+
+    (async () => {
+      try {
+        const settings = await SettingsManager.getSettings();
+        const data = await TranslationCoordinator.translateDirectToPrimary(text, settings);
+        sendResponse({ success: true, data });
+      } catch (error: any) {
+        sendResponse({ success: false, error: error.message });
+      }
+    })();
+
+    return true;
+  }
+
   if (message.type === 'CAPTURE_TAB') {
     const { rect, viewport } = message;
 

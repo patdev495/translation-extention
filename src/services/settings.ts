@@ -4,6 +4,8 @@ export interface Settings {
   primaryTargetLang: TargetLanguage;
   secondaryTargetLang: TargetLanguage;
   reverseTargetLang: TargetLanguage;
+  inputReplacementEnabled: boolean;
+  inputReplacementShortcut: string;
   ocrShortcut: 'disabled' | 'ctrl-space' | 'alt-o' | 'ctrl-shift-o';
   ocrModelTier: 'tiny' | 'small' | 'medium';
   ocrLanguage: 'ch' | 'latin';
@@ -22,6 +24,8 @@ export class SettingsManager {
     primaryTargetLang: 'vi',
     secondaryTargetLang: 'zh',
     reverseTargetLang: 'en',
+    inputReplacementEnabled: true,
+    inputReplacementShortcut: 'ControlLeft',
     ocrShortcut: 'ctrl-space',
     ocrModelTier: 'medium',
     ocrLanguage: 'latin',
