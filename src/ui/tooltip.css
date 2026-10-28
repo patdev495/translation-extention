@@ -1,0 +1,33 @@
+/* Hallmark · shape: app screen · genre: modern-minimal · theme: Coral · redesign: full · signature: multilingual reading sheet · v2.0.0 */
+/* Hallmark · pre-emit critique: P4 H4 E4 S4 R5 V4 · weakest: H, reading blocks now use rules and a shared action rail */
+@import "./tokens.css";
+@import "./base.css";
+
+:host { all: initial; font-family: var(--font-body); color: var(--color-ink); }
+#tooltip { --color-muted: var(--color-tooltip-muted); --color-rule: var(--color-tooltip-rule); --color-paper-2: var(--color-tooltip-hover); --color-paper-3: var(--color-tooltip-pressed); position: absolute; display: none; background: var(--color-tooltip-paper); color: var(--color-ink); outline: 1px solid var(--color-tooltip-edge); outline-offset: -1px; border-radius: var(--radius-card); padding: var(--space-md); box-shadow: var(--shadow-panel); font-family: var(--font-body); font-size: var(--tooltip-font-size, 14px); line-height: 1.6; max-height: calc(100dvh - 32px); overflow: auto; scrollbar-width: thin; scrollbar-color: var(--color-tooltip-edge) var(--color-tooltip-paper); cursor: move; transform: translate(-50%, -50%); }
+.tt-body { display: flex; flex-direction: column; gap: var(--space-sm); cursor: default; }
+.tt-body > div { min-width: 0; }
+.tt-section-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2xs) var(--space-xs); min-height: 44px; margin-bottom: var(--space-2xs); }
+.tt-lang-badge { font-size: max(12px, 0.78em); font-weight: 600; color: var(--color-muted); line-height: 1.5; }
+.tt-lang-badge.tr1, .tt-lang-badge.tr2 { color: var(--color-ink); }
+.tt-actions { display: flex; align-items: center; gap: var(--space-xs); flex-shrink: 0; }
+.tt-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: var(--radius-input); color: var(--color-muted); background: var(--color-transparent); cursor: pointer; flex-shrink: 0; }
+.tt-btn::before { content: ""; position: absolute; inset: -4px; }
+.tt-btn:focus-visible, #trigger:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.tt-btn:active { background: var(--color-paper-3); }
+.tt-btn:disabled, #trigger:disabled { opacity: 0.55; cursor: not-allowed; }
+.tt-btn svg { width: 16px !important; height: 16px !important; }
+.tt-source-text, .tt-translation-text { display: block; color: var(--color-ink); font-weight: 400; line-height: 1.6; }
+.tt-source-text { color: var(--color-ink-2); }
+.tt-translation-text { font-weight: 500; }
+.tt-phonetic { display: block; color: var(--color-muted); font-family: var(--font-body); font-size: max(12px, 0.875em); line-height: 1.6; overflow-wrap: break-word; white-space: pre-wrap; }
+.phonetics-container { margin-top: var(--space-xs); }
+.tt-sep { height: 1px; background: var(--color-rule); }
+.break-words { overflow-wrap: break-word; white-space: pre-wrap; }
+.break-normal { word-break: normal; white-space: pre; }
+.tt-copy-ok { color: var(--color-success); background: var(--color-success-soft); }
+#trigger { position: absolute; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: var(--radius-card); color: var(--color-accent-ink); background: var(--color-accent); box-shadow: var(--shadow-card); transform: translate(-50%, -100%); }
+#trigger svg { width: 24px; height: 24px; }
+#trigger:active { background: var(--color-ink); }
+@media (hover: hover) { .tt-btn:hover { background: var(--color-paper-2); color: var(--color-ink); } #trigger:hover { background: var(--color-ink-2); } }
+@media (max-width: 480px) { .tt-actions { gap: var(--space-2xs); } }

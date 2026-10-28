@@ -1,3 +1,5 @@
+import OCR_CSS from '../ui/ocr.css?inline';
+
 export interface OcrSelectionOverlayOptions {
   isPdfMode?: boolean;
   shadowMode?: boolean;
@@ -100,57 +102,7 @@ export class OcrSelectionOverlay {
 
     // Styles for Shadow DOM
     const styleEl = document.createElement('style');
-    styleEl.textContent = `
-      @keyframes spin {
-        to { transform: rotate(360deg); }
-      }
-      .overlay {
-        position: absolute;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.2);
-        cursor: crosshair;
-        user-select: none;
-        box-sizing: border-box;
-      }
-      .selection-box {
-        position: absolute;
-        border: 2px solid #89b4fa;
-        background: rgba(137, 180, 250, 0.16);
-        box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35);
-        pointer-events: none;
-        box-sizing: border-box;
-      }
-      .ocr-progress-indicator {
-        position: absolute;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        max-width: 320px;
-        min-height: 28px;
-        padding: 6px 12px;
-        border-radius: 8px;
-        background: rgba(30, 30, 46, 0.96);
-        border: 1px solid rgba(137, 180, 250, 0.35);
-        color: #cdd6f4;
-        font-size: 13px;
-        line-height: 1.3;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-        pointer-events: none;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        box-sizing: border-box;
-        z-index: 10;
-      }
-      .mini-spinner {
-        width: 14px;
-        height: 14px;
-        border: 2px solid #313244;
-        border-top-color: #89b4fa;
-        border-radius: 50%;
-        animation: spin 0.8s linear infinite;
-        flex: 0 0 auto;
-        box-sizing: border-box;
-      }
-    `;
+    styleEl.textContent = OCR_CSS;
     this.shadow.appendChild(styleEl);
 
     const overlayEl = document.createElement('div');

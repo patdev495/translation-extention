@@ -1,3 +1,5 @@
+import INPUT_STATUS_CSS from '../ui/input-status.css?inline';
+
 import {
   type InputReplacementAdapter,
   type InputReplacementSelection,
@@ -129,20 +131,19 @@ function createStatus(): InputTranslationStatus {
     top: `${(rect?.bottom ?? 12) + 6}px`,
     left: `${rect?.left ?? 12}px`,
     zIndex: '2147483647',
-    padding: '4px 8px',
-    borderRadius: '6px',
-    background: '#0f766e',
-    color: '#fff',
-    font: '12px system-ui, sans-serif',
     pointerEvents: 'none',
   });
+  const shadow = indicator.attachShadow({ mode: 'open' });
+  const style = document.createElement('style');
+  style.textContent = INPUT_STATUS_CSS;
+  shadow.append(style, document.createElement('slot'));
   document.body.appendChild(indicator);
 
   return {
     hide: () => indicator.remove(),
     error: (message) => {
       indicator.textContent = message || 'Dịch thất bại.';
-      indicator.style.background = '#b91c1c';
+      indicator.dataset.state = 'error';
       window.setTimeout(() => indicator.remove(), 3000);
     },
   };

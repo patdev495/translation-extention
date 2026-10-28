@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Design System Test — Light & Dark</title>
+  <link rel="stylesheet" href="./dist/popup.css">
+  <style>
+    body {
+      font-family: var(--font-sans);
+      margin: 0;
+      padding: 20px;
+      background: hsl(var(--color-background));
+      color: hsl(var(--color-foreground));
+      transition: background 0.3s, color 0.3s;
+    }
+
+    .test-container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    h1 { color: hsl(var(--color-primary)); }
+    h2 { color: hsl(var(--color-secondary)); margin-top: 30px; }
+
+    .color-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin: 20px 0;
+    }
+
+    .color-swatch {
+      padding: 16px;
+      border-radius: var(--radius-DEFAULT);
+      border: 1px solid hsl(var(--color-border));
+      text-align: center;
+      font-size: 12px;
+    }
+
+    .primary { background: hsl(var(--color-primary)); color: hsl(var(--color-primary-foreground)); }
+    .secondary { background: hsl(var(--color-secondary)); color: hsl(var(--color-secondary-foreground)); }
+    .accent { background: hsl(var(--color-accent)); color: hsl(var(--color-accent-foreground)); }
+    .destructive { background: hsl(var(--color-destructive)); color: hsl(var(--color-destructive-foreground)); }
+    .success { background: hsl(var(--color-success)); color: hsl(var(--color-success-foreground)); }
+    .warning { background: hsl(var(--color-warning)); color: hsl(var(--color-warning-foreground)); }
+    .info { background: hsl(var(--color-info)); color: hsl(var(--color-info-foreground)); }
+
+    .button-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 20px 0;
+    }
+
+    button {
+      padding: 8px 16px;
+      border: 1px solid hsl(var(--color-border));
+      border-radius: var(--radius-DEFAULT);
+      background: hsl(var(--color-primary));
+      color: hsl(var(--color-primary-foreground));
+      font-family: var(--font-sans);
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    button:focus-visible {
+      outline: 2px solid hsl(var(--color-ring));
+      outline-offset: 2px;
+    }
+
+    .contrast-check {
+      background: hsl(var(--color-card));
+      padding: 16px;
+      border-radius: var(--radius-DEFAULT);
+      margin: 20px 0;
+      border: 1px solid hsl(var(--color-border));
+    }
+
+    .dark-mode-toggle {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 8px 16px;
+      background: hsl(var(--color-primary));
+      color: hsl(var(--color-primary-foreground));
+      border: none;
+      border-radius: var(--radius-DEFAULT);
+      cursor: pointer;
+      font-weight: 600;
+      z-index: 1000;
+    }
+
+    html.dark {
+      color-scheme: dark;
+    }
+
+    html.light {
+      color-scheme: light;
+    }
+  </style>
+</head>
+<body>
+  <button class="dark-mode-toggle" onclick="toggleDarkMode()">🌙 Toggle Dark Mode</button>
+
+  <div class="test-container">
+    <h1>Warm SaaS Design System Test</h1>
+    <p>Testing light and dark modes with proper contrast and accessibility.</p>
+
+    <h2>Color Palette</h2>
+    <div class="color-grid">
+      <div class="color-swatch primary">Primary</div>
+      <div class="color-swatch secondary">Secondary</div>
+      <div class="color-swatch accent">Accent</div>
+      <div class="color-swatch destructive">Destructive</div>
+      <div class="color-swatch success">Success</div>
+      <div class="color-swatch warning">Warning</div>
+      <div class="color-swatch info">Info</div>
+    </div>
+
+    <h2>Buttons</h2>
+    <div class="button-group">
+      <button>Primary Button</button>
+      <button style="background: hsl(var(--color-secondary)); color: hsl(var(--color-secondary-foreground));">Secondary</button>
+      <button style="background: transparent; color: hsl(var(--color-primary)); border: 2px solid hsl(var(--color-primary));">Ghost</button>
+    </div>
+
+    <h2>Contrast Check</h2>
+    <div class="contrast-check">
+      <h3>Card with proper contrast</h3>
+      <p>This card should have readable text on background. Foreground color provides AA contrast.</p>
+      <p>Font: <strong>Plus Jakarta Sans</strong> (loaded from Google Fonts)</p>
+    </div>
+
+    <h2>Typography</h2>
+    <div class="contrast-check">
+      <p style="font-size: 12px; color: hsl(var(--color-muted-foreground));">Small muted text</p>
+      <p style="font-size: 14px;">Normal paragraph text</p>
+      <p style="font-size: 16px; font-weight: 600;">Semibold accent text</p>
+      <p style="font-family: var(--font-mono); font-size: 13px;">Monospace (DM Mono)</p>
+    </div>
+
+    <h2>Accessibility</h2>
+    <div class="contrast-check">
+      <button>Focus this button (Shift+Tab)</button>
+      <p>The button above should show a 2px outline with ring color when focused.</p>
+      <p style="margin-top: 16px;"><code>:focus-visible</code> outline: 2px solid var(--color-ring), 2px offset</p>
+    </div>
+  </div>
+
+  <script>
+    function toggleDarkMode() {
+      const html = document.documentElement;
+      if (html.classList.contains('dark')) {
+        html.classList.remove('dark');
+        html.classList.add('light');
+      } else {
+        html.classList.add('dark');
+        html.classList.remove('light');
+      }
+    }
+
+    // Default to light mode
+    document.documentElement.classList.add('light');
+  </script>
+</body>
+</html>
