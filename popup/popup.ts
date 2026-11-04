@@ -15,6 +15,8 @@ const ocrLanguage = document.getElementById('ocr-language') as HTMLSelectElement
 const ttsToggle = document.getElementById('tts-toggle') as HTMLInputElement;
 const tooltipFontSizeSelect = document.getElementById('tooltip-font-size') as HTMLSelectElement;
 const hanziStrokeSpeedSelect = document.getElementById('hanzi-stroke-speed') as HTMLSelectElement;
+const hanziBreakdownToggle = document.getElementById('hanzi-breakdown-enabled') as HTMLInputElement;
+const hanziBreakdownLanguageSelect = document.getElementById('hanzi-breakdown-language') as HTMLSelectElement;
 const ocrPinToggle = document.getElementById('ocr-pin-toggle') as HTMLInputElement;
 const ocrCopyToggle = document.getElementById('ocr-copy-toggle') as HTMLInputElement;
 const autoTranslateToggle = document.getElementById('auto-translate') as HTMLInputElement;
@@ -158,6 +160,8 @@ async function loadSettings() {
     deeplApiKeyInput.value = settings.deeplApiKey;
     tooltipFontSizeSelect.value = settings.tooltipFontSize;
     hanziStrokeSpeedSelect.value = String(settings.hanziStrokeSpeed);
+    hanziBreakdownToggle.checked = settings.hanziBreakdownEnabled;
+    hanziBreakdownLanguageSelect.value = settings.hanziBreakdownLanguage;
     ocrPinToggle.checked = settings.ocrPinImage;
     ocrCopyToggle.checked = settings.ocrCopyToClipboard;
     autoTranslateToggle.checked = settings.autoTranslate;
@@ -200,6 +204,8 @@ async function saveSettings() {
       deeplApiKey: deeplApiKeyInput.value,
       tooltipFontSize: tooltipFontSizeSelect.value as '12' | '14' | '16' | '18' | '20' | '24' | '28' | '32' | '36' | '40',
       hanziStrokeSpeed: Number(hanziStrokeSpeedSelect.value) as 0.5 | 1 | 1.5 | 2 | 3,
+      hanziBreakdownEnabled: hanziBreakdownToggle.checked,
+      hanziBreakdownLanguage: hanziBreakdownLanguageSelect.value as 'vi' | 'en',
       ocrPinImage: ocrPinToggle.checked,
       ocrCopyToClipboard: ocrCopyToggle.checked,
       autoTranslate: autoTranslateToggle.checked,
@@ -244,6 +250,8 @@ ocrLanguage.addEventListener('change', saveSettings);
 ttsToggle.addEventListener('change', saveSettings);
 tooltipFontSizeSelect.addEventListener('change', saveSettings);
 hanziStrokeSpeedSelect.addEventListener('change', saveSettings);
+hanziBreakdownToggle.addEventListener('change', saveSettings);
+hanziBreakdownLanguageSelect.addEventListener('change', saveSettings);
 autoTranslateToggle.addEventListener('change', saveSettings);
 ocrPinToggle.addEventListener('change', saveSettings);
 ocrCopyToggle.addEventListener('change', saveSettings);

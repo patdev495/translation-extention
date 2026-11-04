@@ -33,6 +33,7 @@ export async function loadSettings(ctx: TranslationContext): Promise<void> {
     }
     if (ctx.settings) {
       ctx.tooltip.updateHanziStrokeSpeed(ctx.settings.hanziStrokeSpeed);
+      ctx.tooltip.updateHanziBreakdownSettings(ctx.settings.hanziBreakdownEnabled, ctx.settings.hanziBreakdownLanguage);
     }
     if (ctx.settings && ctx.settings.phoneticsVisible !== undefined) {
       ctx.tooltip.updatePhoneticsVisibility(ctx.settings.phoneticsVisible);
@@ -90,8 +91,9 @@ export function translateSelectedPageText(ctx: TranslationContext): boolean {
   if (!text) return false;
 
   const root = document.getElementById('translation-extension-root');
+  const breakdownRoot = document.getElementById('translation-extension-hanzi-breakdown-root');
   const range = selection.getRangeAt(0);
-  if (isSelectionInsideTooltip(selection, root)) return false;
+  if (isSelectionInsideTooltip(selection, root) || isSelectionInsideTooltip(selection, breakdownRoot)) return false;
 
   const rect = range.getBoundingClientRect();
   const x = rect.left + window.scrollX;
@@ -143,7 +145,9 @@ export function initTranslationListeners(
     const x = event.pageX;
     const y = event.pageY;
     const root = document.getElementById('translation-extension-root');
-    const isInsideRoot = root ? (event as any).composedPath().includes(root) : false;
+    const breakdownRoot = document.getElementById('translation-extension-hanzi-breakdown-root');
+    const path = event.composedPath();
+    const isInsideRoot = (!!root && path.includes(root)) || (!!breakdownRoot && path.includes(breakdownRoot));
     if (isInsideRoot) return;
 
     setTimeout(() => {
@@ -153,7 +157,7 @@ export function initTranslationListeners(
       const selectedText = selection.toString().trim();
       if (selectedText.length === 0) return;
 
-      if (isSelectionInsideTooltip(selection, root)) return;
+      if (isSelectionInsideTooltip(selection, root) || isSelectionInsideTooltip(selection, breakdownRoot)) return;
 
       ctx.lastSelection = { text: selectedText, x, y };
       performTranslation(ctx, selectedText, x, y);
@@ -164,7 +168,9 @@ export function initTranslationListeners(
   target.addEventListener('mousedown', (e) => {
     const event = e as MouseEvent;
     const root = document.getElementById('translation-extension-root');
-    const isInsideRoot = root ? (event as any).composedPath().includes(root) : false;
+    const breakdownRoot = document.getElementById('translation-extension-hanzi-breakdown-root');
+    const path = event.composedPath();
+    const isInsideRoot = (!!root && path.includes(root)) || (!!breakdownRoot && path.includes(breakdownRoot));
     if (isInsideRoot) return;
 
     const isInsidePinned = event.composedPath().some(node => 

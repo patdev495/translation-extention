@@ -50,6 +50,7 @@
         "pdf.worker.min.mjs",
         "onnxruntime-web/*",
         "hanzi-data/*",
+        "hanzi-dictionary/*",
         "models/*"
       ],
       "matches": [

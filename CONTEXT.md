@@ -142,6 +142,32 @@ The quick-access buttons in the Translation Tooltip pointing to external diction
 A visual demonstration that draws one Chinese character stroke by stroke in its writing order.
 _Avoid_: Animated word image, Static stroke diagram
 
+**Hanzi Component Breakdown**:
+A learning view that first shows a Chinese character's immediate identifiable parts, including parts that suggest meaning or sound, and explains each known part. Selecting a part reveals its own parts one level deeper in the same view, with a way back; unknown parts are identified as unknown rather than given an invented meaning, and the parts have no separate stroke animation.
+_Avoid_: Stroke order for components
+
+**Hanzi Component**:
+An identifiable part of a Chinese character that can contribute to its written form, meaning, or sound. A component may be the character's dictionary radical, but the other components also belong in a Hanzi Component Breakdown.
+_Avoid_: Radical as a name for every component
+
+**Hanzi Component Breakdown Visibility State**:
+The setting that determines whether starting a character's looping Hanzi Stroke Order Animation also reveals its Hanzi Component Breakdown. Stopping that character's loop closes its breakdown when it is the Focused Hanzi Breakdown.
+_Default_: Off
+_Avoid_: Replacing stroke animation with component details
+
+**Hanzi Breakdown Language**:
+The independent setting that selects whether all explanatory text in the Hanzi Breakdown Tooltip is shown in Vietnamese or English. Chinese characters and Pinyin remain in their original forms.
+_Default_: Vietnamese
+_Avoid_: Primary Target Language
+
+**Focused Hanzi Breakdown**:
+The single Hanzi Component Breakdown shown for the most recently selected character when breakdowns are enabled. Other characters may continue looping their stroke animations without showing their own breakdowns.
+_Avoid_: One breakdown per looping character
+
+**Hanzi Breakdown Tooltip**:
+A separate, independently draggable floating card with its own close control that displays the Focused Hanzi Breakdown. It is independent of the Translation Tooltip's layout, but closes when the Translation Tooltip or the focused character's loop closes; closing only this card does not stop a character's looping stroke animation.
+_Avoid_: A section inside the Translation Tooltip
+
 **Looping Hanzi**:
 A character in the Hanzi Stroke Order Animation that the user has chosen for repeated playback. Multiple characters can be Looping Hanzi at the same time.
 _Avoid_: Selected text, Highlighted word

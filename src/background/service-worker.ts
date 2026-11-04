@@ -1,6 +1,7 @@
 import { SettingsManager } from '../services/settings';
 import { PDF_VIEWER_PATH, shouldUseExtensionPdfViewer } from './pdf-redirect';
 import { TranslationCoordinator } from '../services/translation-coordinator';
+import { TranslationEngine } from '../services/translation';
 
 // ─── PDF Redirect Logic ────────────────────────────────────────────────────
 
@@ -157,6 +158,34 @@ async function translateText(text: string) {
 // ─── Message Handlers ──────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'TRANSLATE_HANZI_MEANING') {
+    (async () => {
+      const meaning = typeof message.meaning === 'string' ? message.meaning.trim() : '';
+      if (!meaning) {
+        sendResponse({ success: false, meaning: '' });
+        return;
+      }
+      try {
+        const cacheKey = `hanziMeaning:${meaning}`;
+        const stored = await chrome.storage.local.get(cacheKey);
+        const cached = stored[cacheKey] as string | undefined;
+        if (cached) {
+          sendResponse({ success: true, meaning: cached });
+          return;
+        }
+        const settings = await SettingsManager.getSettings();
+        const result = await TranslationEngine.translateWithSettings(meaning, 'vi', settings);
+        const translated = result.translation.trim();
+        if (!translated) throw new Error('Empty translated meaning');
+        await chrome.storage.local.set({ [cacheKey]: translated });
+        sendResponse({ success: true, meaning: translated });
+      } catch {
+        sendResponse({ success: false, meaning });
+      }
+    })();
+    return true;
+  }
+
   // Open Chrome extension settings page so user can enable "Allow access to file URLs"
   if (message.type === 'OPEN_EXTENSION_SETTINGS') {
     chrome.tabs.create({

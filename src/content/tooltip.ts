@@ -1,5 +1,7 @@
 import TOOLTIP_CSS from '../ui/tooltip.css?inline';
 import HanziWriter, { type CharacterJson } from 'hanzi-writer';
+import BREAKDOWN_CSS from '../ui/hanzi-breakdown.css?inline';
+import { getHanziBreakdown } from '../services/hanzi-breakdown';
 
 const EYE_OPEN_SVG = `
 <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-[1em] h-[1em]">
@@ -32,6 +34,13 @@ export class TranslationTooltip {
   private hanziDataCache = new Map<string, Promise<CharacterJson>>();
   private hanziSelectionStart: Element | null = null;
   private hanziStrokeSpeed = 2;
+  private hanziBreakdownEnabled = false;
+  private hanziBreakdownLanguage: 'vi' | 'en' = 'vi';
+  private breakdownRoot: HTMLDivElement | null = null;
+  private breakdownCharacter: string | null = null;
+  private breakdownPath: string[] = [];
+  private breakdownRequest = 0;
+  private breakdownDragCleanup: (() => void) | null = null;
 
   constructor() {
     this.init();
@@ -94,6 +103,12 @@ export class TranslationTooltip {
           } else {
             void writer.loopCharacterAnimation();
           }
+        }
+        const character = hanziButton.querySelector('.tt-hanzi-fallback')?.textContent ?? '';
+        if (looping && this.breakdownCharacter === character) {
+          this.closeHanziBreakdown();
+        } else if (!looping && this.hanziBreakdownEnabled && character) {
+          void this.showHanziBreakdown(character);
         }
         return;
       }
@@ -415,6 +430,7 @@ export class TranslationTooltip {
 
   hide() {
     if (this.tooltipEl) {
+      this.closeHanziBreakdown();
       this.stopHanziAnimations();
       this.tooltipEl.classList.remove('visible');
       this.tooltipEl.style.display = 'none';
@@ -593,6 +609,7 @@ export class TranslationTooltip {
   }
 
   private stopHanziAnimations(): void {
+    this.closeHanziBreakdown();
     const writers = [...this.hanziWriters.values()];
     this.hanziWriters.clear();
     for (const writer of writers) {
@@ -672,6 +689,187 @@ export class TranslationTooltip {
 
   updateHanziStrokeSpeed(speed: number): void {
     if ([0.5, 1, 1.5, 2, 3].includes(speed)) this.hanziStrokeSpeed = speed;
+  }
+
+  updateHanziBreakdownSettings(enabled: boolean, language: 'vi' | 'en'): void {
+    const languageChanged = this.hanziBreakdownLanguage !== language;
+    this.hanziBreakdownEnabled = enabled;
+    this.hanziBreakdownLanguage = language;
+    if (!enabled) this.closeHanziBreakdown();
+    else if (languageChanged && this.breakdownRoot && this.breakdownPath.length) {
+      const path = [...this.breakdownPath];
+      void this.showHanziBreakdown(path[path.length - 1], path);
+    }
+  }
+
+  private async showHanziBreakdown(character: string, path: string[] = [character]): Promise<void> {
+    const request = ++this.breakdownRequest;
+    this.breakdownCharacter = path[0];
+    this.breakdownPath = path;
+    const root = this.ensureHanziBreakdownRoot();
+    const shadow = root.shadowRoot!;
+    shadow.querySelector('.hanzi-breakdown-card')?.remove();
+    const loading = document.createElement('section');
+    loading.className = 'hanzi-breakdown-card';
+    const pendingClose = document.createElement('button');
+    pendingClose.type = 'button';
+    pendingClose.className = 'hanzi-breakdown-close';
+    pendingClose.setAttribute('aria-label', this.hanziBreakdownLanguage === 'vi' ? 'Đóng phân rã' : 'Close breakdown');
+    pendingClose.textContent = '×';
+    pendingClose.addEventListener('click', () => this.closeHanziBreakdown());
+    loading.append(pendingClose, document.createTextNode(`${character} · ${this.hanziBreakdownLanguage === 'vi' ? 'Đang tải' : 'Loading'}`));
+    shadow.appendChild(loading);
+    try {
+      const breakdown = await getHanziBreakdown(character);
+      if (request !== this.breakdownRequest) return;
+      const language = this.hanziBreakdownLanguage;
+      const ownMeaning = breakdown.meaning && language === 'vi'
+        ? await this.translateHanziMeaning(breakdown.meaning) : breakdown.meaning;
+      const componentMeanings = await Promise.all(breakdown.components.map(async component => {
+        if (!component.meaning || language === 'en') return component.meaning;
+        return this.translateHanziMeaning(component.meaning);
+      }));
+      if (request !== this.breakdownRequest) return;
+      const labels = language === 'vi'
+        ? { title: 'Phân rã chữ Hán', unknown: 'Chưa rõ cấu tạo', empty: 'Chưa có dữ liệu phân rã', meaning: 'Gợi nghĩa', sound: 'Gợi âm', radical: 'Bộ thủ tra cứu', back: 'Quay lại', close: 'Đóng phân rã' }
+        : { title: 'Hanzi breakdown', unknown: 'Unknown component', empty: 'No component data', meaning: 'Meaning hint', sound: 'Sound hint', radical: 'Dictionary radical', back: 'Back', close: 'Close breakdown' };
+      shadow.querySelector('.hanzi-breakdown-card')?.remove();
+      const card = document.createElement('section');
+      card.className = 'hanzi-breakdown-card';
+      card.setAttribute('aria-label', labels.title);
+      const close = document.createElement('button');
+      close.type = 'button';
+      close.className = 'hanzi-breakdown-close';
+      close.setAttribute('aria-label', labels.close);
+      close.textContent = '×';
+      close.addEventListener('click', () => this.closeHanziBreakdown());
+      card.appendChild(close);
+      if (path.length > 1) {
+        const parent = path[path.length - 2];
+        const back = document.createElement('button');
+        back.type = 'button';
+        back.className = 'hanzi-breakdown-back';
+        back.setAttribute('aria-label', language === 'vi' ? `${labels.back} ${parent}` : `${labels.back} to ${parent}`);
+        back.textContent = `← ${labels.back}: ${parent}`;
+        back.addEventListener('click', () => void this.showHanziBreakdown(parent, path.slice(0, -1)));
+        card.appendChild(back);
+      }
+      const title = document.createElement('h2');
+      title.textContent = `${breakdown.character} ${breakdown.pinyin.join(', ')}`;
+      const heading = document.createElement('p');
+      heading.className = 'hanzi-breakdown-heading';
+      heading.textContent = labels.title;
+      heading.addEventListener('mousedown', event => {
+        if (event.button !== 0 || !this.breakdownRoot) return;
+        event.preventDefault();
+        this.breakdownDragCleanup?.();
+        const target = this.breakdownRoot;
+        const bounds = target.getBoundingClientRect();
+        const startX = event.clientX;
+        const startY = event.clientY;
+        const left = bounds.left;
+        const top = bounds.top;
+        target.style.right = 'auto';
+        target.style.left = `${left}px`;
+        const move = (moveEvent: MouseEvent) => {
+          target.style.left = `${left + moveEvent.clientX - startX}px`;
+          target.style.top = `${top + moveEvent.clientY - startY}px`;
+        };
+        const stop = () => this.breakdownDragCleanup?.();
+        document.addEventListener('mousemove', move);
+        document.addEventListener('mouseup', stop);
+        this.breakdownDragCleanup = () => {
+          document.removeEventListener('mousemove', move);
+          document.removeEventListener('mouseup', stop);
+          this.breakdownDragCleanup = null;
+        };
+      });
+      card.appendChild(heading);
+      card.appendChild(title);
+      if (ownMeaning) {
+        const definition = document.createElement('p');
+        definition.className = 'hanzi-breakdown-definition';
+        definition.textContent = ownMeaning;
+        card.appendChild(definition);
+      }
+      if (!breakdown.components.length) {
+        const empty = document.createElement('p');
+        empty.textContent = labels.empty;
+        card.appendChild(empty);
+      }
+      for (const [index, component] of breakdown.components.entries()) {
+        const row = document.createElement('div');
+        row.className = 'hanzi-breakdown-component';
+        const glyph = document.createElement(component.expandable ? 'button' : 'strong');
+        glyph.textContent = component.character;
+        if (component.expandable) {
+          glyph.setAttribute('type', 'button');
+          glyph.setAttribute('data-component', component.character);
+          glyph.addEventListener('click', () => void this.showHanziBreakdown(component.character, [...path, component.character]));
+        }
+        const meaning = document.createElement('span');
+        const pronunciation = document.createElement('span');
+        pronunciation.className = 'hanzi-breakdown-pinyin';
+        pronunciation.textContent = component.pinyin.join(', ');
+        meaning.textContent = componentMeanings[index] ?? labels.unknown;
+        row.append(glyph, pronunciation, meaning);
+        const tags: string[] = [];
+        if (component.isRadical) tags.push(labels.radical);
+        if (component.role === 'meaning') tags.push(labels.meaning);
+        if (component.role === 'sound') tags.push(labels.sound);
+        if (tags.length) {
+          const annotation = document.createElement('small');
+          annotation.textContent = tags.join(' · ');
+          row.appendChild(annotation);
+        }
+        card.appendChild(row);
+      }
+      shadow.appendChild(card);
+    } catch (error) {
+      if (request === this.breakdownRequest) {
+        const message = this.hanziBreakdownLanguage === 'vi' ? 'Không tải được dữ liệu phân rã' : 'Could not load breakdown data';
+        loading.lastChild!.textContent = message;
+        console.error('Failed to load Hanzi breakdown:', error);
+      }
+    }
+  }
+
+  private ensureHanziBreakdownRoot(): HTMLDivElement {
+    if (this.breakdownRoot) return this.breakdownRoot;
+    const root = document.createElement('div');
+    root.id = 'translation-extension-hanzi-breakdown-root';
+    root.style.position = 'fixed';
+    root.style.top = '16px';
+    root.style.right = '16px';
+    root.style.zIndex = '2147483647';
+    const shadow = root.attachShadow({ mode: 'open' });
+    const style = document.createElement('style');
+    style.textContent = BREAKDOWN_CSS;
+    shadow.appendChild(style);
+    document.body.appendChild(root);
+    this.breakdownRoot = root;
+    return root;
+  }
+
+  private closeHanziBreakdown(): void {
+    this.breakdownDragCleanup?.();
+    this.breakdownRequest++;
+    this.breakdownCharacter = null;
+    this.breakdownPath = [];
+    this.breakdownRoot?.remove();
+    this.breakdownRoot = null;
+  }
+
+  private translateHanziMeaning(meaning: string): Promise<string> {
+    return new Promise(resolve => {
+      try {
+        chrome.runtime.sendMessage({ type: 'TRANSLATE_HANZI_MEANING', meaning }, response => {
+          resolve(response?.success && typeof response.meaning === 'string' ? response.meaning : meaning);
+        });
+      } catch {
+        resolve(meaning);
+      }
+    });
   }
 
   setPointerPassthrough(enabled: boolean) {

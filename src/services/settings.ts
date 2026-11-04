@@ -14,6 +14,8 @@ export interface Settings {
   deeplApiKey: string;
   tooltipFontSize: '12' | '14' | '16' | '18' | '20' | '24' | '28' | '32' | '36' | '40' | '48' | '56' | '64' | '72' | '80';
   hanziStrokeSpeed: 0.5 | 1 | 1.5 | 2 | 3;
+  hanziBreakdownEnabled: boolean;
+  hanziBreakdownLanguage: 'vi' | 'en';
   ocrPinImage: boolean;
   ocrCopyToClipboard: boolean;
   autoTranslate: boolean;
@@ -35,6 +37,8 @@ export class SettingsManager {
     deeplApiKey: '',
     tooltipFontSize: '16',
     hanziStrokeSpeed: 2,
+    hanziBreakdownEnabled: false,
+    hanziBreakdownLanguage: 'vi',
     ocrPinImage: false,
     ocrCopyToClipboard: true,
     autoTranslate: true,

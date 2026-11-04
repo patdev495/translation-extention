@@ -52,6 +52,8 @@ describe('SettingsManager', () => {
       deeplApiKey: '',
       tooltipFontSize: '16',
       hanziStrokeSpeed: 2,
+      hanziBreakdownEnabled: false,
+      hanziBreakdownLanguage: 'vi',
       ocrPinImage: false,
       ocrCopyToClipboard: true,
       autoTranslate: true,
