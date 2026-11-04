@@ -18,6 +18,12 @@ body { width: 640px; max-width: 100%; min-width: 0; margin-inline: auto; }
 .header-right { display: flex; align-items: center; gap: var(--space-xs); }
 .power-label { font-size: var(--text-sm); color: var(--color-muted); }
 .settings-main { padding: var(--space-md); }
+.privacy-consent { padding: var(--space-md); margin-bottom: var(--space-md); border: 1px solid var(--color-rule); border-radius: var(--radius-input); background: var(--color-cotton); }
+.privacy-consent[hidden] { display: none; }
+.privacy-consent h2 { margin-bottom: var(--space-xs); }
+.privacy-consent p { font-size: var(--text-sm); line-height: 1.5; margin-bottom: var(--space-xs); }
+.privacy-consent button { padding: var(--space-xs) var(--space-md); border-radius: var(--radius-input); border: 1px solid var(--color-ink); background: var(--color-ink); color: var(--color-cotton); cursor: pointer; }
+#privacy-consent:not([hidden]) ~ * { display: none; }
 .language-section { padding-bottom: var(--space-md); border-bottom: 1px solid var(--color-rule); }
 .language-section h2 { margin-bottom: var(--space-xs); }
 .language-grid, .ocr-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-md); }

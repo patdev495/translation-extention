@@ -31,7 +31,7 @@ chrome.runtime.onMessage.addListener((message) => {
 
 // Listen for storage changes to sync settings dynamically
 chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName === 'local' && (changes.settings || changes.active)) {
+  if (areaName === 'local' && (changes.settings || changes.active || changes.privacyConsentGranted)) {
     loadSettings(ctx);
   }
 });

@@ -3,6 +3,9 @@ import type { TargetLanguage } from '../src/services/translation-plan';
 import { shortcutConflictsWithOcr, shortcutFromKeyboardEvent } from '../src/content/input-replacement-shortcut';
 
 const activeToggle = document.getElementById('active-toggle') as HTMLInputElement;
+const privacyConsentPanel = document.getElementById('privacy-consent') as HTMLElement;
+const privacyConsentAccept = document.getElementById('privacy-consent-accept') as HTMLButtonElement;
+let privacyConsentGranted = false;
 const primaryLang = document.getElementById('primary-lang') as HTMLSelectElement;
 const secondaryLang = document.getElementById('secondary-lang') as HTMLSelectElement;
 const reverseLang = document.getElementById('reverse-lang') as HTMLSelectElement;
@@ -76,7 +79,7 @@ function updateDeepLContainer() {
 }
 
 async function validateDeepLKey(key: string): Promise<boolean> {
-  if (!key) return false;
+  if (!key || !privacyConsentGranted) return false;
   const isFree = key.endsWith(':fx');
   const url = isFree 
     ? 'https://api-free.deepl.com/v2/usage' 
@@ -140,10 +143,13 @@ function triggerKeyValidation() {
 async function loadSettings() {
   try {
     const settings = await SettingsManager.getSettings();
-    const res = await chrome.storage.local.get('active');
+    const res = await chrome.storage.local.get(['active', 'privacyConsentGranted']);
+    privacyConsentGranted = res.privacyConsentGranted === true;
+    privacyConsentPanel.hidden = privacyConsentGranted;
+    activeToggle.disabled = !privacyConsentGranted;
     const active = res.active !== undefined ? res.active : true;
 
-    activeToggle.checked = active;
+    activeToggle.checked = privacyConsentGranted && active;
     primaryLang.value = settings.primaryTargetLang;
     secondaryLang.value = settings.secondaryTargetLang;
     reverseLang.value = settings.reverseTargetLang;
@@ -188,7 +194,7 @@ async function saveSettings() {
       return;
     }
 
-    await chrome.storage.local.set({ active: activeToggle.checked });
+    await chrome.storage.local.set({ active: privacyConsentGranted && activeToggle.checked });
     
     await SettingsManager.updateSettings({
       primaryTargetLang: primaryLang.value as TargetLanguage,
@@ -237,6 +243,11 @@ async function saveSettings() {
 }
 
 // Bind change events
+privacyConsentAccept.addEventListener('click', async () => {
+  await chrome.storage.local.set({ privacyConsentGranted: true, active: true });
+  await loadSettings();
+});
+
 activeToggle.addEventListener('change', saveSettings);
 primaryLang.addEventListener('change', () => {
   showInputShortcutError('');

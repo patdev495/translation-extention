@@ -26,8 +26,8 @@ export function createTranslationContext(): TranslationContext {
 export async function loadSettings(ctx: TranslationContext): Promise<void> {
   try {
     ctx.settings = await SettingsManager.getSettings();
-    const res = await chrome.storage.local.get('active');
-    ctx.active = res.active !== undefined ? res.active : true;
+    const res = await chrome.storage.local.get(['active', 'privacyConsentGranted']);
+    ctx.active = res.privacyConsentGranted === true && (res.active !== undefined ? res.active : true);
     if (ctx.settings && ctx.settings.tooltipFontSize) {
       ctx.tooltip.updateFontSize(ctx.settings.tooltipFontSize);
     }

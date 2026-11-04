@@ -19,6 +19,9 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   const { url, tabId } = details;
   if (!shouldUseExtensionPdfViewer(url)) return;
 
+  const { privacyConsentGranted } = await chrome.storage.local.get('privacyConsentGranted');
+  if (privacyConsentGranted !== true) return;
+
   // Check if extension is active
   const res = await chrome.storage.local.get('active');
   const active = res.active !== undefined ? res.active : true;
@@ -44,7 +47,8 @@ chrome.webRequest?.onHeadersReceived?.addListener(
     if (!contentType?.value?.includes('application/pdf')) return;
 
     // Use tabs API asynchronously (non-blocking)
-    chrome.storage.local.get('active').then((res) => {
+    chrome.storage.local.get(['active', 'privacyConsentGranted']).then((res) => {
+      if (res.privacyConsentGranted !== true) return;
       const active = res.active !== undefined ? res.active : true;
       if (!active) return;
       const viewerUrl = buildViewerUrl(details.url);
@@ -151,6 +155,8 @@ async function cropScreenshot(
 // ─── Translation Helper ─────────────────────────────────────────────────────
 
 async function translateText(text: string) {
+  const { privacyConsentGranted } = await chrome.storage.local.get('privacyConsentGranted');
+  if (privacyConsentGranted !== true) throw new Error('Open PolyTranslate settings and agree to data use before translating.');
   const settings = await SettingsManager.getSettings();
   return TranslationCoordinator.translate(text, settings);
 }
@@ -166,6 +172,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return;
       }
       try {
+        const { privacyConsentGranted } = await chrome.storage.local.get('privacyConsentGranted');
+        if (privacyConsentGranted !== true) throw new Error('Privacy consent required');
         const cacheKey = `hanziMeaning:${meaning}`;
         const stored = await chrome.storage.local.get(cacheKey);
         const cached = stored[cacheKey] as string | undefined;
@@ -215,6 +223,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     (async () => {
       try {
+        const { privacyConsentGranted } = await chrome.storage.local.get('privacyConsentGranted');
+        if (privacyConsentGranted !== true) throw new Error('Privacy consent required');
         const settings = await SettingsManager.getSettings();
         const data = await TranslationCoordinator.translateDirectToPrimary(text, settings);
         sendResponse({ success: true, data });
@@ -231,6 +241,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     (async () => {
       try {
+        const { privacyConsentGranted } = await chrome.storage.local.get('privacyConsentGranted');
+        if (privacyConsentGranted !== true) throw new Error('Privacy consent required');
         // 1. Capture the screen viewport of the current active tab
         const dataUrl = await chrome.tabs.captureVisibleTab(chrome.windows.WINDOW_ID_CURRENT, { format: 'png' });
 
