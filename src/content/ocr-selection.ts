@@ -43,13 +43,7 @@ function initOverlay() {
       const height = rect.height;
 
       // Show progress indicator inside overlay shadow DOM
-      if (currentCtx?.settings?.autoTranslate) {
-        overlay?.showProgress('Preparing OCR...', { left, top: top + height });
-      } else if (currentCtx?.settings?.ocrPinImage) {
-        overlay?.showProgress('Pinning image...', { left, top: top + height });
-      } else {
-        overlay?.showProgress('Copying image...', { left, top: top + height });
-      }
+      overlay?.showProgress('Preparing OCR...', { left, top: top + height });
 
       ocrBusy = true;
 
@@ -84,7 +78,7 @@ function initOverlay() {
             const docX = left + window.scrollX + width / 2;
             const docY = top + window.scrollY;
 
-            if (currentCtx.settings?.autoTranslate && text) {
+            if (text) {
               performTranslation(currentCtx, text, docX, docY, width);
             }
 
@@ -96,11 +90,6 @@ function initOverlay() {
               copyImageToClipboard(croppedDataUrl).catch((err) => {
                 console.error('Failed to copy image to clipboard:', err);
               });
-            }
-
-            if (!currentCtx.settings?.autoTranslate) {
-              cleanupOverlay();
-              return;
             }
 
             if (!text) {

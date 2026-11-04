@@ -51,6 +51,7 @@ describe('SettingsManager', () => {
       provider: 'google',
       deeplApiKey: '',
       tooltipFontSize: '16',
+      hanziStrokeSpeed: 2,
       ocrPinImage: false,
       ocrCopyToClipboard: true,
       autoTranslate: true,
@@ -99,5 +100,13 @@ describe('SettingsManager', () => {
     expect(updated.inputReplacementEnabled).toBe(false);
     expect(updated.inputReplacementShortcut).toBe('KeyQ');
     expect((await SettingsManager.getSettings()).inputReplacementShortcut).toBe('KeyQ');
+  });
+
+  test('persists Hanzi stroke drawing speed and uses the current speed by default', async () => {
+    expect((await SettingsManager.getSettings()).hanziStrokeSpeed).toBe(2);
+
+    await SettingsManager.updateSettings({ hanziStrokeSpeed: 0.5 });
+
+    expect((await SettingsManager.getSettings()).hanziStrokeSpeed).toBe(0.5);
   });
 });

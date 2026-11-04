@@ -146,6 +146,24 @@ async function runBuild() {
   }
   console.log('Copied ONNX Runtime Web WASM assets to dist/onnxruntime-web/');
 
+  // 7. Copy stroke data by character so content scripts can load it offline on demand.
+  console.log('\n--- Copying Hanzi stroke data ---');
+  const hanziSrcDir = resolve(__dirname, '../node_modules/hanzi-writer-data');
+  const hanziDstDir = resolve(distPath, 'hanzi-data');
+  mkdirSync(hanziDstDir, { recursive: true });
+  let hanziCount = 0;
+  for (const file of readdirSync(hanziSrcDir)) {
+    if (!file.endsWith('.json')) continue;
+    copyFileSync(resolve(hanziSrcDir, file), resolve(hanziDstDir, file));
+    hanziCount++;
+  }
+  copyFileSync(resolve(hanziSrcDir, 'ARPHICPL.TXT'), resolve(hanziDstDir, 'ARPHICPL.TXT'));
+  const licenseDir = resolve(distPath, 'licenses');
+  mkdirSync(licenseDir, { recursive: true });
+  copyFileSync(resolve(__dirname, '../node_modules/hanzi-writer/LICENSE'), resolve(licenseDir, 'hanzi-writer-MIT.txt'));
+  copyFileSync(resolve(__dirname, '../node_modules/hanzi-writer/COPYING.md'), resolve(licenseDir, 'hanzi-writer-attribution.md'));
+  console.log(`Copied ${hanziCount} Hanzi characters + license to dist/hanzi-data/`);
+
   console.log('\nBuild completed successfully!');
 }
 

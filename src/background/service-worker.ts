@@ -214,7 +214,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         // 3. Request OCR from the Offscreen Document on the pre-cropped image
         const settings = await SettingsManager.getSettings();
-        const autoTranslate = settings.autoTranslate;
         const ocrResponse = await chrome.runtime.sendMessage({
           type: 'RUN_OCR',
           dataUrl: croppedDataUrl,
@@ -222,7 +221,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           viewport: null,
           tier: settings.ocrModelTier ?? 'small',
           language: settings.ocrLanguage ?? 'ch',
-          skipOcr: !autoTranslate
         });
 
         if (!ocrResponse || !ocrResponse.success) {
@@ -230,17 +228,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
 
         const text = ocrResponse.text;
-
-        if (!autoTranslate) {
-          sendResponse({
-            success: true,
-            data: {
-              text: '',
-              croppedDataUrl
-            }
-          });
-          return;
-        }
 
         if (!text) {
           sendResponse({ success: true, data: null });

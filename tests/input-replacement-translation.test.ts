@@ -18,6 +18,7 @@ const settings: Settings = {
   provider: 'google',
   deeplApiKey: '',
   tooltipFontSize: '16',
+  hanziStrokeSpeed: 2,
   ocrPinImage: false,
   ocrCopyToClipboard: false,
   autoTranslate: false,

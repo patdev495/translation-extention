@@ -49,6 +49,7 @@
         "pdf.min.mjs",
         "pdf.worker.min.mjs",
         "onnxruntime-web/*",
+        "hanzi-data/*",
         "models/*"
       ],
       "matches": [

@@ -362,33 +362,13 @@ async function translateOcrRegion(wrapper: HTMLElement, pageCanvas: HTMLCanvasEl
   if (ocrBusy || rect.width < 8 || rect.height < 8) return;
   ocrBusy = true;
 
-  if (translationCtx.settings?.autoTranslate) {
-    ocrSelectionOverlay?.showProgress('Preparing OCR...', { left: rect.left, top: rect.top });
-  } else if (translationCtx.settings?.ocrPinImage) {
-    ocrSelectionOverlay?.showProgress('Pinning image...', { left: rect.left, top: rect.top });
-  } else {
-    ocrSelectionOverlay?.showProgress('Copying image...', { left: rect.left, top: rect.top });
-  }
+  ocrSelectionOverlay?.showProgress('Preparing OCR...', { left: rect.left, top: rect.top });
 
   try {
     const cropCanvas = cropPageCanvas(pageCanvas, wrapper, rect);
     const croppedDataUrl = (translationCtx.settings?.ocrPinImage || translationCtx.settings?.ocrCopyToClipboard)
       ? cropCanvas.toDataURL('image/png')
       : null;
-
-    if (!translationCtx.settings?.autoTranslate) {
-      if (translationCtx.settings?.ocrPinImage && croppedDataUrl) {
-        addPinnedSnippet(croppedDataUrl, rect.left, rect.top, rect.width, rect.height);
-      }
-
-      if (translationCtx.settings?.ocrCopyToClipboard && croppedDataUrl) {
-        await copyImageToClipboard(croppedDataUrl).catch((err) => {
-          console.error('Failed to copy image to clipboard in PDF viewer:', err);
-        });
-      }
-      ocrSelectionOverlay?.removeProgress();
-      return;
-    }
 
     const tier = translationCtx.settings?.ocrModelTier ?? 'small';
     const lang = translationCtx.settings?.ocrLanguage ?? 'ch';
@@ -478,17 +458,11 @@ $btnZoomFit.addEventListener('click', async () => {
 $btnOcrRegion.addEventListener('click', () => {
   if (ocrBusy) return;
   if (!translationCtx.active || !translationCtx.settings) return;
-  const isOcrNeeded = translationCtx.settings.autoTranslate || translationCtx.settings.ocrPinImage || translationCtx.settings.ocrCopyToClipboard;
-  if (!isOcrNeeded) return;
-
   setOcrSelectionMode(!ocrSelectionMode);
 });
 
 document.addEventListener('keydown', (event) => {
   if (!translationCtx.active || !translationCtx.settings) return;
-  const isOcrNeeded = translationCtx.settings.autoTranslate || translationCtx.settings.ocrPinImage || translationCtx.settings.ocrCopyToClipboard;
-  if (!isOcrNeeded) return;
-
   if (matchesOcrShortcut(translationCtx, event)) {
     event.preventDefault();
     if (!ocrBusy) setOcrSelectionMode(!ocrSelectionMode);

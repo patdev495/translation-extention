@@ -99,6 +99,10 @@ The text-to-speech capability (audio button) that reads aloud the Source Text.
 **Phonetic Transcription**:
 The pronunciation representation (IPA for English, Pinyin for Chinese) shown in the Translation Tooltip.
 
+**Reading Focus**:
+The emphasis that links selected Chinese characters or English words in a Translation Tooltip section to their corresponding Phonetic Transcription. Selecting either the text or its transcription emphasizes the matching parts in both rows.
+_Avoid_: Selected text, Translation highlight
+
 **Phonetics Visibility State**:
 The configuration setting determining whether Phonetic Transcription is displayed inside the Translation Tooltip.
 _Default_: true
@@ -133,6 +137,18 @@ The offline Chinese-to-Pinyin conversion library (`pinyin-pro`) integrated into 
 
 **Dictionary Integration**:
 The quick-access buttons in the Translation Tooltip pointing to external dictionaries (Cambridge Dictionary for English, Hanzii for Chinese) for deep learning.
+
+**Hanzi Stroke Order Animation**:
+A visual demonstration that draws one Chinese character stroke by stroke in its writing order.
+_Avoid_: Animated word image, Static stroke diagram
+
+**Looping Hanzi**:
+A character in the Hanzi Stroke Order Animation that the user has chosen for repeated playback. Multiple characters can be Looping Hanzi at the same time.
+_Avoid_: Selected text, Highlighted word
+
+**Hanzi Stroke Speed**:
+The user setting that controls the pace of the Hanzi Stroke Order Animation.
+_Default_: 2×
 
 **Shadow DOM Isolation**:
 The encapsulation mechanism used to render the Translation Tooltip, ensuring its glassmorphism styles are unaffected by the styles of the host webpage.

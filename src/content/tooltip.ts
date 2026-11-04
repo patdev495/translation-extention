@@ -1,4 +1,5 @@
 import TOOLTIP_CSS from '../ui/tooltip.css?inline';
+import HanziWriter, { type CharacterJson } from 'hanzi-writer';
 
 const EYE_OPEN_SVG = `
 <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-[1em] h-[1em]">
@@ -27,6 +28,10 @@ export class TranslationTooltip {
   private dragStartY = 0;
   private dragInitialLeft = 0;
   private dragInitialTop = 0;
+  private hanziWriters = new Map<HTMLButtonElement, HanziWriter>();
+  private hanziDataCache = new Map<string, Promise<CharacterJson>>();
+  private hanziSelectionStart: Element | null = null;
+  private hanziStrokeSpeed = 2;
 
   constructor() {
     this.init();
@@ -77,6 +82,21 @@ export class TranslationTooltip {
     // Click handler with delegation
     this.shadow.addEventListener('click', (event) => {
       const target = event.target as HTMLElement;
+
+      const hanziButton = target.closest<HTMLButtonElement>('.tt-hanzi-button');
+      if (hanziButton) {
+        const looping = hanziButton.getAttribute('aria-pressed') === 'true';
+        hanziButton.setAttribute('aria-pressed', String(!looping));
+        const writer = this.hanziWriters.get(hanziButton);
+        if (writer) {
+          if (looping) {
+            void writer.showCharacter({ duration: 0 });
+          } else {
+            void writer.loopCharacterAnimation();
+          }
+        }
+        return;
+      }
       
       // Handle Trigger button click
       const trigBtn = target.closest('#trigger');
@@ -162,11 +182,42 @@ export class TranslationTooltip {
       }
     });
 
+    this.shadow.addEventListener('mousedown', (event) => {
+      const target = event.target as Element;
+      const textElement = target.closest('.tt-source-text, .tt-translation-text, .tt-phonetic');
+      this.hanziSelectionStart = textElement && this.tooltipEl?.contains(textElement) ? textElement : null;
+    });
+
+    this.shadow.addEventListener('mouseup', (event) => {
+      const target = event.target as Element;
+      const textElement = this.hanziSelectionStart ?? target.closest('.tt-source-text, .tt-translation-text, .tt-phonetic');
+      this.hanziSelectionStart = null;
+      if (!textElement || !this.tooltipEl?.contains(textElement)) return;
+      const section = textElement.closest('.tt-section');
+      const lang = section?.getAttribute('data-lang')?.toLowerCase() ?? '';
+      if (!section || (!lang.startsWith('zh') && !lang.startsWith('en'))) return;
+      // Chrome retargets window Selection endpoints to BODY for native selections
+      // inside a shadow root, so read the shadow-local Selection when available.
+      const selection = (this.shadow as ShadowRoot & { getSelection?: () => Selection | null })
+        .getSelection?.() ?? window.getSelection();
+      if (!selection || selection.isCollapsed || !selection.toString().trim()) return;
+      if (!selection.anchorNode || !selection.focusNode
+        || !textElement.contains(selection.anchorNode)
+        || !textElement.contains(selection.focusNode)) return;
+      const mappedCharacters = this.highlightReading(section, textElement, selection, lang);
+      if (lang.startsWith('zh')) {
+        const characters = textElement.matches('.tt-phonetic')
+          ? mappedCharacters
+          : selection.toString().match(/\p{Script=Han}/gu);
+        if (characters?.length) this.showHanziChoices(section, characters);
+      }
+    });
+
     // Draggable event handlers
     this.tooltipEl.addEventListener('mousedown', (e) => {
       const target = e.target as HTMLElement;
-      // If clicking interactive elements like buttons, don't drag
-      if (target.closest('button') || target.closest('select') || target.closest('input')) {
+      // Let users select tooltip text without starting a drag.
+      if (target.closest('button, select, input, .tt-source-text, .tt-translation-text, .tt-phonetic, .tt-lang-badge')) {
         return;
       }
       this.isDragging = true;
@@ -192,6 +243,7 @@ export class TranslationTooltip {
 
   show(x: number, y: number, sourceText: string, data: any, ttsEnabled: boolean = true, phoneticsVisible: boolean = true, ocrWidth?: number) {
     if (!this.tooltipEl || !this.shadow) return;
+    this.stopHanziAnimations();
 
     const { detectedLang, sourcePhonetics } = data;
     const translations = Array.isArray(data.translations)
@@ -226,7 +278,7 @@ export class TranslationTooltip {
     const contentMaxWidth = `${Math.max(0, window.innerWidth - viewportMargin * 4)}px`;
     const tooltipMaxWidth = `${Math.max(0, window.innerWidth - viewportMargin * 2)}px`;
     const widthStyle = 'max-content';
-    const minWidthStyle = isOcrTooltip ? `min(${ocrWidth}px, ${contentMaxWidth})` : `min(280px, ${contentMaxWidth})`;
+    const minWidthStyle = `min(${Math.max(350, ocrWidth ?? 0)}px, ${contentMaxWidth})`;
     const tooltipWidthStyle = 'max-content';
     const textBreakClass = isOcrTooltip ? 'break-normal' : 'break-words';
 
@@ -234,9 +286,9 @@ export class TranslationTooltip {
       <div class="tt-body" style="width:${widthStyle}; min-width:${minWidthStyle}; max-width:${contentMaxWidth};">
 
         <!-- Source Block -->
-        <div>
+        <div class="tt-section" data-lang="${this.escapeHtml(detectedLang)}">
           <div class="tt-section-header">
-            <span class="tt-lang-badge src">${getLangLabel(detectedLang)} / Source</span>
+            <span class="tt-lang-badge src">${getLangLabel(detectedLang)}</span>
             <div class="tt-actions">
               <button type="button" class="tt-btn phonetics-toggle-button" title="Toggle phonetics (IPA/Pinyin)" aria-label="Toggle phonetics (IPA/Pinyin)">
                 ${phoneticsVisible ? EYE_OPEN_SVG : EYE_SLASH_SVG}
@@ -268,7 +320,7 @@ export class TranslationTooltip {
 
         <!-- Translation 1 -->
         ${translation1 ? `
-        <div>
+        <div class="tt-section" data-lang="${this.escapeHtml(translation1.lang)}">
           <div class="tt-section-header">
             <span class="tt-lang-badge tr1">${getLangLabel(translation1.lang)}</span>
             <div class="tt-actions">
@@ -300,7 +352,7 @@ export class TranslationTooltip {
 
         <!-- Translation 2 -->
         ${translation2 ? `
-        <div>
+        <div class="tt-section" data-lang="${this.escapeHtml(translation2.lang)}">
           <div class="tt-section-header">
             <span class="tt-lang-badge tr2">${getLangLabel(translation2.lang)}</span>
             <div class="tt-actions">
@@ -348,6 +400,12 @@ export class TranslationTooltip {
     // Reset state, then trigger appear animation
     this.tooltipEl.classList.remove('hidden', 'visible');
     this.tooltipEl.style.display = 'block';
+    const initialWidth = this.tooltipEl.getBoundingClientRect().width;
+    if (initialWidth > 0) {
+      this.tooltipEl.style.width = `${initialWidth}px`;
+      const body = this.tooltipEl.querySelector<HTMLElement>('.tt-body');
+      if (body) body.style.width = '100%';
+    }
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         this.tooltipEl!.classList.add('visible');
@@ -357,9 +415,186 @@ export class TranslationTooltip {
 
   hide() {
     if (this.tooltipEl) {
+      this.stopHanziAnimations();
       this.tooltipEl.classList.remove('visible');
       this.tooltipEl.style.display = 'none';
     }
+  }
+
+  private showHanziChoices(section: Element, characters: string[]): void {
+    this.stopHanziAnimations();
+    this.tooltipEl?.querySelector('.tt-hanzi-strip')?.remove();
+    const header = section.querySelector('.tt-section-header');
+    const badge = header?.querySelector('.tt-lang-badge');
+    if (!header || !badge) return;
+    const strip = document.createElement('div');
+    strip.className = 'tt-hanzi-strip';
+    for (const character of characters) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'tt-hanzi-button';
+      button.setAttribute('aria-label', `Loop stroke order for ${character}`);
+      button.setAttribute('aria-pressed', 'false');
+      const fallback = document.createElement('span');
+      fallback.className = 'tt-hanzi-fallback';
+      fallback.textContent = character;
+      button.appendChild(fallback);
+      const drawing = document.createElement('span');
+      drawing.className = 'tt-hanzi-drawing';
+      button.appendChild(drawing);
+      strip.appendChild(button);
+      const writer = HanziWriter.create(drawing, character, {
+        width: 56,
+        height: 56,
+        padding: 3,
+        showCharacter: false,
+        showOutline: false,
+        strokeAnimationSpeed: this.hanziStrokeSpeed,
+        delayBetweenStrokes: 100,
+        delayBetweenLoops: 500,
+        charDataLoader: (char) => this.loadHanziData(char),
+        onLoadCharDataSuccess: () => { fallback.hidden = true; },
+        onLoadCharDataError: () => {
+          drawing.hidden = true;
+          button.disabled = true;
+        },
+      });
+      this.hanziWriters.set(button, writer);
+      void writer.animateCharacter();
+    }
+    badge.after(strip);
+  }
+
+  private highlightReading(section: Element, selectedElement: Element, selection: Selection, lang: string): string[] {
+    const phoneticElement = section.querySelector('.tt-phonetic');
+    const textElement = section.querySelector('.tt-source-text, .tt-translation-text');
+    if (!textElement || !phoneticElement || selection.rangeCount === 0) return [];
+    const range = selection.getRangeAt(0);
+    const before = range.cloneRange();
+    before.selectNodeContents(selectedElement);
+    before.setEnd(range.startContainer, range.startOffset);
+    const start = before.toString().length;
+    const end = start + range.toString().length;
+    const source = textElement.textContent ?? '';
+    const phonetics = phoneticElement.textContent ?? '';
+    type ReadingUnit = { text: { start: number; end: number }; phonetic: Array<{ start: number; end: number }> };
+    const units: ReadingUnit[] = [];
+    if (lang.startsWith('en')) {
+      const words = [...source.matchAll(/[A-Za-z'-]+/g)];
+      const groups: Array<{ start: number; end: number }> = [];
+      let groupStart = 0;
+      for (const group of phonetics.split(' · ')) {
+        if (/^[A-Za-z'-]+/.test(group)) {
+          const withoutPunctuation = group.replace(/[^\p{L}\p{M}]+$/gu, '');
+          groups.push({ start: groupStart, end: groupStart + withoutPunctuation.length });
+        }
+        groupStart += group.length + 3;
+      }
+      words.forEach((word, index) => {
+        if (groups[index]) units.push({
+          text: { start: word.index, end: word.index + word[0].length },
+          phonetic: [groups[index]],
+        });
+      });
+    } else if (lang.startsWith('zh')) {
+      const textGlyphs = [...source.matchAll(/\p{Script=Han}/gu)];
+      let glyphIndex = 0;
+      for (const match of phonetics.matchAll(/\p{Script=Han}+/gu)) {
+        const run = [...match[0]];
+        const runEnd = match.index + match[0].length;
+        const nextSeparator = phonetics.indexOf(' · ', runEnd);
+        const tail = phonetics.slice(runEnd, nextSeparator < 0 ? undefined : nextSeparator);
+        const syllables = [...tail.matchAll(/\p{Script=Latin}+/gu)];
+        run.forEach((glyph, localIndex) => {
+          const textGlyph = textGlyphs[glyphIndex++];
+          const syllable = syllables[localIndex];
+          if (!textGlyph || !syllable || textGlyph[0] !== glyph) return;
+          units.push({
+            text: { start: textGlyph.index, end: textGlyph.index + glyph.length },
+            phonetic: [
+              { start: match.index + localIndex, end: match.index + localIndex + glyph.length },
+              { start: runEnd + syllable.index, end: runEnd + syllable.index + syllable[0].length },
+            ],
+          });
+        });
+      }
+    }
+    const selectingPhonetics = selectedElement === phoneticElement;
+    const overlaps = (part: { start: number; end: number }) => part.start < end && part.end > start;
+    const focused = units.filter(unit => selectingPhonetics
+      ? unit.phonetic.some(overlaps) : overlaps(unit.text));
+    this.clearReadingFocus();
+    if (focused.length) {
+      this.markReadingRanges(textElement, focused.map(unit => unit.text));
+      this.markReadingRanges(phoneticElement, focused.flatMap(unit => unit.phonetic));
+    }
+    this.restoreReadingSelection(selection, range, selectedElement, start, end);
+    return lang.startsWith('zh')
+      ? focused.map(unit => source.slice(unit.text.start, unit.text.end))
+      : [];
+  }
+
+  private restoreReadingSelection(selection: Selection, range: Range, element: Element, start: number, end: number): void {
+    const locate = (offset: number): { node: Text; offset: number } | null => {
+      const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+      let node: Text | null;
+      while ((node = walker.nextNode() as Text | null)) {
+        if (offset <= node.length) return { node, offset };
+        offset -= node.length;
+      }
+      return null;
+    };
+    const first = locate(start);
+    const last = locate(end);
+    if (!first || !last) return;
+    range.setStart(first.node, first.offset);
+    range.setEnd(last.node, last.offset);
+    selection.removeAllRanges?.();
+    selection.addRange?.(range);
+  }
+
+  private clearReadingFocus(): void {
+    this.tooltipEl?.querySelectorAll('.tt-source-text, .tt-translation-text, .tt-phonetic')
+      .forEach(element => {
+        if (element.querySelector('.tt-reading-focus')) element.textContent = element.textContent;
+      });
+  }
+
+  private markReadingRanges(element: Element, ranges: Array<{ start: number; end: number }>): void {
+    const content = element.textContent ?? '';
+    const fragment = document.createDocumentFragment();
+    let cursor = 0;
+    for (const { start, end } of ranges.sort((a, b) => a.start - b.start)) {
+      fragment.appendChild(document.createTextNode(content.slice(cursor, start)));
+      const strong = document.createElement('strong');
+      strong.className = 'tt-reading-focus';
+      strong.textContent = content.slice(start, end);
+      fragment.appendChild(strong);
+      cursor = end;
+    }
+    fragment.appendChild(document.createTextNode(content.slice(cursor)));
+    element.replaceChildren(fragment);
+  }
+
+  private loadHanziData(character: string): Promise<CharacterJson> {
+    let data = this.hanziDataCache.get(character);
+    if (!data) {
+      const url = chrome.runtime.getURL(`hanzi-data/${encodeURIComponent(character)}.json`);
+      data = fetch(url).then(response => {
+        if (!response.ok) throw new Error(`No stroke data for ${character}`);
+        return response.json() as Promise<CharacterJson>;
+      });
+      this.hanziDataCache.set(character, data);
+      void data.catch(() => this.hanziDataCache.delete(character));
+    }
+    return data;
+  }
+
+  private stopHanziAnimations(): void {
+    for (const writer of this.hanziWriters.values()) {
+      void writer.showCharacter({ duration: 0 });
+    }
+    this.hanziWriters.clear();
   }
 
   showTrigger(x: number, y: number) {
@@ -426,6 +661,10 @@ export class TranslationTooltip {
     if (this.tooltipEl) {
       this.tooltipEl.style.setProperty('--tooltip-font-size', `${size}px`);
     }
+  }
+
+  updateHanziStrokeSpeed(speed: number): void {
+    if ([0.5, 1, 1.5, 2, 3].includes(speed)) this.hanziStrokeSpeed = speed;
   }
 
   setPointerPassthrough(enabled: boolean) {

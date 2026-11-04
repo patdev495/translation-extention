@@ -31,6 +31,9 @@ export async function loadSettings(ctx: TranslationContext): Promise<void> {
     if (ctx.settings && ctx.settings.tooltipFontSize) {
       ctx.tooltip.updateFontSize(ctx.settings.tooltipFontSize);
     }
+    if (ctx.settings) {
+      ctx.tooltip.updateHanziStrokeSpeed(ctx.settings.hanziStrokeSpeed);
+    }
     if (ctx.settings && ctx.settings.phoneticsVisible !== undefined) {
       ctx.tooltip.updatePhoneticsVisibility(ctx.settings.phoneticsVisible);
     }
@@ -63,6 +66,39 @@ export function performTranslation(ctx: TranslationContext, text: string, x: num
       }
     }
   );
+}
+
+/** Shadow DOM descendants are not covered by Element.contains on the host. */
+export function isSelectionInsideTooltip(selection: Selection, root: Element | null): boolean {
+  if (!root) return false;
+  const inside = (node: Node | null) => !!node &&
+    (root.contains(node) || !!root.shadowRoot?.contains(node));
+  return inside(selection.anchorNode) || inside(selection.focusNode)
+    || (selection.rangeCount > 0 && inside(selection.getRangeAt(0).commonAncestorContainer));
+}
+
+/** Translates the current page selection when the user invokes the shortcut. */
+export function translateSelectedPageText(ctx: TranslationContext): boolean {
+  if (!ctx.active || !ctx.settings) return false;
+  const focused = document.activeElement;
+  if ((focused && 'isContentEditable' in focused && focused.isContentEditable)
+    || focused?.nodeName === 'INPUT' || focused?.nodeName === 'TEXTAREA') return false;
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return false;
+
+  const text = selection.toString().trim();
+  if (!text) return false;
+
+  const root = document.getElementById('translation-extension-root');
+  const range = selection.getRangeAt(0);
+  if (isSelectionInsideTooltip(selection, root)) return false;
+
+  const rect = range.getBoundingClientRect();
+  const x = rect.left + window.scrollX;
+  const y = rect.bottom + window.scrollY;
+  ctx.lastSelection = { text, x, y };
+  performTranslation(ctx, text, x, y);
+  return true;
 }
 
 /**
@@ -108,6 +144,7 @@ export function initTranslationListeners(
     const y = event.pageY;
     const root = document.getElementById('translation-extension-root');
     const isInsideRoot = root ? (event as any).composedPath().includes(root) : false;
+    if (isInsideRoot) return;
 
     setTimeout(() => {
       const selection = window.getSelection();
@@ -116,7 +153,7 @@ export function initTranslationListeners(
       const selectedText = selection.toString().trim();
       if (selectedText.length === 0) return;
 
-      if (isInsideRoot) return;
+      if (isSelectionInsideTooltip(selection, root)) return;
 
       ctx.lastSelection = { text: selectedText, x, y };
       performTranslation(ctx, selectedText, x, y);

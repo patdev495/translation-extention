@@ -3,6 +3,7 @@ import {
   loadSettings,
   initTranslationListeners,
   matchesOcrShortcut,
+  translateSelectedPageText,
 } from './translation-init';
 import { toggleWebpageOcr } from './ocr-selection';
 import { initPinnedSnippetsSync } from './pinned-panel';
@@ -53,7 +54,7 @@ function triggerInputReplacement(event: KeyboardEvent, keyPhase: 'down' | 'up'):
   const tracker = getInputShortcutTracker();
   if (!tracker) return;
   const matched = keyPhase === 'down' ? tracker.handleKeyDown(event) : tracker.handleKeyUp(event);
-  if (matched && inputReplacementController.trigger()) {
+  if (matched && (inputReplacementController.trigger() || translateSelectedPageText(ctx))) {
     event.preventDefault();
     event.stopImmediatePropagation();
   }
@@ -66,9 +67,6 @@ document.addEventListener('keyup', (event) => triggerInputReplacement(event, 'up
 document.addEventListener('keydown', (event) => {
   if (event.defaultPrevented) return;
   if (!ctx.active || !ctx.settings) return;
-
-  const isOcrNeeded = ctx.settings.autoTranslate || ctx.settings.ocrPinImage || ctx.settings.ocrCopyToClipboard;
-  if (!isOcrNeeded) return;
 
   if (matchesOcrShortcut(ctx, event)) {
     event.preventDefault();
