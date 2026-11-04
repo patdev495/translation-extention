@@ -86,7 +86,7 @@ describe('Hanzi Stroke Order Animation in the Translation Tooltip', () => {
     await vi.waitFor(() => {
       expect(root.querySelector('.tt-hanzi-button svg path')).not.toBeNull();
     });
-    expect(fetch).toHaveBeenCalledWith('chrome-extension://test/hanzi-data/%E6%88%91.json');
+    expect(fetch).toHaveBeenCalledWith('chrome-extension://test/hanzi-data/6211.json');
   });
 
   test('Chinese source and reverse selections replace the displayed characters', () => {
@@ -152,6 +152,35 @@ describe('Hanzi Stroke Order Animation in the Translation Tooltip', () => {
       expect(root.querySelector<HTMLButtonElement>('.tt-hanzi-button')?.disabled).toBe(true);
     });
     expect(root.querySelector('.tt-hanzi-fallback')?.textContent).toBe('我');
+  });
+
+  test('missing stroke data cannot block closing the tooltip or selecting another character', async () => {
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { callback(0); return 1; });
+    vi.stubGlobal('chrome', { runtime: { getURL: (path: string) => `chrome-extension://test/${path}` } });
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => url.includes('/6211.json')
+      ? { ok: true, json: async () => woData }
+      : { ok: false }));
+
+    const tooltip = new TranslationTooltip();
+    tooltip.show(0, 0, 'again', {
+      detectedLang: 'en',
+      translations: [{ lang: 'zh', text: '再次' }],
+    });
+    const root = document.getElementById('translation-extension-root')!.shadowRoot!;
+    selectTextInside(root.querySelector('.tt-translation-text')!, '再次');
+    await vi.waitFor(() => {
+      expect([...root.querySelectorAll<HTMLButtonElement>('.tt-hanzi-button')].every(button => button.disabled)).toBe(true);
+    });
+
+    expect(() => tooltip.hide()).not.toThrow();
+    expect((root.querySelector('#tooltip') as HTMLElement).style.display).toBe('none');
+    expect(() => tooltip.show(0, 0, 'me', {
+      detectedLang: 'en', translations: [{ lang: 'zh', text: '我' }],
+    })).not.toThrow();
+    selectTextInside(root.querySelector('.tt-translation-text')!, '我');
+    await vi.waitFor(() => {
+      expect(root.querySelector('.tt-hanzi-button svg path')).not.toBeNull();
+    });
   });
 
   test('dragging from Chinese text and releasing on the heading still displays the selection', () => {

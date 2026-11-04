@@ -154,7 +154,10 @@ async function runBuild() {
   let hanziCount = 0;
   for (const file of readdirSync(hanziSrcDir)) {
     if (!file.endsWith('.json')) continue;
-    copyFileSync(resolve(hanziSrcDir, file), resolve(hanziDstDir, file));
+    const character = file.slice(0, -'.json'.length);
+    if ([...character].length !== 1) continue;
+    const codePoint = character.codePointAt(0).toString(16).toUpperCase();
+    copyFileSync(resolve(hanziSrcDir, file), resolve(hanziDstDir, `${codePoint}.json`));
     hanziCount++;
   }
   copyFileSync(resolve(hanziSrcDir, 'ARPHICPL.TXT'), resolve(hanziDstDir, 'ARPHICPL.TXT'));

@@ -8,11 +8,13 @@ describe('packaged Hanzi Stroke Order Animation', () => {
     const root = resolve(__dirname, '..');
     execFileSync(process.execPath, ['scripts/build.js'], { cwd: root, stdio: 'pipe' });
 
-    const dataPath = resolve(root, 'dist/hanzi-data/我.json');
+    const dataPath = resolve(root, 'dist/hanzi-data/6211.json');
     const manifest = JSON.parse(readFileSync(resolve(root, 'dist/manifest.json'), 'utf8'));
     const resources = manifest.web_accessible_resources.flatMap((entry: { resources: string[] }) => entry.resources);
 
     expect(existsSync(dataPath)).toBe(true);
+    expect(existsSync(resolve(root, 'dist/hanzi-data/518D.json'))).toBe(true);
+    expect(existsSync(resolve(root, 'dist/hanzi-data/6B21.json'))).toBe(true);
     expect(existsSync(resolve(root, 'dist/hanzi-data/ARPHICPL.TXT'))).toBe(true);
     expect(existsSync(resolve(root, 'dist/licenses/hanzi-writer-MIT.txt'))).toBe(true);
     expect(resources).toContain('hanzi-data/*');

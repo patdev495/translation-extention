@@ -457,6 +457,7 @@ export class TranslationTooltip {
         onLoadCharDataError: () => {
           drawing.hidden = true;
           button.disabled = true;
+          this.hanziWriters.delete(button);
         },
       });
       this.hanziWriters.set(button, writer);
@@ -579,7 +580,8 @@ export class TranslationTooltip {
   private loadHanziData(character: string): Promise<CharacterJson> {
     let data = this.hanziDataCache.get(character);
     if (!data) {
-      const url = chrome.runtime.getURL(`hanzi-data/${encodeURIComponent(character)}.json`);
+      const codePoint = character.codePointAt(0)!.toString(16).toUpperCase();
+      const url = chrome.runtime.getURL(`hanzi-data/${codePoint}.json`);
       data = fetch(url).then(response => {
         if (!response.ok) throw new Error(`No stroke data for ${character}`);
         return response.json() as Promise<CharacterJson>;
@@ -591,10 +593,15 @@ export class TranslationTooltip {
   }
 
   private stopHanziAnimations(): void {
-    for (const writer of this.hanziWriters.values()) {
-      void writer.showCharacter({ duration: 0 });
-    }
+    const writers = [...this.hanziWriters.values()];
     this.hanziWriters.clear();
+    for (const writer of writers) {
+      try {
+        void writer.showCharacter({ duration: 0 }).catch(() => {});
+      } catch {
+        // Hanzi Writer throws synchronously if its character data failed to load.
+      }
+    }
   }
 
   showTrigger(x: number, y: number) {
