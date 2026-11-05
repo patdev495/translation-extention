@@ -507,9 +507,17 @@ export class TranslationTooltip {
     submitButton.disabled = true;
     const response = await this.sendLearningMessage({ type: 'LEARNING_SAVE', choice: this.saveChoice, item });
     if (!response?.success) { status.textContent = response?.error ?? 'Không lưu được.'; submitButton.disabled = false; return; }
-    status.classList.add('tt-save-success');
-    status.textContent = `✓ Đã lưu “${text}” vào thư viện`;
-    submitButton.textContent = 'Đã lưu';
+    if (response.state === 'pending') {
+      status.textContent = `Chờ đồng bộ “${text}”. Sẽ tự gửi khi kết nối trở lại.`;
+      submitButton.textContent = 'Đang chờ';
+    } else if (response.state === 'failed') {
+      status.textContent = `Không đồng bộ được “${text}”: ${response.result?.error ?? 'Hãy kiểm tra trong cài đặt extension.'}`;
+      submitButton.textContent = 'Lưu thất bại';
+    } else {
+      status.classList.add('tt-save-success');
+      status.textContent = `✓ Đã lưu “${text}” vào thư viện`;
+      submitButton.textContent = 'Đã lưu';
+    }
     try { await chrome.storage.local.set({ defaultLearningFolder: folder_id }); } catch { /* Item saved; folder preference may be retried next time. */ }
   }
 

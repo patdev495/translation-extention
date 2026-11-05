@@ -80,8 +80,31 @@ def initialize(path: Path) -> None:
                 sentence_id TEXT NOT NULL REFERENCES learning_items(id) ON DELETE CASCADE,
                 PRIMARY KEY (word_id, sentence_id)
             );
+            CREATE TABLE IF NOT EXISTS learning_sync_receipts (
+                user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                request_id TEXT NOT NULL,
+                payload_hash TEXT NOT NULL,
+                result_json TEXT NOT NULL,
+                PRIMARY KEY (user_id, request_id)
+            );
             """
         )
         columns = {str(row["name"]) for row in connection.execute("PRAGMA table_info(users)")}
         if "email" in columns and "username" not in columns:
             connection.execute("ALTER TABLE users RENAME COLUMN email TO username")
+        for table in ("folders", "learning_items"):
+            existing = {str(row["name"]) for row in connection.execute(f"PRAGMA table_info({table})")}
+            if "deleted_at" not in existing:
+                connection.execute(f"ALTER TABLE {table} ADD COLUMN deleted_at INTEGER")
+            if "trash_root_id" not in existing:
+                connection.execute(f"ALTER TABLE {table} ADD COLUMN trash_root_id TEXT")
+        connection.executescript(
+            """
+            DROP INDEX IF EXISTS folder_sibling_name_idx;
+            CREATE UNIQUE INDEX folder_sibling_name_idx
+                ON folders(user_id, COALESCE(parent_id, ''), name_key) WHERE deleted_at IS NULL;
+            DROP INDEX IF EXISTS learning_item_identity;
+            CREATE UNIQUE INDEX learning_item_identity
+                ON learning_items(user_id, folder_id, category, text) WHERE deleted_at IS NULL;
+            """
+        )

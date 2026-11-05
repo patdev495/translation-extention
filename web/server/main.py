@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import secrets
 import sqlite3
@@ -126,6 +127,12 @@ class BothInput(BaseModel):
         return value
 
 
+class SyncInput(BaseModel):
+    request_id: str = Field(min_length=1, max_length=100)
+    choice: Literal["word", "sentence", "both"]
+    item: ItemInput | BothInput
+
+
 class Item(BaseModel):
     id: str
     folder_id: str
@@ -134,6 +141,14 @@ class Item(BaseModel):
     meaning: str
     pinyin: str
     linked_item_ids: list[str]
+
+
+class TrashEntry(BaseModel):
+    id: str
+    kind: Literal["item", "folder"]
+    name: str
+    category: Literal["word", "sentence"] | None = None
+    folder_id: str | None = None
 
 
 def _now() -> int:
@@ -320,14 +335,15 @@ def create_app(database_path: Path | None = None) -> FastAPI:
         if parent_id is None:
             return
         row = connection.execute(
-            "SELECT id FROM folders WHERE id = ? AND user_id = ?", (parent_id, user_id)
+            "SELECT id FROM folders WHERE id = ? AND user_id = ? AND deleted_at IS NULL", (parent_id, user_id)
         ).fetchone()
         if row is None:
             raise HTTPException(status_code=404, detail="Parent folder not found")
 
     def item(connection: sqlite3.Connection, row: sqlite3.Row) -> Item:
         links = connection.execute(
-            "SELECT sentence_id AS id FROM learning_item_links WHERE word_id = ? UNION SELECT word_id AS id FROM learning_item_links WHERE sentence_id = ?",
+            """SELECT sentence_id AS id FROM learning_item_links l JOIN learning_items i ON i.id = l.sentence_id AND i.deleted_at IS NULL WHERE word_id = ?
+               UNION SELECT word_id AS id FROM learning_item_links l JOIN learning_items i ON i.id = l.word_id AND i.deleted_at IS NULL WHERE sentence_id = ?""",
             (row["id"], row["id"]),
         ).fetchall()
         return Item(id=row["id"], folder_id=row["folder_id"], category=row["category"],
@@ -335,13 +351,13 @@ def create_app(database_path: Path | None = None) -> FastAPI:
                     linked_item_ids=[str(link["id"]) for link in links])
 
     def require_folder(connection: sqlite3.Connection, user_id: str, folder_id: str) -> None:
-        if connection.execute("SELECT 1 FROM folders WHERE id = ? AND user_id = ?", (folder_id, user_id)).fetchone() is None:
+        if connection.execute("SELECT 1 FROM folders WHERE id = ? AND user_id = ? AND deleted_at IS NULL", (folder_id, user_id)).fetchone() is None:
             raise HTTPException(status_code=404, detail="Learning Folder not found")
 
     def create_item(connection: sqlite3.Connection, user_id: str, body: ItemInput, reuse: bool = False) -> Item:
         require_folder(connection, user_id, body.folder_id)
         existing = connection.execute(
-            "SELECT * FROM learning_items WHERE user_id = ? AND folder_id = ? AND category = ? AND text = ?",
+            "SELECT * FROM learning_items WHERE user_id = ? AND folder_id = ? AND category = ? AND text = ? AND deleted_at IS NULL",
             (user_id, body.folder_id, body.category, body.text),
         ).fetchone()
         if existing is not None:
@@ -364,7 +380,7 @@ def create_app(database_path: Path | None = None) -> FastAPI:
     @app.get("/api/extension/folders", response_model=list[Folder])
     def extension_folders(account: Account = Depends(extension_account)) -> list[Folder]:
         with connect(db_path) as connection:
-            rows = connection.execute("SELECT id, name, parent_id FROM folders WHERE user_id = ? ORDER BY name_key", (account.id,)).fetchall()
+            rows = connection.execute("SELECT id, name, parent_id FROM folders WHERE user_id = ? AND deleted_at IS NULL ORDER BY name_key", (account.id,)).fetchall()
         return [_folder(row) for row in rows]
 
     @app.post("/api/extension/items", response_model=Item, status_code=201)
@@ -387,17 +403,57 @@ def create_app(database_path: Path | None = None) -> FastAPI:
             assert word_row is not None and sentence_row is not None
             return {"word": item(connection, word_row), "sentence": item(connection, sentence_row)}
 
+    @app.post("/api/extension/sync", status_code=201)
+    def sync_save(body: SyncInput, account: Account = Depends(extension_account)) -> dict[str, object]:
+        if body.choice == "both" and not isinstance(body.item, BothInput):
+            raise HTTPException(status_code=422, detail="Paired save requires word and sentence")
+        if body.choice != "both" and (not isinstance(body.item, ItemInput) or body.item.category != body.choice):
+            raise HTTPException(status_code=422, detail="Save category mismatch")
+        payload = body.model_dump(mode="json")
+        payload_hash = _digest(json.dumps({"choice": payload["choice"], "item": payload["item"]}, sort_keys=True, ensure_ascii=False))
+        with connect(db_path) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            receipt = connection.execute(
+                "SELECT payload_hash, result_json FROM learning_sync_receipts WHERE user_id = ? AND request_id = ?",
+                (account.id, body.request_id),
+            ).fetchone()
+            if receipt is not None:
+                if receipt["payload_hash"] != payload_hash:
+                    raise HTTPException(status_code=409, detail="Sync request already used for different content")
+                return json.loads(receipt["result_json"])
+            if isinstance(body.item, BothInput):
+                if body.item.word_text not in body.item.sentence_text:
+                    raise HTTPException(status_code=422, detail="Sentence must contain selected text")
+                word = create_item(connection, account.id, ItemInput(
+                    folder_id=body.item.folder_id, category="word", text=body.item.word_text, meaning=body.item.word_meaning,
+                ), reuse=True)
+                sentence = create_item(connection, account.id, ItemInput(
+                    folder_id=body.item.folder_id, category="sentence", text=body.item.sentence_text, meaning=body.item.sentence_meaning,
+                ))
+                connection.execute("INSERT INTO learning_item_links (word_id, sentence_id) VALUES (?, ?)", (word.id, sentence.id))
+                word_row = connection.execute("SELECT * FROM learning_items WHERE id = ?", (word.id,)).fetchone()
+                sentence_row = connection.execute("SELECT * FROM learning_items WHERE id = ?", (sentence.id,)).fetchone()
+                assert word_row is not None and sentence_row is not None
+                result: dict[str, object] = {"word": item(connection, word_row).model_dump(), "sentence": item(connection, sentence_row).model_dump()}
+            else:
+                result = create_item(connection, account.id, body.item).model_dump()
+            connection.execute(
+                "INSERT INTO learning_sync_receipts (user_id, request_id, payload_hash, result_json) VALUES (?, ?, ?, ?)",
+                (account.id, body.request_id, payload_hash, json.dumps(result, ensure_ascii=False)),
+            )
+            return result
+
     @app.get("/api/items", response_model=list[Item])
     def list_items(account: Account = Depends(web_account)) -> list[Item]:
         with connect(db_path) as connection:
-            rows = connection.execute("SELECT * FROM learning_items WHERE user_id = ? ORDER BY created_at DESC, id", (account.id,)).fetchall()
+            rows = connection.execute("SELECT * FROM learning_items WHERE user_id = ? AND deleted_at IS NULL ORDER BY created_at DESC, id", (account.id,)).fetchall()
             return [item(connection, row) for row in rows]
 
     @app.patch("/api/items/{item_id}", response_model=Item, dependencies=[Depends(require_browser_origin)])
     def update_item(item_id: str, body: ItemUpdate, account: Account = Depends(web_account)) -> Item:
         with connect(db_path) as connection:
             connection.execute("BEGIN IMMEDIATE")
-            row = connection.execute("SELECT * FROM learning_items WHERE id = ? AND user_id = ?", (item_id, account.id)).fetchone()
+            row = connection.execute("SELECT * FROM learning_items WHERE id = ? AND user_id = ? AND deleted_at IS NULL", (item_id, account.id)).fetchone()
             if row is None:
                 raise HTTPException(status_code=404, detail="Saved Learning Item not found")
             folder_id = body.folder_id if body.folder_id is not None else row["folder_id"]
@@ -416,11 +472,138 @@ def create_app(database_path: Path | None = None) -> FastAPI:
             assert updated is not None
             return item(connection, updated)
 
+    @app.delete("/api/items/{item_id}", status_code=204, dependencies=[Depends(require_browser_origin)])
+    def trash_item(item_id: str, account: Account = Depends(web_account)) -> None:
+        with connect(db_path) as connection:
+            changed = connection.execute(
+                "UPDATE learning_items SET deleted_at = ? WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+                (_now(), item_id, account.id),
+            )
+            if changed.rowcount != 1:
+                raise HTTPException(status_code=404, detail="Saved Learning Item not found")
+
+    @app.get("/api/trash", response_model=list[TrashEntry])
+    def list_trash(account: Account = Depends(web_account)) -> list[TrashEntry]:
+        with connect(db_path) as connection:
+            folders_in_trash = connection.execute(
+                "SELECT id, name FROM folders WHERE user_id = ? AND deleted_at IS NOT NULL AND trash_root_id = id ORDER BY deleted_at DESC, id",
+                (account.id,),
+            ).fetchall()
+            items_in_trash = connection.execute(
+                "SELECT id, text, category, folder_id FROM learning_items WHERE user_id = ? AND deleted_at IS NOT NULL AND trash_root_id IS NULL ORDER BY deleted_at DESC, id",
+                (account.id,),
+            ).fetchall()
+        return [TrashEntry(id=row["id"], kind="folder", name=row["name"]) for row in folders_in_trash] + [
+            TrashEntry(id=row["id"], kind="item", name=row["text"], category=row["category"], folder_id=row["folder_id"])
+            for row in items_in_trash
+        ]
+
+    def recovery_folder(connection: sqlite3.Connection, user_id: str, category: str, text: str) -> str:
+        suffix = 1
+        while True:
+            name = "Đã khôi phục" if suffix == 1 else f"Đã khôi phục {suffix}"
+            existing = connection.execute(
+                "SELECT id FROM folders WHERE user_id = ? AND parent_id IS NULL AND name_key = ? AND deleted_at IS NULL",
+                (user_id, name.casefold()),
+            ).fetchone()
+            if existing is None:
+                folder_id = _new_id()
+                connection.execute(
+                    "INSERT INTO folders (id, user_id, parent_id, name, name_key, created_at) VALUES (?, ?, NULL, ?, ?, ?)",
+                    (folder_id, user_id, name, name.casefold(), _now()),
+                )
+                return folder_id
+            collision = connection.execute(
+                "SELECT 1 FROM learning_items WHERE user_id = ? AND folder_id = ? AND category = ? AND text = ? AND deleted_at IS NULL",
+                (user_id, existing["id"], category, text),
+            ).fetchone()
+            if collision is None:
+                return str(existing["id"])
+            suffix += 1
+
+    @app.post("/api/trash/items/{item_id}/restore", response_model=Item, dependencies=[Depends(require_browser_origin)])
+    def restore_item(item_id: str, account: Account = Depends(web_account)) -> Item:
+        with connect(db_path) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT * FROM learning_items WHERE id = ? AND user_id = ? AND deleted_at IS NOT NULL AND trash_root_id IS NULL",
+                (item_id, account.id),
+            ).fetchone()
+            if row is None:
+                raise HTTPException(status_code=404, detail="Trash item not found")
+            folder = connection.execute(
+                "SELECT 1 FROM folders WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+                (row["folder_id"], account.id),
+            ).fetchone()
+            collision = connection.execute(
+                "SELECT 1 FROM learning_items WHERE user_id = ? AND folder_id = ? AND category = ? AND text = ? AND deleted_at IS NULL",
+                (account.id, row["folder_id"], row["category"], row["text"]),
+            ).fetchone()
+            target_folder = row["folder_id"] if folder is not None and collision is None else recovery_folder(
+                connection, account.id, row["category"], row["text"],
+            )
+            try:
+                connection.execute("UPDATE learning_items SET folder_id = ?, deleted_at = NULL WHERE id = ?", (target_folder, item_id))
+            except sqlite3.IntegrityError as error:
+                raise HTTPException(status_code=409, detail="Duplicate Learning Item") from error
+            restored = connection.execute("SELECT * FROM learning_items WHERE id = ?", (item_id,)).fetchone()
+            assert restored is not None
+            return item(connection, restored)
+
+    @app.delete("/api/trash/items/{item_id}", status_code=204, dependencies=[Depends(require_browser_origin)])
+    def permanently_delete_item(item_id: str, account: Account = Depends(web_account)) -> None:
+        with connect(db_path) as connection:
+            changed = connection.execute(
+                "DELETE FROM learning_items WHERE id = ? AND user_id = ? AND deleted_at IS NOT NULL AND trash_root_id IS NULL",
+                (item_id, account.id),
+            )
+            if changed.rowcount != 1:
+                raise HTTPException(status_code=404, detail="Trash item not found")
+
+    def permanently_delete_folder_group(connection: sqlite3.Connection, user_id: str, folder_id: str) -> None:
+        root = connection.execute(
+            "SELECT 1 FROM folders WHERE id = ? AND user_id = ? AND deleted_at IS NOT NULL AND trash_root_id = id",
+            (folder_id, user_id),
+        ).fetchone()
+        if root is None:
+            raise HTTPException(status_code=404, detail="Trash folder not found")
+        group = connection.execute(
+            "SELECT id FROM folders WHERE user_id = ? AND trash_root_id = ?", (user_id, folder_id),
+        ).fetchall()
+        ids = [str(row["id"]) for row in group]
+        placeholders = ",".join("?" for _ in ids)
+        other_items = connection.execute(
+            f"SELECT id, category, text FROM learning_items WHERE user_id = ? AND folder_id IN ({placeholders}) AND trash_root_id IS NULL",
+            (user_id, *ids),
+        ).fetchall()
+        for row in other_items:
+            destination = recovery_folder(connection, user_id, row["category"], row["text"])
+            connection.execute("UPDATE learning_items SET folder_id = ? WHERE id = ?", (destination, row["id"]))
+        connection.execute(
+            f"UPDATE folders SET parent_id = NULL WHERE user_id = ? AND parent_id IN ({placeholders}) AND trash_root_id != ?",
+            (user_id, *ids, folder_id),
+        )
+        connection.execute("DELETE FROM learning_items WHERE user_id = ? AND trash_root_id = ?", (user_id, folder_id))
+        connection.execute("DELETE FROM folders WHERE user_id = ? AND trash_root_id = ?", (user_id, folder_id))
+
+    @app.delete("/api/trash/folders/{folder_id}", status_code=204, dependencies=[Depends(require_browser_origin)])
+    def permanently_delete_folder(folder_id: str, account: Account = Depends(web_account)) -> None:
+        with connect(db_path) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            permanently_delete_folder_group(connection, account.id, folder_id)
+
+    @app.delete("/api/trash", status_code=204, dependencies=[Depends(require_browser_origin)])
+    def empty_trash(account: Account = Depends(web_account)) -> None:
+        with connect(db_path) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            connection.execute("DELETE FROM learning_items WHERE user_id = ? AND deleted_at IS NOT NULL", (account.id,))
+            connection.execute("DELETE FROM folders WHERE user_id = ? AND deleted_at IS NOT NULL", (account.id,))
+
     @app.get("/api/folders", response_model=list[Folder])
     def list_folders(account: Account = Depends(web_account)) -> list[Folder]:
         with connect(db_path) as connection:
             rows = connection.execute(
-                "SELECT id, name, parent_id FROM folders WHERE user_id = ? ORDER BY name_key, id",
+                "SELECT id, name, parent_id FROM folders WHERE user_id = ? AND deleted_at IS NULL ORDER BY name_key, id",
                 (account.id,),
             ).fetchall()
         return [_folder(row) for row in rows]
@@ -445,7 +628,7 @@ def create_app(database_path: Path | None = None) -> FastAPI:
         with connect(db_path) as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
-                "SELECT id, name, parent_id FROM folders WHERE id = ? AND user_id = ?",
+                "SELECT id, name, parent_id FROM folders WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
                 (folder_id, account.id),
             ).fetchone()
             if row is None:
@@ -458,7 +641,7 @@ def create_app(database_path: Path | None = None) -> FastAPI:
                 if current == folder_id:
                     raise HTTPException(status_code=400, detail="Cannot move folder into itself or a descendant")
                 parent = connection.execute(
-                    "SELECT parent_id FROM folders WHERE id = ? AND user_id = ?", (current, account.id)
+                    "SELECT parent_id FROM folders WHERE id = ? AND user_id = ? AND deleted_at IS NULL", (current, account.id)
                 ).fetchone()
                 current = parent["parent_id"] if parent else None
             try:
@@ -469,6 +652,77 @@ def create_app(database_path: Path | None = None) -> FastAPI:
             except sqlite3.IntegrityError as error:
                 raise HTTPException(status_code=409, detail="Folder name already used here") from error
         return Folder(id=folder_id, name=name, parent_id=parent_id)
+
+    def subtree_ids(connection: sqlite3.Connection, user_id: str, folder_id: str) -> list[str]:
+        rows = connection.execute(
+            """WITH RECURSIVE tree(id) AS (
+                   SELECT id FROM folders WHERE id = ? AND user_id = ?
+                   UNION ALL SELECT child.id FROM folders child JOIN tree ON child.parent_id = tree.id WHERE child.user_id = ?
+               ) SELECT id FROM tree""",
+            (folder_id, user_id, user_id),
+        ).fetchall()
+        return [str(row["id"]) for row in rows]
+
+    @app.delete("/api/folders/{folder_id}", status_code=204, dependencies=[Depends(require_browser_origin)])
+    def trash_folder(folder_id: str, account: Account = Depends(web_account)) -> None:
+        with connect(db_path) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT id FROM folders WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+                (folder_id, account.id),
+            ).fetchone()
+            if row is None:
+                raise HTTPException(status_code=404, detail="Folder not found")
+            ids = subtree_ids(connection, account.id, folder_id)
+            placeholders = ",".join("?" for _ in ids)
+            timestamp = _now()
+            connection.execute(
+                f"UPDATE learning_items SET deleted_at = ?, trash_root_id = ? WHERE user_id = ? AND folder_id IN ({placeholders}) AND deleted_at IS NULL",
+                (timestamp, folder_id, account.id, *ids),
+            )
+            connection.execute(
+                f"UPDATE folders SET deleted_at = ?, trash_root_id = ? WHERE user_id = ? AND id IN ({placeholders}) AND deleted_at IS NULL",
+                (timestamp, folder_id, account.id, *ids),
+            )
+
+    @app.post("/api/trash/folders/{folder_id}/restore", response_model=Folder, dependencies=[Depends(require_browser_origin)])
+    def restore_folder(folder_id: str, account: Account = Depends(web_account)) -> Folder:
+        with connect(db_path) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            root = connection.execute(
+                "SELECT * FROM folders WHERE id = ? AND user_id = ? AND deleted_at IS NOT NULL AND trash_root_id = id",
+                (folder_id, account.id),
+            ).fetchone()
+            if root is None:
+                raise HTTPException(status_code=404, detail="Trash folder not found")
+            parent = connection.execute(
+                "SELECT 1 FROM folders WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+                (root["parent_id"], account.id),
+            ).fetchone() if root["parent_id"] else None
+            if root["parent_id"] and parent is None:
+                connection.execute("UPDATE folders SET parent_id = NULL WHERE id = ?", (folder_id,))
+            destination_parent = root["parent_id"] if parent is not None else None
+            name = str(root["name"])
+            suffix = 1
+            while connection.execute(
+                "SELECT 1 FROM folders WHERE user_id = ? AND COALESCE(parent_id, '') = COALESCE(?, '') AND name_key = ? AND deleted_at IS NULL",
+                (account.id, destination_parent, name.casefold()),
+            ).fetchone():
+                suffix += 1
+                name = f"{str(root['name'])[:80]} (khôi phục {suffix})"
+            if name != root["name"]:
+                connection.execute("UPDATE folders SET name = ?, name_key = ? WHERE id = ?", (name, name.casefold(), folder_id))
+            connection.execute(
+                "UPDATE folders SET deleted_at = NULL, trash_root_id = NULL WHERE user_id = ? AND trash_root_id = ?",
+                (account.id, folder_id),
+            )
+            connection.execute(
+                "UPDATE learning_items SET deleted_at = NULL, trash_root_id = NULL WHERE user_id = ? AND trash_root_id = ?",
+                (account.id, folder_id),
+            )
+            restored = connection.execute("SELECT id, name, parent_id FROM folders WHERE id = ?", (folder_id,)).fetchone()
+            assert restored is not None
+            return _folder(restored)
 
     return app
 

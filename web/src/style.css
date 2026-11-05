@@ -75,6 +75,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .tree-button { @apply flex items-center gap-3; width: 100%; min-height: 41px; padding: 8px 14px; border: 0; border-radius: 9px; background: transparent; color: #5d6682; text-align: left; font-size: 13px; font-weight: 600; }
 .tree-button:hover { background: #f4f5ff; color: #4740b2; }
 .tree-button.active { background: #ebeaff; color: #4b43cd; font-weight: 800; }
+.trash-nav { margin-top: 16px; border-top: 1px solid #e9ebf5; border-radius: 0 0 9px 9px; }
 .tree-button svg { flex: none; }
 .folder-context-menu { position: fixed; z-index: 100; width: 225px; max-width: calc(100vw - 16px); padding: 6px; border: 1px solid #dfe2f2; border-radius: 12px; background: #fff; box-shadow: 0 14px 36px #25295829; }
 .folder-context-title { margin: 0 4px 5px; padding: 7px 8px 9px; border-bottom: 1px solid #eceef7; color: #727c99; overflow-wrap: anywhere; font-size: 12px; font-weight: 700; }
@@ -140,6 +141,19 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .saved-item-top, .saved-item-links { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .saved-item-category { padding: 5px 8px; border-radius: 7px; background: #ecebff; color: #4f46b7; font-size: 11px; font-weight: 700; }
 .saved-item-top button, .saved-item-links button { display: inline-flex; align-items: center; gap: 4px; border: 0; background: none; color: var(--indigo); font-size: 12px; font-weight: 700; }
+.saved-item-controls { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.saved-item-controls button:last-child { color: #a33d4c; }
+.trash-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 14px; }
+.trash-card { padding: 18px; border: 1px solid #e2e5f1; border-radius: 14px; background: #fff; }
+.trash-card h2 { margin: 13px 0 5px; overflow-wrap: anywhere; font-size: 20px; }
+.trash-card p { color: var(--muted); font-size: 13px; }
+.trash-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 18px; }
+.trash-actions button { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px; border: 1px solid #d8dded; border-radius: 9px; background: #fff; color: var(--indigo); font-size: 12px; font-weight: 750; }
+.danger-button, .trash-actions .danger-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; padding: 0 14px; border: 1px solid #f0c8ce; border-radius: 9px; background: #fff1f2; color: #9e2940; font-size: 12px; font-weight: 800; }
+.danger-button:hover, .trash-actions .danger-button:hover { background: #ffe3e6; }
+.danger-button:disabled, .trash-actions button:disabled { opacity: .55; cursor: not-allowed; }
+.trash-feedback { margin: 0 0 18px; padding: 12px 15px; border: 1px solid #c9dfd3; border-radius: 9px; background: #f0faf4; color: #245b3a; font-size: 13px; }
+.danger-icon { color: #a33d4c; background: #fff1f2; }
 .saved-item-card h3 { margin: 18px 0 5px; overflow-wrap: anywhere; font-size: 22px; line-height: 1.4; }
 .saved-item-pinyin { margin: 0 0 13px; color: #5a62a0; font-size: 13px; }
 .saved-item-meaning { min-height: 32px; margin: 0; overflow-wrap: anywhere; font-size: 13px; }

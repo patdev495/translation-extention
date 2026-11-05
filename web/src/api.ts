@@ -19,6 +19,14 @@ export interface SavedLearningItem {
   linked_item_ids: string[];
 }
 
+export interface TrashEntry {
+  id: string;
+  kind: 'item' | 'folder';
+  name: string;
+  category: 'word' | 'sentence' | null;
+  folder_id: string | null;
+}
+
 interface ApiErrorBody {
   detail?: unknown;
 }
@@ -91,4 +99,12 @@ export const learningApi = {
   items: (): Promise<SavedLearningItem[]> => api('/items'),
   updateItem: (id: string, change: Pick<SavedLearningItem, 'folder_id' | 'category' | 'text' | 'meaning'>): Promise<SavedLearningItem> =>
     api(`/items/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(change) }),
+  trash: (): Promise<TrashEntry[]> => api('/trash'),
+  trashItem: (id: string): Promise<void> => api(`/items/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  trashFolder: (id: string): Promise<void> => api(`/folders/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  restoreItem: (id: string): Promise<SavedLearningItem> => api(`/trash/items/${encodeURIComponent(id)}/restore`, { method: 'POST' }),
+  restoreFolder: (id: string): Promise<LearningFolder> => api(`/trash/folders/${encodeURIComponent(id)}/restore`, { method: 'POST' }),
+  permanentlyDeleteItem: (id: string): Promise<void> => api(`/trash/items/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  permanentlyDeleteFolder: (id: string): Promise<void> => api(`/trash/folders/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  emptyTrash: (): Promise<void> => api('/trash', { method: 'DELETE' }),
 };

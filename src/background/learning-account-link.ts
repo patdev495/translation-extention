@@ -1,9 +1,11 @@
 declare const __LEARNING_API_BASE__: string;
+import { pinyin } from 'pinyin-pro';
 
 const API_BASE = (typeof __LEARNING_API_BASE__ === 'string' ? __LEARNING_API_BASE__ : 'http://127.0.0.1:8000').replace(/\/$/, '');
 const WEB_BASE = 'http://127.0.0.1:5173';
 const ALARM_NAME = 'polytranslate-learning-link-poll';
 const PUBLIC_STATUS_KEY = 'learningAccountStatus';
+const SYNC_ALARM_NAME = 'polytranslate-learning-sync';
 
 interface Account {
   id: string;
@@ -24,6 +26,17 @@ interface LinkedAccount {
   account: Account;
 }
 
+export interface PendingSyncItem {
+  id: string;
+  account_id: string;
+  choice: 'word' | 'sentence' | 'both';
+  item: Record<string, string>;
+  pinyin: string;
+  sentence_pinyin?: string;
+  state: 'pending' | 'completed' | 'failed';
+  error?: string;
+}
+
 type PrivateLinkState = PendingLink | LinkedAccount;
 
 export interface PublicLinkStatus {
@@ -38,13 +51,100 @@ function accountUsername(account: Account): string | undefined {
 
 function openLinkDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('polytranslate-learning-account', 1);
+    const request = indexedDB.open('polytranslate-learning-account', 2);
     request.onupgradeneeded = () => {
-      request.result.createObjectStore('link');
+      if (!request.result.objectStoreNames.contains('link')) request.result.createObjectStore('link');
+      if (!request.result.objectStoreNames.contains('sync')) request.result.createObjectStore('sync', { keyPath: 'id' });
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
+}
+
+async function syncStore<T>(mode: IDBTransactionMode, action: (store: IDBObjectStore, resolve: (value: T) => void, reject: (reason: unknown) => void) => void): Promise<T> {
+  const database = await openLinkDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction('sync', mode);
+    action(transaction.objectStore('sync'), resolve, reject);
+    transaction.onerror = () => { database.close(); reject(transaction.error); };
+    transaction.oncomplete = () => database.close();
+  });
+}
+
+async function allSyncItems(): Promise<PendingSyncItem[]> {
+  return syncStore('readonly', (store, resolve, reject) => {
+    const request = store.getAll();
+    request.onsuccess = () => resolve(request.result as PendingSyncItem[]);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function putSyncItem(item: PendingSyncItem): Promise<void> {
+  const database = await openLinkDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction('sync', 'readwrite');
+    transaction.objectStore('sync').put(item);
+    transaction.oncomplete = () => { database.close(); resolve(); };
+    transaction.onerror = () => { database.close(); reject(transaction.error); };
+  });
+}
+
+export async function listSyncItems(): Promise<PendingSyncItem[]> {
+  const current = await readPrivateState();
+  if (current?.state !== 'linked') return [];
+  return (await allSyncItems()).filter(item => item.account_id === current.account.id);
+}
+
+let syncing: Promise<void> | null = null;
+
+export function syncPendingItems(): Promise<void> {
+  if (syncing) return syncing;
+  syncing = (async () => {
+    const current = await readPrivateState();
+    if (current?.state !== 'linked') return;
+    const pending = (await allSyncItems()).filter(item => item.account_id === current.account.id && item.state === 'pending');
+    for (const entry of pending) {
+      try {
+        await learningRequest('/sync', {
+          method: 'POST', body: JSON.stringify({ request_id: entry.id, choice: entry.choice, item: entry.item }),
+        }, entry.account_id);
+        await putSyncItem({ ...entry, state: 'completed', error: undefined });
+      } catch (error) {
+        const transient = error instanceof TypeError || error instanceof AccountChangedError || (error instanceof LearningRequestError && error.status >= 500);
+        if (!transient) await putSyncItem({ ...entry, state: 'failed', error: error instanceof Error ? error.message : 'Không đồng bộ được.' });
+      }
+    }
+    const stillPending = (await allSyncItems()).some(item => item.account_id === current.account.id && item.state === 'pending');
+    if (stillPending) await chrome.alarms.create(SYNC_ALARM_NAME, { periodInMinutes: 1 });
+    else await chrome.alarms.clear(SYNC_ALARM_NAME);
+  })().finally(() => { syncing = null; });
+  return syncing;
+}
+
+export async function retryFailedItems(): Promise<void> {
+  const current = await readPrivateState();
+  if (current?.state !== 'linked') return;
+  for (const entry of await allSyncItems()) {
+    if (entry.account_id === current.account.id && entry.state === 'failed') {
+      await putSyncItem({ ...entry, state: 'pending', error: undefined });
+    }
+  }
+  await syncPendingItems();
+}
+
+export async function saveLearningItem(choice: PendingSyncItem['choice'], item: Record<string, string>): Promise<PendingSyncItem> {
+  const current = await readPrivateState();
+  if (current?.state !== 'linked') throw new Error('Hãy liên kết tài khoản trong cài đặt extension.');
+  const entry: PendingSyncItem = {
+    id: crypto.randomUUID(), account_id: current.account.id, choice, item,
+    pinyin: pinyin(choice === 'both' ? item.word_text : item.text, { toneType: 'symbol' }),
+    ...(choice === 'both' ? { sentence_pinyin: pinyin(item.sentence_text, { toneType: 'symbol' }) } : {}),
+    state: 'pending',
+  };
+  await putSyncItem(entry);
+  await chrome.alarms.create(SYNC_ALARM_NAME, { periodInMinutes: 1 });
+  await syncPendingItems();
+  return (await allSyncItems()).find(saved => saved.id === entry.id) ?? entry;
 }
 
 async function readPrivateState(): Promise<PrivateLinkState | null> {
@@ -131,6 +231,7 @@ export async function pollAccountLink(): Promise<void> {
     await writePrivateState({ state: 'linked', token: result.token, account: result.account });
     await chrome.alarms.clear(ALARM_NAME);
     await publishStatus({ state: 'linked', username: result.account.username });
+    void syncPendingItems();
   } catch (error) {
     if (error instanceof Error && error.message.includes('hết hạn')) {
       await writePrivateState(null);
@@ -177,9 +278,16 @@ export async function unlinkAccount(): Promise<PublicLinkStatus> {
   return publishStatus({ state: 'unlinked' });
 }
 
-export async function learningRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+class LearningRequestError extends Error {
+  constructor(readonly status: number, message: string) { super(message); }
+}
+
+class AccountChangedError extends Error {}
+
+export async function learningRequest<T>(path: string, options: RequestInit = {}, expectedAccountId?: string): Promise<T> {
   const current = await readPrivateState();
   if (current?.state !== 'linked') throw new Error('Hãy liên kết tài khoản trong cài đặt extension.');
+  if (expectedAccountId && current.account.id !== expectedAccountId) throw new AccountChangedError('Tài khoản liên kết đã thay đổi.');
   const response = await fetch(`${API_BASE}/api/extension${path}`, {
     ...options,
     headers: { ...(options.body ? { 'Content-Type': 'application/json' } : {}), Authorization: `Bearer ${current.token}`, ...options.headers },
@@ -188,10 +296,10 @@ export async function learningRequest<T>(path: string, options: RequestInit = {}
     const body = await response.json().catch(() => ({}));
     if (response.status === 409) {
       const duplicate = body?.detail?.existing_item;
-      throw new Error(duplicate ? `Duplicate Learning Item: ${duplicate.text}` : 'Duplicate Learning Item');
+      throw new LearningRequestError(response.status, duplicate ? `Duplicate Learning Item: ${duplicate.text}` : 'Duplicate Learning Item');
     }
-    if (response.status === 401) throw new Error('Liên kết hết hạn. Hãy liên kết lại trong cài đặt extension.');
-    throw new Error(typeof body.detail === 'string' ? body.detail : `Máy chủ trả lỗi ${response.status}.`);
+    if (response.status === 401) throw new LearningRequestError(response.status, 'Liên kết hết hạn. Hãy liên kết lại trong cài đặt extension.');
+    throw new LearningRequestError(response.status, typeof body.detail === 'string' ? body.detail : `Máy chủ trả lỗi ${response.status}.`);
   }
   return await response.json() as T;
 }
@@ -202,6 +310,7 @@ export async function openLearningLibrary(): Promise<void> {
 
 chrome.alarms?.onAlarm?.addListener((alarm) => {
   if (alarm.name === ALARM_NAME) void pollAccountLink();
+  if (alarm.name === SYNC_ALARM_NAME) void syncPendingItems();
 });
 
 chrome.runtime.onStartup?.addListener(() => {
@@ -209,5 +318,6 @@ chrome.runtime.onStartup?.addListener(() => {
     if (state?.state === 'pending') {
       void chrome.alarms.create(ALARM_NAME, { periodInMinutes: 0.5 });
     }
+    if (state?.state === 'linked') void syncPendingItems();
   });
 });

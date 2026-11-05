@@ -166,3 +166,23 @@ test('Both uses Vietnamese Source Text for full sentence but translates selected
   expect((root.querySelector('.tt-save-sentence-meaning') as HTMLInputElement).value).toBe('Nếu định làm extension thương mại');
   expect(sendMessage.mock.calls.filter(([message]) => message.type === 'LEARNING_SUGGEST_MEANING').map(([message]) => message.text)).toEqual(['商业']);
 });
+
+test('offline save visibly says pending instead of saved on website', async () => {
+  vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { cb(0); return 1; });
+  vi.stubGlobal('chrome', {
+    runtime: { sendMessage: vi.fn((message, callback) => callback(message.type === 'LEARNING_FOLDERS'
+      ? { success: true, result: [{ id: 'f1', name: 'HSK', parent_id: null }] }
+      : { success: true, state: 'pending' })) },
+    storage: { local: { get: vi.fn(async () => ({})), set: vi.fn(async () => {}) } },
+  });
+  const tooltip = new TranslationTooltip();
+  tooltip.show(0, 0, '你好', { detectedLang: 'zh', translations: [{ lang: 'vi', text: 'xin chào' }] });
+  const root = document.getElementById('translation-extension-root')!.shadowRoot!;
+  root.querySelector<HTMLButtonElement>('.tt-save-button')!.click();
+  root.querySelector<HTMLButtonElement>('[data-choice="word"]')!.click();
+  await vi.waitFor(() => expect((root.querySelector('.tt-save-folder') as HTMLSelectElement).options.length).toBe(2));
+  (root.querySelector('.tt-save-folder') as HTMLSelectElement).value = 'f1';
+  root.querySelector<HTMLFormElement>('.tt-save-form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  await vi.waitFor(() => expect(root.querySelector('.tt-save-status')?.textContent).toContain('Chờ đồng bộ'));
+  expect(root.querySelector('.tt-save-status')?.textContent).not.toContain('Đã lưu');
+});

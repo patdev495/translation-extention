@@ -18,6 +18,16 @@
 .learning-account-actions button { padding: 7px 12px; border: 1px solid #b8c0e7; border-radius: 8px; background: #fff; color: #353a72; font-weight: 700; cursor: pointer; }
 .learning-account-actions button:first-child { background: #4f46e5; border-color: #4f46e5; color: #fff; }
 .learning-account-actions button:disabled { opacity: .6; cursor: wait; }
+.learning-sync-section { margin-top: 12px; padding-top: 11px; border-top: 1px solid #dfe2f4; }
+.learning-sync-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.learning-sync-heading h3 { margin: 0; font-size: 12px; }
+.learning-sync-heading button { padding: 5px 9px; border: 1px solid #b8c0e7; border-radius: 7px; background: white; color: #353a72; font-size: 11px; font-weight: 700; cursor: pointer; }
+.learning-sync-section ul { display: grid; gap: 6px; max-height: 150px; margin: 9px 0 0; padding: 0; overflow: auto; list-style: none; }
+.learning-sync-section li { display: flex; justify-content: space-between; gap: 7px; padding: 7px 9px; border: 1px solid #e2e4f2; border-radius: 8px; background: #fff; font-size: 11px; }
+.learning-sync-section li span:first-child { overflow-wrap: anywhere; }
+.learning-sync-section li[data-state="pending"] strong { color: #8a641d; }
+.learning-sync-section li[data-state="completed"] strong { color: #27724f; }
+.learning-sync-section li[data-state="failed"] strong { color: #ac344a; }
 .hanzi-backup-section h2 { margin: 0 0 4px; }
 .hanzi-backup-section p { margin: 0 0 10px; }
 .hanzi-backup-actions { display: flex; flex-wrap: wrap; gap: 8px; }

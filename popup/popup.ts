@@ -45,6 +45,8 @@ const hanziImportUseFile = document.getElementById('hanzi-import-use-file') as H
 const learningAccountStatus = document.getElementById('learning-account-status') as HTMLParagraphElement;
 const learningAccountLink = document.getElementById('learning-account-link') as HTMLButtonElement;
 const learningAccountUnlink = document.getElementById('learning-account-unlink') as HTMLButtonElement;
+const learningSyncList = document.getElementById('learning-sync-list') as HTMLUListElement;
+const learningSyncRetry = document.getElementById('learning-sync-retry') as HTMLButtonElement;
 let pendingHanziBackup: HanziLearningBackup | null = null;
 
 interface LinkStatus {
@@ -75,10 +77,52 @@ async function sendLinkMessage(type: string): Promise<LinkStatus> {
 async function refreshLinkStatus(): Promise<void> {
   try {
     renderLinkStatus(await sendLinkMessage('GET_ACCOUNT_LINK_STATUS'));
+    await refreshSyncStatus();
   } catch {
     learningAccountStatus.textContent = 'Chưa kiểm tra được tài khoản. Hãy thử lại.';
   }
 }
+
+interface SyncStatusItem {
+  id: string;
+  choice: 'word' | 'sentence' | 'both';
+  item: { text?: string; word_text?: string; sentence_text?: string };
+  state: 'pending' | 'completed' | 'failed';
+  error?: string;
+}
+
+async function refreshSyncStatus(type = 'LEARNING_SYNC_STATUS'): Promise<void> {
+  try {
+    const response = await chrome.runtime.sendMessage({ type }) as { success?: boolean; result?: SyncStatusItem[] };
+    if (!response?.success) throw new Error('Không tải được trạng thái đồng bộ.');
+    learningSyncList.replaceChildren();
+    const entries = (response.result ?? []).slice().reverse().slice(0, 20);
+    if (!entries.length) {
+      const row = document.createElement('li');
+      row.textContent = 'Chưa có mục học tập chờ đồng bộ.';
+      learningSyncList.append(row);
+    }
+    for (const entry of entries) {
+      const row = document.createElement('li');
+      row.dataset.state = entry.state;
+      const text = document.createElement('span');
+      text.textContent = entry.choice === 'both' ? `${entry.item.word_text} / ${entry.item.sentence_text}` : entry.item.text ?? '';
+      const state = document.createElement('strong');
+      state.textContent = entry.state === 'pending' ? 'Chờ đồng bộ' : entry.state === 'completed' ? 'Đã đồng bộ' : 'Thất bại';
+      if (entry.error) row.title = entry.error;
+      row.append(text, state);
+      learningSyncList.append(row);
+    }
+  } catch {
+    learningSyncList.textContent = 'Không tải được trạng thái đồng bộ.';
+  }
+}
+
+learningSyncRetry.addEventListener('click', async () => {
+  learningSyncRetry.disabled = true;
+  await refreshSyncStatus('LEARNING_SYNC_RETRY');
+  learningSyncRetry.disabled = false;
+});
 
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;
 let validationTimeout: ReturnType<typeof setTimeout> | null = null;

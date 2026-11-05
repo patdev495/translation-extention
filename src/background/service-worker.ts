@@ -2,7 +2,7 @@ import { SettingsManager } from '../services/settings';
 import { PDF_VIEWER_PATH, shouldUseExtensionPdfViewer } from './pdf-redirect';
 import { TranslationCoordinator } from '../services/translation-coordinator';
 import { TranslationEngine } from '../services/translation';
-import { getAccountLinkStatus, learningRequest, openLearningLibrary, startAccountLink, unlinkAccount } from './learning-account-link';
+import { getAccountLinkStatus, learningRequest, listSyncItems, openLearningLibrary, retryFailedItems, saveLearningItem, startAccountLink, unlinkAccount } from './learning-account-link';
 
 // ─── PDF Redirect Logic ────────────────────────────────────────────────────
 
@@ -186,14 +186,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     void openLearningLibrary().then(() => sendResponse({ success: true }), () => sendResponse({ success: false }));
     return true;
   }
+  if (message.type === 'LEARNING_SYNC_STATUS') {
+    void listSyncItems().then(result => sendResponse({ success: true, result }), () => sendResponse({ success: false }));
+    return true;
+  }
+  if (message.type === 'LEARNING_SYNC_RETRY') {
+    void retryFailedItems().then(() => listSyncItems()).then(result => sendResponse({ success: true, result }), () => sendResponse({ success: false }));
+    return true;
+  }
   if (message.type === 'LEARNING_FOLDERS' || message.type === 'LEARNING_SAVE') {
     const task = message.type === 'LEARNING_FOLDERS'
       ? learningRequest('/folders')
-      : learningRequest(message.choice === 'both' ? '/items/both' : '/items', {
-          method: 'POST', body: JSON.stringify(message.item),
-        });
+      : saveLearningItem(message.choice, message.item);
     void task.then(
-      (result) => sendResponse({ success: true, result }),
+      (result) => sendResponse(message.type === 'LEARNING_SAVE' ? { success: true, state: (result as { state: string }).state, result } : { success: true, result }),
       (error: unknown) => sendResponse({ success: false, error: error instanceof Error ? error.message : 'Không lưu được.' }),
     );
     return true;

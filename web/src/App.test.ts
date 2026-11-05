@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import App from './App.vue';
-import { learningApi, type LearningFolder, type SavedLearningItem } from './api';
+import { learningApi, type LearningFolder, type SavedLearningItem, type TrashEntry } from './api';
 
 vi.mock('./api', async (importOriginal) => {
   const original = await importOriginal<typeof import('./api')>();
@@ -11,6 +11,8 @@ vi.mock('./api', async (importOriginal) => {
     learningApi: {
       me: vi.fn(), register: vi.fn(), login: vi.fn(), logout: vi.fn(),
       approveLink: vi.fn(), folders: vi.fn(), createFolder: vi.fn(), updateFolder: vi.fn(), items: vi.fn(), updateItem: vi.fn(),
+      trash: vi.fn(), trashItem: vi.fn(), trashFolder: vi.fn(), restoreItem: vi.fn(), restoreFolder: vi.fn(),
+      permanentlyDeleteItem: vi.fn(), permanentlyDeleteFolder: vi.fn(), emptyTrash: vi.fn(),
     },
   };
 });
@@ -18,15 +20,18 @@ vi.mock('./api', async (importOriginal) => {
 const api = vi.mocked(learningApi);
 let storedFolders: LearningFolder[];
 let storedItems: SavedLearningItem[];
+let storedTrash: TrashEntry[];
 
 beforeEach(() => {
   window.history.replaceState({}, '', '/');
   storedFolders = [];
   storedItems = [];
+  storedTrash = [];
   vi.clearAllMocks();
   api.me.mockResolvedValue({ id: 'person-1', username: 'learner' });
   api.folders.mockImplementation(async () => [...storedFolders]);
   api.items.mockImplementation(async () => [...storedItems]);
+  api.trash.mockImplementation(async () => [...storedTrash]);
   api.updateItem.mockImplementation(async (id, change) => {
     const item = storedItems.find((entry) => entry.id === id)!;
     Object.assign(item, change);
@@ -44,6 +49,78 @@ beforeEach(() => {
   });
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
+});
+
+test('learner deletes item, finds it in Trash, and restores it', async () => {
+  storedFolders = [{ id: 'f1', name: 'HSK', parent_id: null }];
+  storedItems = [{ id: 'w1', folder_id: 'f1', category: 'word', text: '学习', meaning: 'học', pinyin: 'xué xí', linked_item_ids: [] }];
+  api.trashItem.mockImplementation(async (id) => {
+    const item = storedItems.find((entry) => entry.id === id)!;
+    storedItems = storedItems.filter((entry) => entry.id !== id);
+    storedTrash.push({ id, kind: 'item', name: item.text, category: item.category, folder_id: item.folder_id });
+  });
+  api.restoreItem.mockImplementation(async (id) => {
+    storedTrash = storedTrash.filter((entry) => entry.id !== id);
+    storedItems.push({ id, folder_id: 'f1', category: 'word', text: '学习', meaning: 'học', pinyin: 'xué xí', linked_item_ids: [] });
+    return storedItems[0]!;
+  });
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+
+  await page.get('button[aria-label="Xóa 学习"]').trigger('click');
+  await page.get('.confirm-dialog button[type="submit"]').trigger('click');
+  await flushPromises();
+  expect(page.text()).toContain('Đã chuyển mục học tập vào thùng rác');
+  await page.get('button[aria-label="Mở thùng rác"]').trigger('click');
+  await flushPromises();
+  expect(page.text()).toContain('学习');
+  await page.get('button[aria-label="Khôi phục 学习"]').trigger('click');
+  await flushPromises();
+  expect(api.restoreItem).toHaveBeenCalledWith('w1');
+  expect(page.text()).toContain('Đã khôi phục');
+  page.unmount();
+});
+
+test('permanent deletion waits for confirmation and empty Trash is explicit', async () => {
+  storedTrash = [{ id: 'f1', kind: 'folder', name: 'HSK', category: null, folder_id: null }];
+  api.permanentlyDeleteFolder.mockImplementation(async () => { storedTrash = []; });
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+  await page.get('button[aria-label="Mở thùng rác"]').trigger('click');
+  await flushPromises();
+
+  await page.get('button[aria-label="Xóa vĩnh viễn HSK"]').trigger('click');
+  expect(api.permanentlyDeleteFolder).not.toHaveBeenCalled();
+  expect(page.get('.confirm-dialog').text()).toContain('không thể hoàn tác');
+  await page.get('.confirm-dialog .plain-button').trigger('click');
+  expect(api.permanentlyDeleteFolder).not.toHaveBeenCalled();
+  await page.get('button[aria-label="Xóa vĩnh viễn HSK"]').trigger('click');
+  await page.get('.confirm-dialog button[type="submit"]').trigger('click');
+  await flushPromises();
+  expect(api.permanentlyDeleteFolder).toHaveBeenCalledWith('f1');
+  expect(page.text()).toContain('Đã xóa vĩnh viễn');
+  expect(page.text()).toContain('Thùng rác trống');
+  page.unmount();
+});
+
+test('restore feedback names recovery folder when original folder is unavailable', async () => {
+  storedTrash = [{ id: 'w1', kind: 'item', name: '你好', category: 'word', folder_id: 'gone' }];
+  api.restoreItem.mockImplementation(async () => {
+    storedTrash = [];
+    storedFolders.push({ id: 'recovered', name: 'Đã khôi phục', parent_id: null });
+    const item: SavedLearningItem = { id: 'w1', folder_id: 'recovered', category: 'word', text: '你好', meaning: 'xin chào', pinyin: 'nǐ hǎo', linked_item_ids: [] };
+    storedItems.push(item);
+    return item;
+  });
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+  await page.get('button[aria-label="Mở thùng rác"]').trigger('click');
+  await flushPromises();
+  await page.get('button[aria-label="Khôi phục 你好"]').trigger('click');
+  await flushPromises();
+  expect(page.get('.trash-feedback').text()).toContain('Đã khôi phục');
+  expect(page.get('.trash-feedback').text()).toContain('Đã khôi phục”');
+  page.unmount();
 });
 
 afterEach(() => vi.restoreAllMocks());
@@ -90,7 +167,7 @@ test('creates, browses, renames and moves a nested folder through the website', 
   await page.get('nav[aria-label="Cây thư mục"]').findAll('.tree-button')[1]!.trigger('contextmenu', { clientX: 100, clientY: 120 });
   await flushPromises();
   expect(page.get('[role="menu"]').findAll('[role="menuitem"]').map((item) => item.text())).toEqual([
-    'Tạo thư mục con', 'Đổi tên', 'Chuyển thư mục',
+    'Tạo thư mục con', 'Đổi tên', 'Chuyển thư mục', 'Xóa thư mục',
   ]);
   document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
   await page.vm.$nextTick();

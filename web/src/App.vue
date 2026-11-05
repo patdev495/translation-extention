@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
-import { ArrowRight, BookOpen, Check, ChevronRight, CircleHelp, Folder, FolderPlus, Home, Link2, LogOut, MoveRight, Pencil, Plus, Sparkles } from '@lucide/vue';
-import { ApiError, learningApi, type Account, type LearningFolder, type SavedLearningItem } from './api';
+import { ArrowRight, BookOpen, Check, ChevronRight, CircleHelp, Folder, FolderPlus, Home, Link2, LogOut, MoveRight, Pencil, Plus, RotateCcw, Sparkles, Trash2 } from '@lucide/vue';
+import { ApiError, learningApi, type Account, type LearningFolder, type SavedLearningItem, type TrashEntry } from './api';
 
 type EditorMode = 'create' | 'rename' | 'move';
 
@@ -27,6 +27,14 @@ const folders = ref<LearningFolder[]>([]);
 const foldersLoading = ref(false);
 const folderError = ref('');
 const items = ref<SavedLearningItem[]>([]);
+const trash = ref<TrashEntry[]>([]);
+const showTrash = ref(false);
+const trashBusy = ref(false);
+const feedback = ref('');
+const confirmDialog = ref<HTMLDialogElement | null>(null);
+const confirmLabel = ref('');
+const confirmSuccess = ref('');
+let confirmedAction: (() => Promise<void>) | null = null;
 const itemError = ref('');
 const itemEditor = ref<HTMLDialogElement | null>(null);
 const editingItem = ref<SavedLearningItem | null>(null);
@@ -80,6 +88,61 @@ async function loadFolders(): Promise<void> {
   } finally {
     foldersLoading.value = false;
   }
+}
+
+async function loadTrash(): Promise<void> {
+  trash.value = await learningApi.trash();
+}
+
+async function openTrash(): Promise<void> {
+  showTrash.value = true;
+  selectedId.value = null;
+  try { await loadTrash(); } catch (error) { feedback.value = errorMessage(error); }
+}
+
+function openLibrary(folderId: string | null): void {
+  showTrash.value = false;
+  selectedId.value = folderId;
+}
+
+function askToDelete(label: string, action: () => Promise<void>, success: string): void {
+  confirmLabel.value = label;
+  confirmSuccess.value = success;
+  confirmedAction = action;
+  confirmDialog.value?.showModal();
+}
+
+async function confirmDeletion(): Promise<void> {
+  if (!confirmedAction || trashBusy.value) return;
+  trashBusy.value = true;
+  feedback.value = '';
+  try {
+    await confirmedAction();
+    await loadFolders();
+    await loadTrash();
+    feedback.value = confirmSuccess.value;
+    confirmDialog.value?.close();
+  } catch (error) { feedback.value = errorMessage(error); }
+  finally { trashBusy.value = false; }
+}
+
+async function restoreEntry(entry: TrashEntry): Promise<void> {
+  trashBusy.value = true;
+  feedback.value = '';
+  try {
+    const restored = entry.kind === 'item'
+      ? await learningApi.restoreItem(entry.id)
+      : await learningApi.restoreFolder(entry.id);
+    await loadFolders();
+    await loadTrash();
+    const destination = entry.kind === 'item' && 'folder_id' in restored && restored.folder_id !== entry.folder_id
+      ? folders.value.find(folder => folder.id === restored.folder_id)?.name
+      : null;
+    feedback.value = destination
+      ? `Đã khôi phục “${entry.name}” vào “${destination}” vì thư mục cũ không còn.`
+      : `Đã khôi phục “${entry.name}”.`;
+  } catch (error) { feedback.value = errorMessage(error); }
+  finally { trashBusy.value = false; }
 }
 
 onMounted(async () => {
@@ -149,6 +212,8 @@ async function signOut(): Promise<void> {
     password.value = '';
     folders.value = [];
     items.value = [];
+    trash.value = [];
+    showTrash.value = false;
     selectedId.value = null;
     linkApproved.value = false;
   } catch (error) {
@@ -373,9 +438,10 @@ async function submitEditor(): Promise<void> {
       <aside class="sidebar" aria-label="Thư mục học tập">
         <div class="sidebar-heading"><span>THƯ VIỆN</span><button class="small-icon-button" type="button" title="Tạo thư mục gốc" aria-label="Tạo thư mục gốc" @click="openEditor('create')"><FolderPlus :size="18" /></button></div>
         <nav aria-label="Cây thư mục">
-          <button class="tree-button" :class="{ active: selectedId === null }" type="button" :aria-current="selectedId === null ? 'page' : undefined" @click="selectedId = null" @contextmenu.prevent="showFolderContextMenu(null, $event.clientX, $event.clientY)" @keydown="handleFolderContextKey($event, null)"><Home :size="17" aria-hidden="true" /> Tất cả thư mục</button>
-          <button v-for="row in treeRows" :key="row.folder.id" class="tree-button" :class="{ active: selectedId === row.folder.id }" :style="{ paddingLeft: `${14 + row.depth * 18}px` }" type="button" :aria-current="selectedId === row.folder.id ? 'page' : undefined" @click="selectedId = row.folder.id" @contextmenu.prevent="showFolderContextMenu(row.folder.id, $event.clientX, $event.clientY)" @keydown="handleFolderContextKey($event, row.folder.id)"><Folder :size="17" aria-hidden="true" /> <span class="truncate">{{ row.folder.name }}</span></button>
+          <button class="tree-button" :class="{ active: selectedId === null && !showTrash }" type="button" :aria-current="selectedId === null && !showTrash ? 'page' : undefined" @click="openLibrary(null)" @contextmenu.prevent="showFolderContextMenu(null, $event.clientX, $event.clientY)" @keydown="handleFolderContextKey($event, null)"><Home :size="17" aria-hidden="true" /> Tất cả thư mục</button>
+          <button v-for="row in treeRows" :key="row.folder.id" class="tree-button" :class="{ active: selectedId === row.folder.id && !showTrash }" :style="{ paddingLeft: `${14 + row.depth * 18}px` }" type="button" :aria-current="selectedId === row.folder.id && !showTrash ? 'page' : undefined" @click="openLibrary(row.folder.id)" @contextmenu.prevent="showFolderContextMenu(row.folder.id, $event.clientX, $event.clientY)" @keydown="handleFolderContextKey($event, row.folder.id)"><Folder :size="17" aria-hidden="true" /> <span class="truncate">{{ row.folder.name }}</span></button>
         </nav>
+        <button class="tree-button trash-nav" :class="{ active: showTrash }" type="button" aria-label="Mở thùng rác" :aria-current="showTrash ? 'page' : undefined" @click="openTrash"><Trash2 :size="17" aria-hidden="true" /> Thùng rác</button>
         <div class="sidebar-note"><CircleHelp :size="18" aria-hidden="true" /><p>Chuột phải vào thư mục để quản lý nhanh. Tạo thư mục tại đây, rồi chọn khi lưu từ extension.</p></div>
       </aside>
 
@@ -385,10 +451,25 @@ async function submitEditor(): Promise<void> {
         <template v-if="folderContextMenu.folderId">
           <button type="button" role="menuitem" @click="chooseFolderContextAction('rename')"><Pencil :size="16" aria-hidden="true" /> Đổi tên</button>
           <button type="button" role="menuitem" @click="chooseFolderContextAction('move')"><MoveRight :size="17" aria-hidden="true" /> Chuyển thư mục</button>
+          <button type="button" role="menuitem" @click="folderContextMenu?.folderId && askToDelete(`Chuyển thư mục “${folderById.get(folderContextMenu.folderId)?.name}” vào thùng rác?`, () => learningApi.trashFolder(folderContextMenu!.folderId!), 'Đã chuyển thư mục vào thùng rác.'); closeFolderContextMenu()"><Trash2 :size="17" aria-hidden="true" /> Xóa thư mục</button>
         </template>
       </div>
 
-      <section class="library-main" aria-labelledby="library-title">
+      <section v-if="showTrash" class="library-main trash-main" aria-labelledby="trash-title">
+        <div class="library-header"><div><p class="overline">CÓ THỂ KHÔI PHỤC</p><h1 id="trash-title">Thùng rác</h1><p class="library-subtitle">Mục chỉ bị xóa vĩnh viễn khi bạn chọn.</p></div><button v-if="trash.length" type="button" class="danger-button" :disabled="trashBusy" @click="askToDelete('Xóa vĩnh viễn toàn bộ thùng rác? Thao tác này không thể hoàn tác.', () => learningApi.emptyTrash(), 'Đã xóa vĩnh viễn toàn bộ thùng rác.')">Dọn sạch thùng rác</button></div>
+        <p v-if="feedback" class="trash-feedback" role="status">{{ feedback }}</p>
+        <p v-if="!trash.length" class="saved-items-empty">Thùng rác trống.</p>
+        <div v-else class="trash-grid">
+          <article v-for="entry in trash" :key="entry.id" class="trash-card">
+            <span class="saved-item-category">{{ entry.kind === 'folder' ? 'Thư mục' : entry.category === 'word' ? 'Từ / cụm từ' : 'Câu' }}</span>
+            <h2>{{ entry.name }}</h2>
+            <p>{{ entry.kind === 'folder' ? 'Gồm thư mục con và mục học tập bên trong.' : 'Mục học tập đã xóa.' }}</p>
+            <div class="trash-actions"><button type="button" :aria-label="`Khôi phục ${entry.name}`" :disabled="trashBusy" @click="restoreEntry(entry)"><RotateCcw :size="16" aria-hidden="true" /> Khôi phục</button><button type="button" class="danger-button" :aria-label="`Xóa vĩnh viễn ${entry.name}`" :disabled="trashBusy" @click="askToDelete(`Xóa vĩnh viễn “${entry.name}”? Thao tác này không thể hoàn tác.`, () => entry.kind === 'folder' ? learningApi.permanentlyDeleteFolder(entry.id) : learningApi.permanentlyDeleteItem(entry.id), `Đã xóa vĩnh viễn “${entry.name}”.`)"><Trash2 :size="16" aria-hidden="true" /> Xóa vĩnh viễn</button></div>
+          </article>
+        </div>
+      </section>
+      <section v-else class="library-main" aria-labelledby="library-title">
+        <p v-if="feedback" class="trash-feedback" role="status">{{ feedback }}</p>
         <div v-if="linkRequest" class="link-banner" role="status">
           <div class="link-banner-icon"><Link2 :size="20" aria-hidden="true" /></div>
           <div><strong>Liên kết extension với tài khoản này?</strong><p>{{ linkApproved ? linkMessage : 'Chỉ xác nhận nếu chính bạn đã bắt đầu liên kết từ cài đặt extension.' }}</p></div>
@@ -409,7 +490,7 @@ async function submitEditor(): Promise<void> {
         <div v-else class="folder-grid">
           <article v-for="folder in currentChildren" :key="folder.id" class="folder-card">
             <button class="folder-card-main" type="button" :aria-label="`Mở thư mục ${folder.name}`" @click="selectedId = folder.id"><span class="folder-card-icon"><Folder :size="25" :stroke-width="1.8" aria-hidden="true" /></span><strong>{{ folder.name }}</strong><span class="folder-card-sub">{{ folders.filter((item) => item.parent_id === folder.id).length }} thư mục con</span><ChevronRight class="card-arrow" :size="19" aria-hidden="true" /></button>
-            <div class="folder-card-actions"><button type="button" :aria-label="`Tạo thư mục con trong ${folder.name}`" title="Tạo thư mục con" @click="openEditor('create', folder.id)"><FolderPlus :size="17" /></button><button type="button" :aria-label="`Đổi tên ${folder.name}`" title="Đổi tên" @click="openEditor('rename', folder.id)"><Pencil :size="16" /></button><button type="button" :aria-label="`Chuyển ${folder.name}`" title="Chuyển thư mục" @click="openEditor('move', folder.id)"><MoveRight :size="17" /></button></div>
+            <div class="folder-card-actions"><button type="button" :aria-label="`Tạo thư mục con trong ${folder.name}`" title="Tạo thư mục con" @click="openEditor('create', folder.id)"><FolderPlus :size="17" /></button><button type="button" :aria-label="`Đổi tên ${folder.name}`" title="Đổi tên" @click="openEditor('rename', folder.id)"><Pencil :size="16" /></button><button type="button" :aria-label="`Chuyển ${folder.name}`" title="Chuyển thư mục" @click="openEditor('move', folder.id)"><MoveRight :size="17" /></button><button type="button" :aria-label="`Xóa thư mục ${folder.name}`" title="Xóa thư mục" @click="askToDelete(`Chuyển thư mục “${folder.name}” và toàn bộ nội dung vào thùng rác?`, () => learningApi.trashFolder(folder.id), 'Đã chuyển thư mục vào thùng rác.')"><Trash2 :size="17" aria-hidden="true" /></button></div>
           </article>
         </div>
         <section class="saved-items" aria-labelledby="saved-items-title">
@@ -417,7 +498,7 @@ async function submitEditor(): Promise<void> {
           <p v-if="visibleItems.length === 0" class="saved-items-empty">Chưa có mục học tập trong vị trí này. Lưu chữ Trung từ Translation Tooltip.</p>
           <div v-else class="saved-items-grid">
             <article v-for="item in visibleItems" :id="`learning-item-${item.id}`" :key="item.id" class="saved-item-card" :class="{ focused: focusedItemId === item.id }" tabindex="-1">
-              <div class="saved-item-top"><span class="saved-item-category">{{ item.category === 'word' ? 'Từ / cụm từ' : 'Câu' }}</span><button type="button" :aria-label="`Sửa ${item.text}`" @click="openItemEditor(item)"><Pencil :size="16" aria-hidden="true" /> Sửa</button></div>
+              <div class="saved-item-top"><span class="saved-item-category">{{ item.category === 'word' ? 'Từ / cụm từ' : 'Câu' }}</span><div class="saved-item-controls"><button type="button" :aria-label="`Sửa ${item.text}`" @click="openItemEditor(item)"><Pencil :size="16" aria-hidden="true" /> Sửa</button><button type="button" :aria-label="`Xóa ${item.text}`" @click="askToDelete(`Chuyển “${item.text}” vào thùng rác?`, () => learningApi.trashItem(item.id), 'Đã chuyển mục học tập vào thùng rác.')"><Trash2 :size="16" aria-hidden="true" /> Xóa</button></div></div>
               <h3 lang="zh">{{ item.text }}</h3><p class="saved-item-pinyin">{{ item.pinyin }}</p><p class="saved-item-meaning">{{ item.meaning }}</p>
               <div v-if="item.linked_item_ids.length" class="saved-item-links"><span>Liên kết</span><button v-for="linkedId in item.linked_item_ids" :key="linkedId" type="button" @click="followItem(linkedId)">{{ itemById.get(linkedId)?.text ?? 'Mục liên kết' }} <ArrowRight :size="14" aria-hidden="true" /></button></div>
             </article>
@@ -446,6 +527,9 @@ async function submitEditor(): Promise<void> {
         <p v-if="itemError" class="form-error" role="alert">{{ itemError }}</p>
         <div class="dialog-actions"><button type="button" class="plain-button" @click="itemEditor?.close()">Hủy</button><button type="submit" class="primary-button" :disabled="itemBusy">{{ itemBusy ? 'Đang lưu…' : 'Lưu thay đổi' }}</button></div>
       </form>
+    </dialog>
+    <dialog ref="confirmDialog" class="editor-dialog confirm-dialog" @click.self="confirmDialog?.close()">
+      <form @submit.prevent="confirmDeletion"><div class="dialog-icon danger-icon"><Trash2 :size="23" aria-hidden="true" /></div><h2>Xác nhận xóa</h2><p>{{ confirmLabel }}</p><p v-if="feedback" class="form-error" role="alert">{{ feedback }}</p><div class="dialog-actions"><button type="button" class="plain-button" @click="confirmDialog?.close()">Hủy</button><button type="submit" class="danger-button" :disabled="trashBusy">{{ trashBusy ? 'Đang xử lý…' : 'Xác nhận' }}</button></div></form>
     </dialog>
   </div>
 </template>
