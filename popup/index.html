@@ -77,6 +77,23 @@
         <div class="setting-row"><label class="setting-info" for="hanzi-breakdown-language"><span class="setting-label">Breakdown Language</span><span class="setting-desc">Component explanations</span></label><div class="select-wrap"><select id="hanzi-breakdown-language"><option value="vi" selected>Vietnamese</option><option value="en">English</option></select></div></div>
       </section>
     </div>
+    <section class="hanzi-backup-section" aria-labelledby="hanzi-backup-title">
+      <h2 id="hanzi-backup-title">Hanzi learning backup</h2>
+      <p>Save your personal meanings and memory notes to a JSON file.</p>
+      <div class="hanzi-backup-actions">
+        <button id="hanzi-export-backup" type="button">Export JSON</button>
+        <button id="hanzi-import-backup" type="button">Import JSON</button>
+        <input id="hanzi-backup-file" type="file" accept="application/json,.json" hidden aria-label="Hanzi backup file">
+      </div>
+      <div id="hanzi-import-choice" hidden>
+        <p id="hanzi-import-summary"></p>
+        <div class="hanzi-backup-actions">
+          <button id="hanzi-import-keep-current" type="button">Keep current</button>
+          <button id="hanzi-import-use-file" type="button">Use file</button>
+        </div>
+      </div>
+      <p id="hanzi-backup-status" role="status" aria-live="polite"></p>
+    </section>
     <section class="ocr-section" aria-labelledby="ocr-title">
       <div class="ocr-heading">
         <h2 id="ocr-title">Behavior &amp; OCR</h2>

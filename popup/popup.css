@@ -7,6 +7,12 @@
 /* Hallmark · reworded "Small · Balanced" to "Small (Balanced)" and equivalent OCR / size choices · 63 names the meta separator */
 @import "../src/ui/tokens.css";
 @import "../src/ui/base.css";
+.hanzi-backup-section { margin-top: var(--space-md); padding: var(--space-md); border: 1px solid var(--color-border, #d5dce6); border-radius: 12px; }
+.hanzi-backup-section h2 { margin: 0 0 4px; }
+.hanzi-backup-section p { margin: 0 0 10px; }
+.hanzi-backup-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.hanzi-backup-actions button { padding: 7px 12px; border: 1px solid #b8c6d8; border-radius: 8px; background: transparent; color: inherit; cursor: pointer; }
+#hanzi-backup-status { min-height: 18px; margin-top: 8px; font-size: 12px; }
 
 html { background: var(--color-paper); }
 body { width: 640px; max-width: 100%; min-width: 0; margin-inline: auto; }

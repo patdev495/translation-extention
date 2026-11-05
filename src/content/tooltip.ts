@@ -2,6 +2,10 @@ import TOOLTIP_CSS from '../ui/tooltip.css?inline';
 import HanziWriter, { type CharacterJson } from 'hanzi-writer';
 import BREAKDOWN_CSS from '../ui/hanzi-breakdown.css?inline';
 import { getHanziBreakdown } from '../services/hanzi-breakdown';
+import {
+  getHanziMemoryNote, getPersonalHanziMeaning, getUnidentifiedStrokeExplanation,
+  saveHanziMemoryNote, savePersonalHanziMeaning, saveUnidentifiedStrokeExplanation,
+} from '../services/hanzi-learning';
 
 const EYE_OPEN_SVG = `
 <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-[1em] h-[1em]">
@@ -15,6 +19,9 @@ const EYE_SLASH_SVG = `
   <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.893 7.893 3 3m-3-3a8.959 8.959 0 0 1-4.563 1.258m-.54-2.11a3 3 0 0 1-3.72-3.72m1.04-1.04 3.72 3.72M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9" />
 </svg>
 `;
+
+const EDIT_MEANING_SVG = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L9 17l-4 1 1-4L16.5 3.5Z"/></svg>';
+const SWITCH_MEANING_SVG = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h15l-3-3"/><path d="m19 7-3 3"/><path d="M20 17H5l3-3"/><path d="m5 17 3 3"/></svg>';
 
 export class TranslationTooltip {
   private container: HTMLDivElement | null = null;
@@ -41,6 +48,7 @@ export class TranslationTooltip {
   private breakdownPath: string[] = [];
   private breakdownRequest = 0;
   private breakdownDragCleanup: (() => void) | null = null;
+  private breakdownPositionLocked = false;
 
   constructor() {
     this.init();
@@ -719,6 +727,7 @@ export class TranslationTooltip {
     pendingClose.addEventListener('click', () => this.closeHanziBreakdown());
     loading.append(pendingClose, document.createTextNode(`${character} · ${this.hanziBreakdownLanguage === 'vi' ? 'Đang tải' : 'Loading'}`));
     shadow.appendChild(loading);
+    this.positionHanziBreakdown();
     try {
       const breakdown = await getHanziBreakdown(character);
       if (request !== this.breakdownRequest) return;
@@ -729,6 +738,18 @@ export class TranslationTooltip {
         if (!component.meaning || language === 'en') return component.meaning;
         return this.translateHanziMeaning(component.meaning);
       }));
+      const memoryNote = await getHanziMemoryNote(character);
+      const personalMeaning = await getPersonalHanziMeaning(character, language);
+      const componentPersonalMeanings = await Promise.all(breakdown.components.map(component =>
+        component.character === '？' ? '' : getPersonalHanziMeaning(component.character, language)));
+      const unidentifiedPaths = breakdown.unidentifiedStrokeIndices.length
+        ? await this.loadHanziData(character).then(data =>
+          data.strokes.length === breakdown.strokeCount
+            ? breakdown.unidentifiedStrokeIndices.map(index => data.strokes[index]).filter((path): path is string => !!path)
+            : []).catch(() => [] as string[])
+        : [];
+      const unidentifiedExplanation = breakdown.components.some(component => component.character === '？')
+        ? await getUnidentifiedStrokeExplanation(character) : '';
       if (request !== this.breakdownRequest) return;
       const labels = language === 'vi'
         ? { title: 'Phân rã chữ Hán', unknown: 'Chưa rõ cấu tạo', empty: 'Chưa có dữ liệu phân rã', meaning: 'Gợi nghĩa', sound: 'Gợi âm', radical: 'Bộ thủ tra cứu', back: 'Quay lại', close: 'Đóng phân rã' }
@@ -762,6 +783,7 @@ export class TranslationTooltip {
       heading.addEventListener('mousedown', event => {
         if (event.button !== 0 || !this.breakdownRoot) return;
         event.preventDefault();
+        this.breakdownPositionLocked = true;
         this.breakdownDragCleanup?.();
         const target = this.breakdownRoot;
         const bounds = target.getBoundingClientRect();
@@ -786,18 +808,66 @@ export class TranslationTooltip {
       });
       card.appendChild(heading);
       card.appendChild(title);
-      if (ownMeaning) {
-        const definition = document.createElement('p');
-        definition.className = 'hanzi-breakdown-definition';
-        definition.textContent = ownMeaning;
-        card.appendChild(definition);
-      }
+      card.appendChild(this.createHanziMeaningEditor(character, language, ownMeaning ?? labels.unknown, personalMeaning, true));
       if (!breakdown.components.length) {
         const empty = document.createElement('p');
         empty.textContent = labels.empty;
         card.appendChild(empty);
       }
+      let unknownShown = false;
       for (const [index, component] of breakdown.components.entries()) {
+        if (component.character === '？') {
+          if (unknownShown) continue;
+          unknownShown = true;
+          const row = document.createElement('div');
+          row.className = 'hanzi-breakdown-component hanzi-breakdown-unidentified';
+          if (unidentifiedPaths.length) {
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('viewBox', '0 0 1024 1024');
+            svg.setAttribute('aria-label', `${language === 'vi' ? 'Nét chưa xác định của' : 'Unidentified strokes for'} ${character}`);
+            const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            group.setAttribute('transform', 'translate(0 900) scale(1 -1)');
+            for (const pathData of unidentifiedPaths) {
+              const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+              path.setAttribute('d', pathData);
+              group.appendChild(path);
+            }
+            svg.appendChild(group);
+            row.appendChild(svg);
+          }
+          const label = document.createElement('span');
+          label.textContent = unidentifiedExplanation || (language === 'vi' ? 'Chưa xác định' : 'Unidentified');
+          const edit = document.createElement('button');
+          edit.type = 'button';
+          edit.className = 'hanzi-breakdown-meaning-action';
+          edit.setAttribute('aria-label', `Edit unidentified strokes for ${character}`);
+          edit.title = language === 'vi' ? 'Sửa phần chưa xác định' : 'Edit unidentified strokes';
+          edit.innerHTML = EDIT_MEANING_SVG;
+          const input = document.createElement('textarea');
+          input.className = 'hanzi-breakdown-meaning-input';
+          input.setAttribute('aria-label', `Explanation for unidentified strokes of ${character}`);
+          input.value = unidentifiedExplanation;
+          input.hidden = true;
+          const status = document.createElement('span');
+          status.className = 'hanzi-breakdown-save-status';
+          status.setAttribute('role', 'status');
+          edit.addEventListener('click', () => {
+            input.hidden = !input.hidden;
+            if (!input.hidden) input.focus();
+          });
+          input.addEventListener('input', () => {
+            label.textContent = input.value || (language === 'vi' ? 'Chưa xác định' : 'Unidentified');
+            status.textContent = language === 'vi' ? 'Đang lưu…' : 'Saving…';
+            void saveUnidentifiedStrokeExplanation(character, input.value).then(() => {
+              status.textContent = language === 'vi' ? 'Đã lưu' : 'Saved';
+            }, () => {
+              status.textContent = language === 'vi' ? 'Không lưu được' : 'Could not save';
+            });
+          });
+          row.append(label, edit, input, status);
+          card.appendChild(row);
+          continue;
+        }
         const row = document.createElement('div');
         row.className = 'hanzi-breakdown-component';
         const glyph = document.createElement(component.expandable ? 'button' : 'strong');
@@ -807,11 +877,11 @@ export class TranslationTooltip {
           glyph.setAttribute('data-component', component.character);
           glyph.addEventListener('click', () => void this.showHanziBreakdown(component.character, [...path, component.character]));
         }
-        const meaning = document.createElement('span');
         const pronunciation = document.createElement('span');
         pronunciation.className = 'hanzi-breakdown-pinyin';
         pronunciation.textContent = component.pinyin.join(', ');
-        meaning.textContent = componentMeanings[index] ?? labels.unknown;
+        const meaning = this.createHanziMeaningEditor(component.character, language,
+          componentMeanings[index] ?? labels.unknown, componentPersonalMeanings[index], false);
         row.append(glyph, pronunciation, meaning);
         const tags: string[] = [];
         if (component.isRadical) tags.push(labels.radical);
@@ -824,7 +894,28 @@ export class TranslationTooltip {
         }
         card.appendChild(row);
       }
+      const noteLabel = document.createElement('label');
+      noteLabel.className = 'hanzi-breakdown-note';
+      noteLabel.textContent = language === 'vi' ? 'Ghi chú ghi nhớ' : 'Memory note';
+      const noteInput = document.createElement('textarea');
+      noteInput.setAttribute('aria-label', noteLabel.textContent);
+      noteInput.rows = 3;
+      noteInput.value = memoryNote;
+      const noteStatus = document.createElement('span');
+      noteStatus.className = 'hanzi-breakdown-save-status';
+      noteStatus.setAttribute('role', 'status');
+      noteInput.addEventListener('input', () => {
+        noteStatus.textContent = language === 'vi' ? 'Đang lưu…' : 'Saving…';
+        void saveHanziMemoryNote(character, noteInput.value).then(() => {
+          noteStatus.textContent = language === 'vi' ? 'Đã lưu' : 'Saved';
+        }, () => {
+          noteStatus.textContent = language === 'vi' ? 'Không lưu được' : 'Could not save';
+        });
+      });
+      noteLabel.append(noteInput, noteStatus);
+      card.appendChild(noteLabel);
       shadow.appendChild(card);
+      this.positionHanziBreakdown();
     } catch (error) {
       if (request === this.breakdownRequest) {
         const message = this.hanziBreakdownLanguage === 'vi' ? 'Không tải được dữ liệu phân rã' : 'Could not load breakdown data';
@@ -832,6 +923,99 @@ export class TranslationTooltip {
         console.error('Failed to load Hanzi breakdown:', error);
       }
     }
+  }
+
+  private positionHanziBreakdown(): void {
+    if (this.breakdownPositionLocked || !this.breakdownRoot || !this.tooltipEl) return;
+    const anchor = this.tooltipEl.getBoundingClientRect();
+    const card = this.breakdownRoot.getBoundingClientRect();
+    if (!anchor.width || !card.width) return;
+    const margin = 16;
+    const gap = 12;
+    const maxLeft = Math.max(margin, window.innerWidth - margin - card.width);
+    const maxTop = Math.max(margin, window.innerHeight - margin - card.height);
+    const clamp = (value: number, max: number) => Math.min(Math.max(value, margin), max);
+    let left: number;
+    let top = clamp(anchor.top, maxTop);
+    if (anchor.right + gap + card.width <= window.innerWidth - margin) {
+      left = anchor.right + gap;
+    } else if (anchor.left - gap - card.width >= margin) {
+      left = anchor.left - gap - card.width;
+    } else if (anchor.bottom + gap + card.height <= window.innerHeight - margin) {
+      left = clamp(anchor.left, maxLeft);
+      top = anchor.bottom + gap;
+    } else if (anchor.top - gap - card.height >= margin) {
+      left = clamp(anchor.left, maxLeft);
+      top = anchor.top - gap - card.height;
+    } else {
+      left = clamp(anchor.right + gap, maxLeft);
+    }
+    this.breakdownRoot.style.right = 'auto';
+    this.breakdownRoot.style.left = `${left}px`;
+    this.breakdownRoot.style.top = `${top}px`;
+  }
+
+  private createHanziMeaningEditor(
+    character: string, language: 'vi' | 'en', original: string, initialPersonal: string, main: boolean,
+  ): HTMLElement {
+    const wrapper = document.createElement(main ? 'p' : 'span');
+    if (main) wrapper.className = 'hanzi-breakdown-definition';
+    else wrapper.className = 'hanzi-breakdown-component-meaning';
+    const text = document.createElement('span');
+    text.className = 'hanzi-breakdown-meaning-text';
+    let personal = initialPersonal;
+    let showPersonal = !!personal;
+    const edit = document.createElement('button');
+    edit.type = 'button';
+    edit.className = 'hanzi-breakdown-meaning-action';
+    edit.setAttribute('aria-label', `Edit meaning for ${character}`);
+    edit.title = language === 'vi' ? 'Sửa nghĩa cá nhân' : 'Edit personal meaning';
+    edit.innerHTML = EDIT_MEANING_SVG;
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'hanzi-breakdown-meaning-action';
+    toggle.innerHTML = SWITCH_MEANING_SVG;
+    const input = document.createElement('textarea');
+    input.setAttribute('aria-label', `Personal meaning for ${character}`);
+    input.className = 'hanzi-breakdown-meaning-input';
+    input.rows = 2;
+    input.hidden = true;
+    input.value = personal;
+    const status = document.createElement('span');
+    status.className = 'hanzi-breakdown-save-status';
+    status.setAttribute('role', 'status');
+    const refresh = () => {
+      text.textContent = showPersonal && personal ? personal : original;
+      toggle.hidden = !personal;
+      toggle.title = showPersonal ? (language === 'vi' ? 'Xem nghĩa gốc' : 'Show original meaning')
+        : (language === 'vi' ? 'Xem nghĩa cá nhân' : 'Show personal meaning');
+      toggle.setAttribute('aria-label', `${showPersonal ? 'Show original meaning for' : 'Show personal meaning for'} ${character}`);
+    };
+    refresh();
+    edit.addEventListener('click', () => {
+      input.hidden = !input.hidden;
+      if (!input.hidden) {
+        input.value = personal || original;
+        input.focus();
+      }
+    });
+    toggle.addEventListener('click', () => {
+      showPersonal = !showPersonal;
+      refresh();
+    });
+    input.addEventListener('input', () => {
+      personal = input.value;
+      showPersonal = !!personal;
+      refresh();
+      status.textContent = language === 'vi' ? 'Đang lưu…' : 'Saving…';
+      void savePersonalHanziMeaning(character, language, personal).then(() => {
+        status.textContent = language === 'vi' ? 'Đã lưu' : 'Saved';
+      }, () => {
+        status.textContent = language === 'vi' ? 'Không lưu được' : 'Could not save';
+      });
+    });
+    wrapper.append(text, edit, toggle, input, status);
+    return wrapper;
   }
 
   private ensureHanziBreakdownRoot(): HTMLDivElement {
@@ -853,6 +1037,7 @@ export class TranslationTooltip {
 
   private closeHanziBreakdown(): void {
     this.breakdownDragCleanup?.();
+    this.breakdownPositionLocked = false;
     this.breakdownRequest++;
     this.breakdownCharacter = null;
     this.breakdownPath = [];

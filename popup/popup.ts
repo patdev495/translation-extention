@@ -1,6 +1,10 @@
 import { SettingsManager } from '../src/services/settings';
 import type { TargetLanguage } from '../src/services/translation-plan';
 import { shortcutConflictsWithOcr, shortcutFromKeyboardEvent } from '../src/content/input-replacement-shortcut';
+import {
+  exportHanziLearningBackup, importHanziLearningBackup, inspectHanziLearningImport,
+  parseHanziLearningBackup, type HanziLearningBackup,
+} from '../src/services/hanzi-learning';
 
 const activeToggle = document.getElementById('active-toggle') as HTMLInputElement;
 const privacyConsentPanel = document.getElementById('privacy-consent') as HTMLElement;
@@ -30,6 +34,15 @@ const deeplApiKeyInput = document.getElementById('deepl-api-key') as HTMLInputEl
 const toggleDeeplKeyBtn = document.getElementById('toggle-deepl-key') as HTMLButtonElement;
 const deeplKeyStatus = document.getElementById('deepl-key-status') as HTMLParagraphElement;
 const statusMsg = document.getElementById('status-msg') as HTMLDivElement;
+const hanziExportBackup = document.getElementById('hanzi-export-backup') as HTMLButtonElement;
+const hanziImportBackup = document.getElementById('hanzi-import-backup') as HTMLButtonElement;
+const hanziBackupFile = document.getElementById('hanzi-backup-file') as HTMLInputElement;
+const hanziBackupStatus = document.getElementById('hanzi-backup-status') as HTMLParagraphElement;
+const hanziImportChoice = document.getElementById('hanzi-import-choice') as HTMLDivElement;
+const hanziImportSummary = document.getElementById('hanzi-import-summary') as HTMLParagraphElement;
+const hanziImportKeepCurrent = document.getElementById('hanzi-import-keep-current') as HTMLButtonElement;
+const hanziImportUseFile = document.getElementById('hanzi-import-use-file') as HTMLButtonElement;
+let pendingHanziBackup: HanziLearningBackup | null = null;
 
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;
 let validationTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -248,6 +261,63 @@ privacyConsentAccept.addEventListener('click', async () => {
   await loadSettings();
 });
 
+hanziExportBackup.addEventListener('click', async () => {
+  try {
+    const backup = await exportHanziLearningBackup();
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'hanzi-learning-backup.json';
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    hanziBackupStatus.textContent = 'Hanzi backup exported';
+  } catch {
+    hanziBackupStatus.textContent = 'Could not export Hanzi backup';
+  }
+});
+hanziImportBackup.addEventListener('click', () => hanziBackupFile.click());
+hanziBackupFile.addEventListener('change', async () => {
+  const file = hanziBackupFile.files?.[0];
+  if (!file) return;
+  hanziImportChoice.hidden = true;
+  pendingHanziBackup = null;
+  try {
+    const content = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(file);
+    });
+    const backup = parseHanziLearningBackup(content);
+    const summary = await inspectHanziLearningImport(backup);
+    if (!summary.conflicts) {
+      const applied = await importHanziLearningBackup(backup, 'keep-current');
+      hanziBackupStatus.textContent = `Hanzi backup imported (${applied} items)`;
+    } else {
+      pendingHanziBackup = backup;
+      hanziImportSummary.textContent = `${summary.additions} new items, ${summary.conflicts} conflicts. Choose which version to keep for conflicts.`;
+      hanziImportChoice.hidden = false;
+      hanziBackupStatus.textContent = '';
+    }
+  } catch {
+    hanziBackupStatus.textContent = 'Invalid or unsupported Hanzi backup file';
+  }
+  hanziBackupFile.value = '';
+});
+async function finishHanziImport(choice: 'keep-current' | 'use-file'): Promise<void> {
+  if (!pendingHanziBackup) return;
+  try {
+    const applied = await importHanziLearningBackup(pendingHanziBackup, choice);
+    hanziBackupStatus.textContent = `Hanzi backup imported (${applied} items)`;
+    hanziImportChoice.hidden = true;
+    pendingHanziBackup = null;
+  } catch {
+    hanziBackupStatus.textContent = 'Could not import Hanzi backup';
+  }
+}
+hanziImportKeepCurrent.addEventListener('click', () => void finishHanziImport('keep-current'));
+hanziImportUseFile.addEventListener('click', () => void finishHanziImport('use-file'));
 activeToggle.addEventListener('change', saveSettings);
 primaryLang.addEventListener('change', () => {
   showInputShortcutError('');

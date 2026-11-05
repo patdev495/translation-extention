@@ -150,6 +150,26 @@ _Avoid_: Stroke order for components
 An identifiable part of a Chinese character that can contribute to its written form, meaning, or sound. A component may be the character's dictionary radical, but the other components also belong in a Hanzi Component Breakdown.
 _Avoid_: Radical as a name for every component
 
+**Unidentified Hanzi Strokes**:
+All strokes of the character in view that the breakdown source cannot assign to named Hanzi Components, grouped into one visual even when the source contains multiple unknown slots. They can have one learner-written explanation specific to that character; without one they are labeled "Chưa xác định". They are not assumed to form a meaningful component shared with other characters.
+_Avoid_: The literal ？ as a reusable component
+
+**Personal Hanzi Meaning**:
+The learner's own meaning for one exact Chinese character in one Hanzi Breakdown Language, available wherever that character appears in a Hanzi Component Breakdown, including as a component of another character. It remains separate from the original meaning, meanings in the other language, and meanings for other written forms of that character.
+_Avoid_: Meaning specific to one parent character
+
+**Original Hanzi Meaning**:
+The supplied meaning for a Chinese character in a Hanzi Breakdown Language, retained independently of any Personal Hanzi Meaning so the learner can switch between them.
+_Avoid_: Personal Hanzi Meaning
+
+**Hanzi Meaning View**:
+The learner's choice to show either the Original Hanzi Meaning or Personal Hanzi Meaning for one character or component in a Hanzi Component Breakdown. Each displayed character has its own choice, with the personal meaning shown first whenever it exists.
+_Avoid_: Toggle for every meaning in the tooltip at once
+
+**Hanzi Memory Note**:
+Free-form text the learner writes to remember one exact Chinese character, shown when that character's breakdown is in view, including when reached by opening a component. It is shared across Hanzi Breakdown Languages but separate for different written forms of a character.
+_Avoid_: Component meaning, Dictionary definition
+
 **Hanzi Component Breakdown Visibility State**:
 The setting that determines whether starting a character's looping Hanzi Stroke Order Animation also reveals its Hanzi Component Breakdown. Stopping that character's loop closes its breakdown when it is the Focused Hanzi Breakdown.
 _Default_: Off

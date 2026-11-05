@@ -13,6 +13,8 @@ export interface HanziBreakdown {
   meaning?: string;
   pinyin: string[];
   components: HanziComponent[];
+  unidentifiedStrokeIndices: number[];
+  strokeCount: number;
 }
 
 interface DictionaryRecord {
@@ -22,6 +24,7 @@ interface DictionaryRecord {
   decomposition?: string;
   radical?: string;
   etymology?: { semantic?: string | null; phonetic?: string | null } | null;
+  matches?: (number[] | null)[];
 }
 
 interface IdsNode { character: string; children: IdsNode[] }
@@ -69,7 +72,8 @@ async function loadRecord(character: string): Promise<DictionaryRecord | null> {
 export async function getHanziBreakdown(character: string): Promise<HanziBreakdown> {
   const record = await loadRecord(character);
   const root = parseIds(record?.decomposition ?? '');
-  const parts = root?.children.flatMap(namedParts) ?? [];
+  const parts = root?.children.length ? root.children.flatMap(namedParts)
+    : root?.character === '？' ? [root] : [];
   const components = await Promise.all(parts.map(async part => {
     const component = part.character;
     const detail = component === '？' ? null : await loadRecord(component);
@@ -84,5 +88,10 @@ export async function getHanziBreakdown(character: string): Promise<HanziBreakdo
       expandable: !!detail?.decomposition && !!parseIds(detail.decomposition)?.children.length,
     };
   }));
-  return { character, meaning: record?.definition, pinyin: record?.pinyin ?? [], components };
+  const matches = record?.matches ?? [];
+  return {
+    character, meaning: record?.definition, pinyin: record?.pinyin ?? [], components,
+    unidentifiedStrokeIndices: matches.flatMap((match, index) => match === null ? [index] : []),
+    strokeCount: matches.length,
+  };
 }
