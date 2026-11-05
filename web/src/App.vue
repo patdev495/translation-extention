@@ -458,6 +458,14 @@ function chooseFolderContextAction(mode: EditorMode): void {
   void openEditor(mode, folderId);
 }
 
+function requestTrashFolder(): void {
+  const folderId = folderContextMenu.value?.folderId;
+  if (!folderId) return;
+  const folderName = folderById.value.get(folderId)?.name ?? 'này';
+  closeFolderContextMenu();
+  askToDelete(`Chuyển thư mục “${folderName}” vào thùng rác?`, () => learningApi.trashFolder(folderId), 'Đã chuyển thư mục vào thùng rác.');
+}
+
 async function openEditor(mode: EditorMode, targetId: string | null = null): Promise<void> {
   editorMode.value = mode;
   editorTarget.value = targetId;
@@ -530,7 +538,7 @@ async function submitEditor(): Promise<void> {
         <p v-if="linkRequest" class="link-hint"><Link2 :size="16" aria-hidden="true" /> Đăng nhập rồi xác nhận liên kết extension.</p>
         <form class="auth-form" @submit.prevent="submitAccount">
           <label for="username">Tên đăng nhập</label>
-          <input id="username" v-model="username" type="text" autocomplete="username" :pattern="accountMode === 'register' ? '[A-Za-z0-9_.-]+' : '[A-Za-z0-9_.@-]+'" required placeholder="Ví dụ: hocvien_hsk1" />
+          <input id="username" v-model="username" type="text" autocomplete="username" :pattern="accountMode === 'register' ? '(?:[A-Za-z0-9_.]|-)+' : '(?:[A-Za-z0-9_.@]|-)+'" required placeholder="Ví dụ: hocvien_hsk1" />
           <label for="password">Mật khẩu</label>
           <input id="password" v-model="password" type="password" :autocomplete="accountMode === 'login' ? 'current-password' : 'new-password'" required placeholder="Nhập mật khẩu" />
           <p v-if="accountError" class="form-error" role="alert">{{ accountError }}</p>
@@ -556,7 +564,7 @@ async function submitEditor(): Promise<void> {
         <template v-if="folderContextMenu.folderId">
           <button type="button" role="menuitem" @click="chooseFolderContextAction('rename')"><Pencil :size="16" aria-hidden="true" /> Đổi tên</button>
           <button type="button" role="menuitem" @click="chooseFolderContextAction('move')"><MoveRight :size="17" aria-hidden="true" /> Chuyển thư mục</button>
-          <button type="button" role="menuitem" @click="folderContextMenu?.folderId && askToDelete(`Chuyển thư mục “${folderById.get(folderContextMenu.folderId)?.name}” vào thùng rác?`, () => learningApi.trashFolder(folderContextMenu!.folderId!), 'Đã chuyển thư mục vào thùng rác.'); closeFolderContextMenu()"><Trash2 :size="17" aria-hidden="true" /> Xóa thư mục</button>
+          <button type="button" role="menuitem" @click="requestTrashFolder"><Trash2 :size="17" aria-hidden="true" /> Xóa thư mục</button>
         </template>
       </div>
 

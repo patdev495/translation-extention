@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { InputReplacementShortcutTracker } from '../src/content/input-replacement-shortcut';
-import { isSelectionInsideTooltip, translateSelectedPageText, type TranslationContext } from '../src/content/translation-init';
+import { isSelectionInsideTooltip, matchesOcrShortcut, translateSelectedPageText, type TranslationContext } from '../src/content/translation-init';
 import { SettingsManager } from '../src/services/settings';
 
 afterEach(() => {
@@ -8,6 +8,11 @@ afterEach(() => {
 });
 
 describe('manual selection translation', () => {
+  test('ignores a synthetic keydown without a key', () => {
+    const context = { settings: SettingsManager.DEFAULT_SETTINGS } as TranslationContext;
+    expect(matchesOcrShortcut(context, { code: undefined } as unknown as KeyboardEvent)).toBe(false);
+  });
+
   test('Ctrl translates selected page text with Auto Translate disabled', () => {
     const tracker = new InputReplacementShortcutTracker('ControlLeft');
     const context = {

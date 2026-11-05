@@ -110,6 +110,7 @@ export function matchesOcrShortcut(ctx: TranslationContext, event: KeyboardEvent
   const shortcut = ctx.settings?.ocrShortcut ?? 'ctrl-space';
   if (shortcut === 'disabled') return false;
 
+  if (typeof event.key !== 'string') return false;
   const key = event.key.toLowerCase();
   if (shortcut === 'ctrl-space') {
     return event.ctrlKey && !event.altKey && !event.shiftKey && event.code === 'Space';

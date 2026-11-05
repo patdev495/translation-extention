@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import App from './App.vue';
-import { learningApi, type LearningFolder, type SavedLearningItem, type TrashEntry } from './api';
+import { ApiError, learningApi, type LearningFolder, type SavedLearningItem, type TrashEntry } from './api';
 
 vi.mock('./api', async (importOriginal) => {
   const original = await importOriginal<typeof import('./api')>();
@@ -79,6 +79,43 @@ test('learner deletes item, finds it in Trash, and restores it', async () => {
   await flushPromises();
   expect(api.restoreItem).toHaveBeenCalledWith('w1');
   expect(page.text()).toContain('Đã khôi phục');
+  page.unmount();
+});
+
+test('one folder confirmation moves the selected folder to Trash', async () => {
+  storedFolders = [{ id: 'f1', name: 'HSK 1', parent_id: null }];
+  api.trashFolder.mockImplementation(async (id) => {
+    storedFolders = storedFolders.filter((folder) => folder.id !== id);
+    storedTrash.push({ id, kind: 'folder', name: 'HSK 1', category: null, folder_id: null });
+  });
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+
+  await page.get('button[aria-label="Tùy chọn HSK 1"]').trigger('click');
+  await page.get('[role="menu"] button:last-child').trigger('click');
+  expect(api.trashFolder).not.toHaveBeenCalled();
+  expect(page.find('[role="menu"]').exists()).toBe(false);
+  expect(page.get('.confirm-dialog').text()).toContain('HSK 1');
+
+  await page.get('.confirm-dialog button[type="submit"]').trigger('click');
+  await flushPromises();
+  expect(api.trashFolder).toHaveBeenCalledTimes(1);
+  expect(api.trashFolder).toHaveBeenCalledWith('f1');
+  expect(page.get('.confirm-dialog').attributes('open')).toBeUndefined();
+  await page.get('button[aria-label="Mở thùng rác"]').trigger('click');
+  await flushPromises();
+  expect(page.text()).toContain('HSK 1');
+  page.unmount();
+});
+
+test('username patterns compile in Chrome Unicode mode', async () => {
+  api.me.mockRejectedValue(new ApiError(401, 'Sign in required'));
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+  const registerPattern = () => new RegExp(`^(?:${page.get('#username').attributes('pattern')})$`, 'v');
+  await page.get('.auth-switch button').trigger('click');
+  expect(registerPattern().test('hoc-vien_1')).toBe(true);
+  expect(registerPattern().test('hoc vien')).toBe(false);
   page.unmount();
 });
 
