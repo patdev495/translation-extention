@@ -1,0 +1,31 @@
+services:
+  backend:
+    build:
+      context: ../../web
+      dockerfile: Dockerfile.api
+    container_name: polytranslate-learning-backend
+    restart: unless-stopped
+    environment:
+      POLY_LEARNING_DB: /data/learning.sqlite3
+      POLY_WEB_ORIGIN: https://learning.peebot.shop
+      POLY_SECURE_COOKIES: "1"
+    volumes:
+      - /var/lib/polytranslate-learning:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=2)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  frontend:
+    build:
+      context: ../../web
+      dockerfile: Dockerfile.frontend
+    container_name: polytranslate-learning-frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8070:80"
+    depends_on:
+      backend:
+        condition: service_healthy

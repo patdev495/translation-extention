@@ -29,6 +29,8 @@ def test_extension_save_is_account_owned_and_duplicate_is_visible(tmp_path: Path
         saved = extension.post("/api/extension/items", json=payload, headers=bearer)
         assert saved.status_code == 201, saved.text
         assert saved.json()["pinyin"] == "nǐ hǎo"
+        assert isinstance(saved.json()["created_at"], int)
+        assert alice.get("/api/items").json()[0]["created_at"] == saved.json()["created_at"]
         assert alice.get("/api/items").json()[0]["text"] == "你好"
         assert bob.get("/api/items").json() == []
         duplicate = extension.post("/api/extension/items", json=payload, headers=bearer)

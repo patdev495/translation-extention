@@ -16,6 +16,7 @@ export interface SavedLearningItem {
   text: string;
   meaning: string;
   pinyin: string;
+  created_at: number;
   linked_item_ids: string[];
 }
 

@@ -1,8 +1,9 @@
 declare const __LEARNING_API_BASE__: string;
+declare const __LEARNING_WEB_BASE__: string;
 import { pinyin } from 'pinyin-pro';
 
 const API_BASE = (typeof __LEARNING_API_BASE__ === 'string' ? __LEARNING_API_BASE__ : 'http://127.0.0.1:8000').replace(/\/$/, '');
-const WEB_BASE = 'http://127.0.0.1:5173';
+const WEB_BASE = (typeof __LEARNING_WEB_BASE__ === 'string' ? __LEARNING_WEB_BASE__ : 'http://127.0.0.1:5173').replace(/\/$/, '');
 const ALARM_NAME = 'polytranslate-learning-link-poll';
 const PUBLIC_STATUS_KEY = 'learningAccountStatus';
 const SYNC_ALARM_NAME = 'polytranslate-learning-sync';

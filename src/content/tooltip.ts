@@ -557,7 +557,7 @@ export class TranslationTooltip {
       `;
     };
     const renderSaveButton = (text: string) => /\p{Script=Han}/u.test(text)
-      ? '<button type="button" class="tt-btn tt-save-button" aria-label="Lưu chữ Trung" title="Lưu chữ Trung">☆</button>' : '';
+      ? '<button type="button" class="tt-btn tt-save-button" aria-label="Lưu chữ Trung" title="Lưu chữ Trung"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2.8 2.8 5.8 6.4.9-4.6 4.5 1.1 6.3-5.7-3-5.7 3 1.1-6.3-4.6-4.5 6.4-.9z"/></svg></button>' : '';
 
     const isOcrTooltip = typeof ocrWidth === 'number' && ocrWidth > 0;
     const viewportMargin = 16;

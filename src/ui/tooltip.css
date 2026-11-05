@@ -35,7 +35,9 @@
 .break-words { overflow-wrap: break-word; white-space: pre-wrap; }
 .break-normal { word-break: normal; white-space: pre; }
 .tt-copy-ok { color: var(--color-success); background: var(--color-success-soft); }
-.tt-save-button { color: var(--color-accent-ink); font-size: 23px; }
+.tt-save-button { border: 1px solid var(--color-accent); background: var(--color-accent-soft); color: var(--color-accent); }
+.tt-save-button svg { width: 19px !important; height: 19px !important; }
+.tt-btn.tt-save-button:hover, .tt-btn.tt-save-button:focus-visible { background: var(--color-accent); color: var(--color-accent-ink); }
 .tt-save-panel { display: grid; gap: 8px; margin-top: 12px; padding: 14px; border: 1px solid var(--color-rule); border-radius: var(--radius-card); background: var(--color-paper-2); color: var(--color-ink); box-shadow: var(--shadow-card); }
 .tt-save-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; }
 .tt-save-title { min-width: 0; overflow-wrap: anywhere; font-size: 14px; line-height: 1.4; }

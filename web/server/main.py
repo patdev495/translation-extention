@@ -140,6 +140,7 @@ class Item(BaseModel):
     text: str
     meaning: str
     pinyin: str
+    created_at: int
     linked_item_ids: list[str]
 
 
@@ -153,6 +154,10 @@ class TrashEntry(BaseModel):
 
 def _now() -> int:
     return int(time.time())
+
+
+def _now_ms() -> int:
+    return int(time.time() * 1000)
 
 
 def _digest(value: str) -> str:
@@ -347,7 +352,7 @@ def create_app(database_path: Path | None = None) -> FastAPI:
             (row["id"], row["id"]),
         ).fetchall()
         return Item(id=row["id"], folder_id=row["folder_id"], category=row["category"],
-                    text=row["text"], meaning=row["meaning"], pinyin=row["pinyin"],
+                    text=row["text"], meaning=row["meaning"], pinyin=row["pinyin"], created_at=row["created_at"],
                     linked_item_ids=[str(link["id"]) for link in links])
 
     def require_folder(connection: sqlite3.Connection, user_id: str, folder_id: str) -> None:
@@ -369,7 +374,7 @@ def create_app(database_path: Path | None = None) -> FastAPI:
         try:
             connection.execute(
                 "INSERT INTO learning_items (id, user_id, folder_id, category, text, meaning, pinyin, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (item_id, user_id, body.folder_id, body.category, body.text, body.meaning, pinyin, _now()),
+                (item_id, user_id, body.folder_id, body.category, body.text, body.meaning, pinyin, _now_ms()),
             )
         except sqlite3.IntegrityError as error:
             raise HTTPException(status_code=409, detail="Duplicate Learning Item") from error

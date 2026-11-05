@@ -13,13 +13,17 @@ afterEach(() => {
 
 function selectTextInside(element: Element, text: string): void {
   const textNode = element.firstChild!;
+  const offset = textNode.textContent!.indexOf(text);
+  const range = document.createRange();
+  range.setStart(textNode, offset);
+  range.setEnd(textNode, offset + text.length);
   vi.spyOn(window, 'getSelection').mockReturnValue({
     isCollapsed: false,
     rangeCount: 1,
     anchorNode: textNode,
     focusNode: textNode,
     toString: () => text,
-    getRangeAt: () => ({ commonAncestorContainer: textNode }),
+    getRangeAt: () => range,
   } as unknown as Selection);
   element.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, composed: true }));
 }
@@ -197,12 +201,15 @@ describe('Hanzi Stroke Order Animation in the Translation Tooltip', () => {
     const text = root.querySelector('.tt-translation-text')!;
     text.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, composed: true }));
     const textNode = text.firstChild!;
+    const range = document.createRange();
+    range.selectNodeContents(text);
     vi.spyOn(window, 'getSelection').mockReturnValue({
       isCollapsed: false,
       rangeCount: 1,
       anchorNode: textNode,
       focusNode: textNode,
       toString: () => '我你',
+      getRangeAt: () => range,
     } as unknown as Selection);
     root.querySelector('.tt-lang-badge.tr1')!
       .dispatchEvent(new MouseEvent('mouseup', { bubbles: true, composed: true }));

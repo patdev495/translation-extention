@@ -24,6 +24,7 @@ let storedTrash: TrashEntry[];
 
 beforeEach(() => {
   window.history.replaceState({}, '', '/');
+  window.localStorage.clear();
   storedFolders = [];
   storedItems = [];
   storedTrash = [];
@@ -53,7 +54,7 @@ beforeEach(() => {
 
 test('learner deletes item, finds it in Trash, and restores it', async () => {
   storedFolders = [{ id: 'f1', name: 'HSK', parent_id: null }];
-  storedItems = [{ id: 'w1', folder_id: 'f1', category: 'word', text: '学习', meaning: 'học', pinyin: 'xué xí', linked_item_ids: [] }];
+  storedItems = [{ id: 'w1', folder_id: 'f1', category: 'word', text: '学习', meaning: 'học', pinyin: 'xué xí', created_at: 1700000000000, linked_item_ids: [] }];
   api.trashItem.mockImplementation(async (id) => {
     const item = storedItems.find((entry) => entry.id === id)!;
     storedItems = storedItems.filter((entry) => entry.id !== id);
@@ -61,7 +62,7 @@ test('learner deletes item, finds it in Trash, and restores it', async () => {
   });
   api.restoreItem.mockImplementation(async (id) => {
     storedTrash = storedTrash.filter((entry) => entry.id !== id);
-    storedItems.push({ id, folder_id: 'f1', category: 'word', text: '学习', meaning: 'học', pinyin: 'xué xí', linked_item_ids: [] });
+    storedItems.push({ id, folder_id: 'f1', category: 'word', text: '学习', meaning: 'học', pinyin: 'xué xí', created_at: 1700000000000, linked_item_ids: [] });
     return storedItems[0]!;
   });
   const page = mount(App, { attachTo: document.body });
@@ -108,7 +109,7 @@ test('restore feedback names recovery folder when original folder is unavailable
   api.restoreItem.mockImplementation(async () => {
     storedTrash = [];
     storedFolders.push({ id: 'recovered', name: 'Đã khôi phục', parent_id: null });
-    const item: SavedLearningItem = { id: 'w1', folder_id: 'recovered', category: 'word', text: '你好', meaning: 'xin chào', pinyin: 'nǐ hǎo', linked_item_ids: [] };
+    const item: SavedLearningItem = { id: 'w1', folder_id: 'recovered', category: 'word', text: '你好', meaning: 'xin chào', pinyin: 'nǐ hǎo', created_at: 1700000000000, linked_item_ids: [] };
     storedItems.push(item);
     return item;
   });
@@ -123,17 +124,83 @@ test('restore feedback names recovery folder when original folder is unavailable
   page.unmount();
 });
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
+
+test('delete confirmation disappears after a short time', async () => {
+  storedFolders = [{ id: 'f1', name: 'HSK', parent_id: null }];
+  storedItems = [{ id: 'w1', folder_id: 'f1', category: 'word', text: '学习', meaning: 'học', pinyin: '', created_at: 1700000000000, linked_item_ids: [] }];
+  api.trashItem.mockImplementation(async () => { storedItems = []; });
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+  vi.useFakeTimers();
+  await page.get('button[aria-label="Xóa 学习"]').trigger('click');
+  await page.get('.confirm-dialog button[type="submit"]').trigger('click');
+  await flushPromises();
+  expect(page.get('.trash-feedback').text()).toContain('Đã chuyển mục học tập vào thùng rác');
+  vi.advanceTimersByTime(5000);
+  await page.vm.$nextTick();
+  expect(page.find('.trash-feedback').exists()).toBe(false);
+  page.unmount();
+});
+
+test('pagination stays visible with only one page of items', async () => {
+  storedFolders = [{ id: 'f1', name: 'HSK', parent_id: null }];
+  storedItems = Array.from({ length: 3 }, (_, index): SavedLearningItem => ({
+    id: `w${index}`, folder_id: 'f1', category: 'word', text: `Từ ${index}`, meaning: '', pinyin: '',
+    created_at: 1700000000000 + index, linked_item_ids: [],
+  }));
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+  await page.get('nav[aria-label="Cây thư mục"]').findAll('.tree-button')[1]!.trigger('click');
+  const pagination = page.get('nav[aria-label="Phân trang mục học tập"]');
+  expect(pagination.text()).toContain('Trang 1 / 1');
+  expect(pagination.get('button[aria-label="Trang trước"]').attributes('disabled')).toBeDefined();
+  expect(pagination.get('button[aria-label="Trang sau"]').attributes('disabled')).toBeDefined();
+  page.unmount();
+});
+
+test('folder items show immediately and can be filtered by word or sentence', async () => {
+  storedFolders = [
+    { id: 'f1', name: 'HSK 1', parent_id: null },
+    { id: 'f2', name: 'HSK 2', parent_id: null },
+  ];
+  storedItems = [
+    { id: 'w1', folder_id: 'f1', category: 'word', text: '学习', meaning: 'học', pinyin: '', created_at: 1700000000000, linked_item_ids: [] },
+    { id: 's1', folder_id: 'f1', category: 'sentence', text: '我学习。', meaning: 'Tôi học', pinyin: '', created_at: 1700000000001, linked_item_ids: [] },
+    { id: 'w2', folder_id: 'f2', category: 'word', text: '你好', meaning: 'chào', pinyin: '', created_at: 1700000000001, linked_item_ids: [] },
+  ];
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+  await page.get('nav[aria-label="Cây thư mục"]').findAll('.tree-button')[1]!.trigger('click');
+  expect(page.get('#learning-item-w1').text()).toContain('学习');
+  expect(page.get('#learning-item-s1').text()).toContain('我学习。');
+  expect(page.find('button[aria-label="Xem toàn bộ từ và câu"]').exists()).toBe(false);
+  const category = page.get('select[aria-label="Lọc mục học tập"]');
+  expect((category.element as HTMLSelectElement).value).toBe('all');
+  await category.setValue('word');
+  expect(page.find('#learning-item-w1').exists()).toBe(true);
+  expect(page.find('#learning-item-s1').exists()).toBe(false);
+  await category.setValue('sentence');
+  expect(page.find('#learning-item-w1').exists()).toBe(false);
+  expect(page.find('#learning-item-s1').exists()).toBe(true);
+  await page.get('nav[aria-label="Cây thư mục"]').findAll('.tree-button')[2]!.trigger('click');
+  expect((page.get('select[aria-label="Lọc mục học tập"]').element as HTMLSelectElement).value).toBe('all');
+  expect(page.get('#learning-item-w2').text()).toContain('你好');
+  page.unmount();
+});
 
 test('learner edits saved item and follows linked context on website', async () => {
   storedFolders = [{ id: 'f1', name: 'HSK', parent_id: null }, { id: 'f2', name: 'Other', parent_id: null }];
   storedItems = [
-    { id: 'w1', folder_id: 'f1', category: 'word', text: '学习', meaning: 'học', pinyin: 'xué xí', linked_item_ids: ['s1'] },
-    { id: 's1', folder_id: 'f1', category: 'sentence', text: '我学习。', meaning: 'Tôi học.', pinyin: 'wǒ xué xí 。', linked_item_ids: ['w1'] },
+    { id: 'w1', folder_id: 'f1', category: 'word', text: '学习', meaning: 'học', pinyin: 'xué xí', created_at: 1700000000000, linked_item_ids: ['s1'] },
+    { id: 's1', folder_id: 'f1', category: 'sentence', text: '我学习。', meaning: 'Tôi học.', pinyin: 'wǒ xué xí 。', created_at: 1700000001000, linked_item_ids: ['w1'] },
   ];
   const page = mount(App, { attachTo: document.body });
   await flushPromises();
-  await page.get('button[aria-label="Mở thư mục HSK"]').trigger('click');
+  await page.get('nav[aria-label="Cây thư mục"]').findAll('.tree-button')[1]!.trigger('click');
   expect(page.text()).toContain('学习');
   await page.get('button[aria-label="Sửa 学习"]').trigger('click');
   await page.get('#item-text').setValue('学中文');
@@ -142,17 +209,46 @@ test('learner edits saved item and follows linked context on website', async () 
   await page.get('.item-editor form').trigger('submit');
   await flushPromises();
   expect(api.updateItem).toHaveBeenCalledWith('w1', { text: '学中文', meaning: 'học tiếng Trung', category: 'word', folder_id: 'f2' });
-  await page.get('.saved-item-links button').trigger('click');
+  await page.get('button[aria-label="Xem 1 từ liên kết của 我学习。"]').trigger('click');
+  await page.get('.linked-items-dialog button[aria-label="Mở 学中文"]').trigger('click');
   await flushPromises();
   expect(page.text()).toContain('学中文');
   expect(page.get('#learning-item-w1').attributes('class')).toContain('focused');
   page.unmount();
 });
 
+test('linked sentences stay off word cards and open in an interactive dialog', async () => {
+  storedFolders = [{ id: 'f1', name: 'Từ vựng', parent_id: null }, { id: 'f2', name: 'Ví dụ', parent_id: null }];
+  storedItems = [
+    { id: 'w1', folder_id: 'f1', category: 'word', text: '学习', meaning: 'học', pinyin: 'xué xí', created_at: 1700000000000, linked_item_ids: ['s1'] },
+    { id: 's1', folder_id: 'f2', category: 'sentence', text: '我学习。', meaning: 'Tôi học.', pinyin: 'wǒ xué xí', created_at: 1700000001000, linked_item_ids: ['w1'] },
+  ];
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+  await page.get('nav[aria-label="Cây thư mục"]').findAll('.tree-button')[1]!.trigger('click');
+  expect(page.get('#learning-item-w1').text()).not.toContain('我学习。');
+  expect(page.find('.linked-items-dialog[open]').exists()).toBe(false);
+  await page.get('button[aria-label="Xem 1 câu liên kết của 学习"]').trigger('click');
+  const dialog = page.get('.linked-items-dialog[open]');
+  expect(dialog.text()).toContain('我学习。');
+  expect(dialog.text()).toContain('wǒ xué xí');
+  expect(dialog.text()).toContain('Tôi học.');
+  await dialog.get('button[aria-label="Sửa 我学习。 trong liên kết"]').trigger('click');
+  expect(page.find('.linked-items-dialog[open]').exists()).toBe(false);
+  expect(page.get('.item-editor[open] #item-text').element).toHaveProperty('value', '我学习。');
+  await page.get('.item-editor .plain-button').trigger('click');
+  await page.get('button[aria-label="Xem 1 câu liên kết của 学习"]').trigger('click');
+  const reopened = page.get('.linked-items-dialog[open]');
+  await reopened.get('button[aria-label="Mở 我学习。"]').trigger('click');
+  expect(page.find('.linked-items-dialog[open]').exists()).toBe(false);
+  expect(page.get('#learning-item-s1').attributes('class')).toContain('focused');
+  page.unmount();
+});
+
 test('creates, browses, renames and moves a nested folder through the website', async () => {
   const page = mount(App, { attachTo: document.body });
   await flushPromises();
-  expect(page.text()).toContain('Mỗi hành trình bắt đầu từ một thư mục');
+  expect(page.text()).toContain('Chưa có mục học tập');
 
   await page.get('nav[aria-label="Cây thư mục"] .tree-button').trigger('contextmenu', { clientX: 90, clientY: 90 });
   await flushPromises();
@@ -185,13 +281,16 @@ test('creates, browses, renames and moves a nested folder through the website', 
 
   await page.get('.breadcrumb').findAll('button')[1]!.trigger('click');
   expect(breadcrumb.findAll('button')[1]!.attributes('aria-current')).toBe('page');
-  await page.get('button[aria-label="Đổi tên Bài 01"]').trigger('click');
+  await page.get('select[aria-label="Chọn thư mục con"]').setValue('folder-2');
+  await page.get('button[aria-label="Tùy chọn Bài 01"]').trigger('click');
+  await page.get('[role="menu"] button:nth-of-type(2)').trigger('click');
   await page.get('#folder-name').setValue('Bài 02');
   await page.get('dialog form').trigger('submit');
   await flushPromises();
   expect(api.updateFolder).toHaveBeenCalledWith('folder-2', { name: 'Bài 02' });
 
-  await page.get('button[aria-label="Chuyển Bài 02"]').trigger('click');
+  await page.get('button[aria-label="Tùy chọn Bài 02"]').trigger('click');
+  await page.get('[role="menu"] button:nth-of-type(3)').trigger('click');
   const destinations = page.get('#folder-parent').findAll('option');
   expect(destinations.map((option) => option.text())).toEqual(['Thư viện (gốc)', 'HSK 1']);
   const parentSelect = page.get('#folder-parent');
@@ -226,4 +325,115 @@ test('asks for sign in and approves an extension link for the signed in account'
   expect(api.approveLink).toHaveBeenCalledWith('request-1');
   expect(page.text()).toContain('Đã liên kết');
   page.unmount();
+});
+
+test('folder location and child dropdown count only items at selected level', async () => {
+  storedFolders = [
+    { id: 'f1', name: 'HSK 1', parent_id: null },
+    { id: 'f2', name: 'HSK 2', parent_id: null },
+    { id: 'f3', name: 'Bài 1', parent_id: 'f1' },
+  ];
+  storedItems = [
+    { id: 'w1', folder_id: 'f1', category: 'word', text: '你好', meaning: 'xin chào', pinyin: 'nǐ hǎo', created_at: 1700000000001, linked_item_ids: [] },
+    { id: 'w2', folder_id: 'f1', category: 'word', text: '学习', meaning: 'học', pinyin: 'xué xí', created_at: 1700000000002, linked_item_ids: [] },
+    { id: 's1', folder_id: 'f1', category: 'sentence', text: '我学习。', meaning: 'Tôi học.', pinyin: '', created_at: 1700000000003, linked_item_ids: [] },
+    { id: 'w3', folder_id: 'f3', category: 'word', text: '中文', meaning: 'Trung văn', pinyin: '', created_at: 1700000000004, linked_item_ids: [] },
+    { id: 's2', folder_id: 'f2', category: 'sentence', text: '你好吗？', meaning: 'Bạn khỏe không?', pinyin: '', created_at: 1700000000005, linked_item_ids: [] },
+  ];
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+
+  expect(page.get('[aria-label="Thống kê vị trí hiện tại"]').text()).toMatch(/3\s*từ.*2\s*câu/s);
+  await page.get('nav[aria-label="Cây thư mục"]').findAll('.tree-button')[1]!.trigger('click');
+  expect(page.get('[aria-label="Thống kê vị trí hiện tại"]').text()).toMatch(/2\s*từ.*1\s*câu/s);
+  expect(page.get('select[aria-label="Chọn thư mục con"]').text()).toMatch(/Bài 1 · 1 từ · 0 câu/);
+  await page.get('select[aria-label="Chọn thư mục con"]').setValue('f3');
+  expect(page.find('.empty-state').exists()).toBe(false);
+  expect(page.get('[aria-label="Thống kê vị trí hiện tại"]').text()).toMatch(/1\s*từ.*0\s*câu/s);
+  page.unmount();
+});
+
+test('breadcrumb carries current folder counts and child navigation without extra header', async () => {
+  storedFolders = [
+    { id: 'f1', name: 'HSK 1', parent_id: null },
+    { id: 'f2', name: 'Bài 1', parent_id: 'f1' },
+  ];
+  storedItems = [
+    { id: 'w1', folder_id: 'f1', category: 'word', text: '你好', meaning: 'chào', pinyin: '', created_at: 1700000000000, linked_item_ids: [] },
+    { id: 's1', folder_id: 'f2', category: 'sentence', text: '你好！', meaning: 'chào', pinyin: '', created_at: 1700000000001, linked_item_ids: [] },
+  ];
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+  await page.get('nav[aria-label="Cây thư mục"]').findAll('.tree-button')[1]!.trigger('click');
+  expect(page.find('.library-main:not(.trash-main) .library-header').exists()).toBe(false);
+  expect(page.get('nav[aria-label="Đường dẫn thư mục"] [aria-label="Thống kê vị trí hiện tại"]').text()).toBe('(1 từ · 0 câu)');
+  await page.get('nav[aria-label="Đường dẫn thư mục"] select[aria-label="Chọn thư mục con"]').setValue('f2');
+  expect(page.get('nav[aria-label="Đường dẫn thư mục"] [aria-label="Thống kê vị trí hiện tại"]').text()).toBe('(0 từ · 1 câu)');
+  expect(page.find('nav[aria-label="Đường dẫn thư mục"] select').exists()).toBe(false);
+  page.unmount();
+});
+
+test('sidebar exposes folder actions without right click', async () => {
+  storedFolders = [{ id: 'f1', name: 'HSK 1', parent_id: null }];
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+  await page.get('button[aria-label="Tùy chọn HSK 1"]').trigger('click');
+  expect(page.get('[role="menu"]').text()).toContain('Tạo thư mục con');
+  expect(page.get('[role="menu"]').text()).toContain('Đổi tên');
+  expect(page.get('[role="menu"]').text()).toContain('Chuyển thư mục');
+  expect(page.get('[role="menu"]').text()).toContain('Xóa thư mục');
+  await page.get('[role="menu"] button:nth-of-type(2)').trigger('click');
+  expect(page.get('#folder-name').element).toHaveProperty('value', 'HSK 1');
+  page.unmount();
+});
+
+test('items show added time, stable numbering, pagination and oldest first order', async () => {
+  storedFolders = [{ id: 'f1', name: 'HSK', parent_id: null }];
+  storedItems = Array.from({ length: 25 }, (_, index): SavedLearningItem => ({
+    id: `i${index + 1}`, folder_id: 'f1', category: index % 2 ? 'sentence' : 'word',
+    text: `Mục ${index + 1}`, meaning: `Nghĩa ${index + 1}`, pinyin: '',
+    created_at: 1700000000000 + index * 1000, linked_item_ids: [],
+  }));
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+  await page.get('nav[aria-label="Cây thư mục"]').findAll('.tree-button')[1]!.trigger('click');
+
+  expect(page.get('[aria-label="Mục học tập số 1"]').text()).toContain('Mục 25');
+  expect(page.findAll('.saved-item-row')).toHaveLength(20);
+  expect(page.get('[aria-label="Mục học tập số 1"]').text()).toMatch(/\d{1,2}\/\d{1,2}\/2023/);
+  await page.get('button[aria-label="Trang sau"]').trigger('click');
+  expect(page.get('[aria-label="Mục học tập số 21"]').text()).toContain('Mục 5');
+  expect(page.text()).toContain('Trang 2 / 2');
+  await page.get('select[aria-label="Sắp xếp mục học tập"]').setValue('oldest');
+  expect(page.get('[aria-label="Mục học tập số 1"]').text()).toContain('Mục 1');
+  expect(page.text()).toContain('Trang 1 / 2');
+  page.unmount();
+});
+
+test('display dropdown independently hides card fields and remembers selection', async () => {
+  storedFolders = [{ id: 'f1', name: 'HSK', parent_id: null }];
+  storedItems = [{ id: 'w1', folder_id: 'f1', category: 'word', text: '学习', meaning: 'học', pinyin: 'xué xí', created_at: 1700000000000, linked_item_ids: [] }];
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+  await page.get('nav[aria-label="Cây thư mục"]').findAll('.tree-button')[1]!.trigger('click');
+  const card = page.get('#learning-item-w1');
+  expect(card.text()).toContain('学习');
+  expect(card.text()).toContain('xué xí');
+  expect(card.text()).toContain('học');
+  await page.get('input[aria-label="Hiển thị tiếng Trung"]').setValue(false);
+  await page.get('input[aria-label="Hiển thị Pinyin"]').setValue(false);
+  expect(card.text()).not.toContain('学习');
+  expect(card.text()).not.toContain('xué xí');
+  expect(card.text()).toContain('học');
+  page.unmount();
+
+  const reopened = mount(App, { attachTo: document.body });
+  await flushPromises();
+  await reopened.get('nav[aria-label="Cây thư mục"]').findAll('.tree-button')[1]!.trigger('click');
+  expect(reopened.get('#learning-item-w1').text()).not.toContain('学习');
+  expect(reopened.get('#learning-item-w1').text()).not.toContain('xué xí');
+  expect(reopened.get('#learning-item-w1').text()).toContain('học');
+  await reopened.get('input[aria-label="Hiển thị tiếng Việt"]').setValue(false);
+  expect(reopened.get('#learning-item-w1').text()).not.toContain('học');
+  reopened.unmount();
 });
