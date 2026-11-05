@@ -186,6 +186,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     void openLearningLibrary().then(() => sendResponse({ success: true }), () => sendResponse({ success: false }));
     return true;
   }
+  if (message.type === 'LEARNING_FIND_SENTENCE') {
+    const query = new URLSearchParams({ folder_id: message.folder_id, text: message.text });
+    void learningRequest(`/items/existing?${query.toString()}`, { signal: AbortSignal.timeout(5000) }).then(
+      (item) => sendResponse({ success: true, item }),
+      (error: unknown) => sendResponse({ success: false, error: error instanceof Error ? error.message : 'Không kiểm tra được câu đã lưu.' }),
+    );
+    return true;
+  }
   if (message.type === 'LEARNING_SYNC_STATUS') {
     void listSyncItems().then(result => sendResponse({ success: true, result }), () => sendResponse({ success: false }));
     return true;

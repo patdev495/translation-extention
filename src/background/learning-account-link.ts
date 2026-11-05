@@ -31,7 +31,7 @@ export interface PendingSyncItem {
   id: string;
   account_id: string;
   choice: 'word' | 'sentence' | 'both';
-  item: Record<string, string>;
+  item: Record<string, string | boolean>;
   pinyin: string;
   sentence_pinyin?: string;
   state: 'pending' | 'completed' | 'failed';
@@ -133,13 +133,13 @@ export async function retryFailedItems(): Promise<void> {
   await syncPendingItems();
 }
 
-export async function saveLearningItem(choice: PendingSyncItem['choice'], item: Record<string, string>): Promise<PendingSyncItem> {
+export async function saveLearningItem(choice: PendingSyncItem['choice'], item: Record<string, string | boolean>): Promise<PendingSyncItem> {
   const current = await readPrivateState();
   if (current?.state !== 'linked') throw new Error('Hãy liên kết tài khoản trong cài đặt extension.');
   const entry: PendingSyncItem = {
     id: crypto.randomUUID(), account_id: current.account.id, choice, item,
-    pinyin: pinyin(choice === 'both' ? item.word_text : item.text, { toneType: 'symbol' }),
-    ...(choice === 'both' ? { sentence_pinyin: pinyin(item.sentence_text, { toneType: 'symbol' }) } : {}),
+    pinyin: pinyin(String(choice === 'both' ? item.word_text : item.text), { toneType: 'symbol' }),
+    ...(choice === 'both' ? { sentence_pinyin: pinyin(String(item.sentence_text), { toneType: 'symbol' }) } : {}),
     state: 'pending',
   };
   await putSyncItem(entry);

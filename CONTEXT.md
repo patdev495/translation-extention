@@ -273,6 +273,6 @@ A Saved Learning Item accepted by the extension for a linked Learning Account wh
 A save request made before an Account Link exists. The extension asks the learner to link an account through settings and does not create a Saved Learning Item.
 
 **Duplicate Learning Item**:
-A save attempt with the same Chinese text and Learning Category as an existing item in the chosen Learning Folder. The learner is shown the existing item and can add a new linked sentence context instead of receiving a silent duplicate; matching items in different folders remain separate.
+A save attempt with the same Chinese text and Learning Category as an existing item in the chosen Learning Folder. In a paired save, an existing Sentence is reused and linked to the new Word or Phrase; its meaning stays as saved unless the learner edits it. Matching items in different folders remain separate.
 
 

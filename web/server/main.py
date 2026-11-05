@@ -118,6 +118,7 @@ class BothInput(BaseModel):
     word_meaning: str = Field(min_length=1)
     sentence_text: str = Field(min_length=1)
     sentence_meaning: str = Field(min_length=1)
+    update_existing_sentence_meaning: bool = False
 
     @field_validator('word_text', 'word_meaning', 'sentence_text', 'sentence_meaning')
     @classmethod
@@ -382,11 +383,42 @@ def create_app(database_path: Path | None = None) -> FastAPI:
         assert row is not None
         return item(connection, row)
 
+    def create_paired_items(connection: sqlite3.Connection, user_id: str, body: BothInput) -> dict[str, Item]:
+        if body.word_text not in body.sentence_text:
+            raise HTTPException(status_code=422, detail="Sentence must contain selected text")
+        word = create_item(connection, user_id, ItemInput(
+            folder_id=body.folder_id, category="word", text=body.word_text, meaning=body.word_meaning,
+        ), reuse=True)
+        existing_sentence = connection.execute(
+            "SELECT id, meaning FROM learning_items WHERE user_id = ? AND folder_id = ? AND category = 'sentence' AND text = ? AND deleted_at IS NULL",
+            (user_id, body.folder_id, body.sentence_text),
+        ).fetchone()
+        sentence = create_item(connection, user_id, ItemInput(
+            folder_id=body.folder_id, category="sentence", text=body.sentence_text, meaning=body.sentence_meaning,
+        ), reuse=True)
+        if existing_sentence is not None and body.update_existing_sentence_meaning and existing_sentence["meaning"] != body.sentence_meaning:
+            connection.execute("UPDATE learning_items SET meaning = ? WHERE id = ?", (body.sentence_meaning, sentence.id))
+        connection.execute("INSERT OR IGNORE INTO learning_item_links (word_id, sentence_id) VALUES (?, ?)", (word.id, sentence.id))
+        word_row = connection.execute("SELECT * FROM learning_items WHERE id = ?", (word.id,)).fetchone()
+        sentence_row = connection.execute("SELECT * FROM learning_items WHERE id = ?", (sentence.id,)).fetchone()
+        assert word_row is not None and sentence_row is not None
+        return {"word": item(connection, word_row), "sentence": item(connection, sentence_row)}
+
     @app.get("/api/extension/folders", response_model=list[Folder])
     def extension_folders(account: Account = Depends(extension_account)) -> list[Folder]:
         with connect(db_path) as connection:
             rows = connection.execute("SELECT id, name, parent_id FROM folders WHERE user_id = ? AND deleted_at IS NULL ORDER BY name_key", (account.id,)).fetchall()
         return [_folder(row) for row in rows]
+
+    @app.get("/api/extension/items/existing", response_model=Item | None)
+    def extension_existing_sentence(folder_id: str, text: str, account: Account = Depends(extension_account)) -> Item | None:
+        with connect(db_path) as connection:
+            require_folder(connection, account.id, folder_id)
+            row = connection.execute(
+                "SELECT * FROM learning_items WHERE user_id = ? AND folder_id = ? AND category = 'sentence' AND text = ? AND deleted_at IS NULL",
+                (account.id, folder_id, text),
+            ).fetchone()
+            return item(connection, row) if row is not None else None
 
     @app.post("/api/extension/items", response_model=Item, status_code=201)
     def extension_save_item(body: ItemInput, account: Account = Depends(extension_account)) -> Item:
@@ -396,17 +428,9 @@ def create_app(database_path: Path | None = None) -> FastAPI:
 
     @app.post("/api/extension/items/both", status_code=201)
     def extension_save_both(body: BothInput, account: Account = Depends(extension_account)) -> dict[str, Item]:
-        if body.word_text not in body.sentence_text:
-            raise HTTPException(status_code=422, detail="Sentence must contain selected text")
         with connect(db_path) as connection:
             connection.execute("BEGIN IMMEDIATE")
-            word = create_item(connection, account.id, ItemInput(folder_id=body.folder_id, category="word", text=body.word_text, meaning=body.word_meaning), reuse=True)
-            sentence = create_item(connection, account.id, ItemInput(folder_id=body.folder_id, category="sentence", text=body.sentence_text, meaning=body.sentence_meaning))
-            connection.execute("INSERT INTO learning_item_links (word_id, sentence_id) VALUES (?, ?)", (word.id, sentence.id))
-            word_row = connection.execute("SELECT * FROM learning_items WHERE id = ?", (word.id,)).fetchone()
-            sentence_row = connection.execute("SELECT * FROM learning_items WHERE id = ?", (sentence.id,)).fetchone()
-            assert word_row is not None and sentence_row is not None
-            return {"word": item(connection, word_row), "sentence": item(connection, sentence_row)}
+            return create_paired_items(connection, account.id, body)
 
     @app.post("/api/extension/sync", status_code=201)
     def sync_save(body: SyncInput, account: Account = Depends(extension_account)) -> dict[str, object]:
@@ -427,19 +451,8 @@ def create_app(database_path: Path | None = None) -> FastAPI:
                     raise HTTPException(status_code=409, detail="Sync request already used for different content")
                 return json.loads(receipt["result_json"])
             if isinstance(body.item, BothInput):
-                if body.item.word_text not in body.item.sentence_text:
-                    raise HTTPException(status_code=422, detail="Sentence must contain selected text")
-                word = create_item(connection, account.id, ItemInput(
-                    folder_id=body.item.folder_id, category="word", text=body.item.word_text, meaning=body.item.word_meaning,
-                ), reuse=True)
-                sentence = create_item(connection, account.id, ItemInput(
-                    folder_id=body.item.folder_id, category="sentence", text=body.item.sentence_text, meaning=body.item.sentence_meaning,
-                ))
-                connection.execute("INSERT INTO learning_item_links (word_id, sentence_id) VALUES (?, ?)", (word.id, sentence.id))
-                word_row = connection.execute("SELECT * FROM learning_items WHERE id = ?", (word.id,)).fetchone()
-                sentence_row = connection.execute("SELECT * FROM learning_items WHERE id = ?", (sentence.id,)).fetchone()
-                assert word_row is not None and sentence_row is not None
-                result: dict[str, object] = {"word": item(connection, word_row).model_dump(), "sentence": item(connection, sentence_row).model_dump()}
+                paired = create_paired_items(connection, account.id, body.item)
+                result: dict[str, object] = {key: value.model_dump() for key, value in paired.items()}
             else:
                 result = create_item(connection, account.id, body.item).model_dump()
             connection.execute(

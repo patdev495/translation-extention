@@ -62,6 +62,48 @@ def test_both_links_existing_word_and_edit_rechecks_collisions(tmp_path: Path) -
         assert collision.status_code == 409
 
 
+def test_both_reuses_existing_sentence_and_only_updates_its_meaning_when_requested(tmp_path: Path) -> None:
+    app = create_app(tmp_path / "reuse-sentence.sqlite3")
+    with TestClient(app) as browser, TestClient(app) as extension:
+        register(browser, "learner")
+        folder = browser.post("/api/folders", json={"name": "HSK"}, headers=ORIGIN).json()["id"]
+        bearer = link(browser, extension)
+        first = extension.post("/api/extension/items/both", json={
+            "folder_id": folder, "word_text": "标准", "word_meaning": "tiêu chuẩn",
+            "sentence_text": "标准教程", "sentence_meaning": "giáo trình chuẩn",
+        }, headers=bearer)
+        assert first.status_code == 201, first.text
+        sentence_id = first.json()["sentence"]["id"]
+        existing = extension.get("/api/extension/items/existing", params={"folder_id": folder, "text": "标准教程"}, headers=bearer)
+        assert existing.status_code == 200
+        assert existing.json()["meaning"] == "giáo trình chuẩn"
+
+        second_payload = {"request_id": "second-word", "choice": "both", "item": {
+            "folder_id": folder, "word_text": "教程", "word_meaning": "giáo trình",
+            "sentence_text": "标准教程", "sentence_meaning": "nghĩa gợi ý khác",
+        }}
+        second = extension.post("/api/extension/sync", json=second_payload, headers=bearer)
+        assert second.status_code == 201, second.text
+        assert second.json()["sentence"]["id"] == sentence_id
+        assert second.json()["sentence"]["meaning"] == "giáo trình chuẩn"
+        assert len(second.json()["sentence"]["linked_item_ids"]) == 2
+        assert extension.post("/api/extension/sync", json=second_payload, headers=bearer).json() == second.json()
+
+        edited = extension.post("/api/extension/items/both", json={
+            "folder_id": folder, "word_text": "教程", "word_meaning": "giáo trình",
+            "sentence_text": "标准教程", "sentence_meaning": "giáo trình tiêu chuẩn",
+            "update_existing_sentence_meaning": True,
+        }, headers=bearer)
+        assert edited.status_code == 201, edited.text
+        assert edited.json()["sentence"]["id"] == sentence_id
+        assert edited.json()["sentence"]["meaning"] == "giáo trình tiêu chuẩn"
+        assert len(edited.json()["sentence"]["linked_item_ids"]) == 2
+        assert len(browser.get("/api/items").json()) == 3
+
+        assert extension.get("/api/extension/items/existing", params={"folder_id": folder, "text": "khác"}, headers=bearer).json() is None
+        assert extension.get("/api/extension/items/existing", params={"folder_id": folder, "text": "标准教程"}).status_code == 401
+
+
 def test_other_account_cannot_edit_item_and_category_change_detects_collision(tmp_path: Path) -> None:
     app = create_app(tmp_path / "isolation.sqlite3")
     with TestClient(app) as alice, TestClient(app) as bob, TestClient(app) as extension:

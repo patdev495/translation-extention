@@ -96,9 +96,49 @@ test('Both saves selected character and containing sentence as distinct linked i
   await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith({
     type: 'LEARNING_SAVE', choice: 'both', item: {
       folder_id: 'folder', word_text: '议', word_meaning: 'ý kiến',
-      sentence_text: '我有建议。', sentence_meaning: 'Tôi có đề xuất.',
+      sentence_text: '我有建议。', sentence_meaning: 'Tôi có đề xuất.', update_existing_sentence_meaning: false,
     },
   }, expect.any(Function)));
+});
+
+test('Both fills a saved sentence meaning and updates it only after editing', async () => {
+  vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { cb(0); return 1; });
+  const sendMessage = vi.fn((message, callback) => {
+    if (message.type === 'LEARNING_FOLDERS') callback({ success: true, result: [{ id: 'folder', name: 'HSK', parent_id: null }] });
+    else if (message.type === 'LEARNING_FIND_SENTENCE') callback({ success: true, item: { id: 'sentence-1', meaning: 'giáo trình chuẩn' } });
+    else if (message.type === 'LEARNING_SUGGEST_MEANING') callback({ success: true, meaning: 'nghĩa gợi ý' });
+    else callback({ success: true, state: 'completed' });
+  });
+  vi.stubGlobal('chrome', { runtime: { sendMessage }, storage: { local: { get: vi.fn(async () => ({ defaultLearningFolder: 'folder' })), set: vi.fn(async () => {}) } } });
+  const tooltip = new TranslationTooltip();
+  tooltip.show(0, 0, '标准教程', { detectedLang: 'zh', translations: [] });
+  const root = document.getElementById('translation-extension-root')!.shadowRoot!;
+  const text = root.querySelector('.tt-source-text')!.firstChild!;
+  const range = document.createRange(); range.setStart(text, 2); range.setEnd(text, 4);
+  vi.spyOn(window, 'getSelection').mockReturnValue({ isCollapsed: false, rangeCount: 1, getRangeAt: () => range, toString: () => '教程' } as unknown as Selection);
+
+  const openForm = async () => {
+    root.querySelector<HTMLButtonElement>('.tt-save-button')!.click();
+    root.querySelector<HTMLButtonElement>('[data-choice="both"]')!.click();
+    await vi.waitFor(() => expect((root.querySelector('.tt-save-sentence-meaning') as HTMLInputElement).value).toBe('giáo trình chuẩn'));
+    expect(root.querySelector('.tt-save-existing-sentence')?.textContent).toContain('Câu đã có');
+  };
+  await openForm();
+  root.querySelector<HTMLFormElement>('.tt-save-form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  await vi.waitFor(() => expect(sendMessage.mock.calls.filter(([message]) => message.type === 'LEARNING_SAVE')).toHaveLength(1));
+  expect(sendMessage.mock.calls.filter(([message]) => message.type === 'LEARNING_SAVE')[0]![0].item).toMatchObject({
+    word_text: '教程', sentence_text: '标准教程', sentence_meaning: 'giáo trình chuẩn', update_existing_sentence_meaning: false,
+  });
+
+  await openForm();
+  const meaning = root.querySelector<HTMLInputElement>('.tt-save-sentence-meaning')!;
+  meaning.value = 'giáo trình tiêu chuẩn';
+  meaning.dispatchEvent(new Event('input', { bubbles: true }));
+  root.querySelector<HTMLFormElement>('.tt-save-form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  await vi.waitFor(() => expect(sendMessage.mock.calls.filter(([message]) => message.type === 'LEARNING_SAVE')).toHaveLength(2));
+  expect(sendMessage.mock.calls.filter(([message]) => message.type === 'LEARNING_SAVE')[1]![0].item).toMatchObject({
+    sentence_meaning: 'giáo trình tiêu chuẩn', update_existing_sentence_meaning: true,
+  });
 });
 
 test('no Learning Folder offers website creation path', async () => {

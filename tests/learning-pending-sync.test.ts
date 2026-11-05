@@ -33,6 +33,13 @@ test('offline save survives service worker restart and syncs once when online', 
   vi.stubGlobal('fetch', vi.fn(async (url: string, options?: RequestInit) => {
     if (url.endsWith('/api/link/start')) return { ok: true, json: async () => ({ request_id: 'link-1', poll_secret: 'secret', approve_url: 'http://local', expires_at: Math.floor(Date.now() / 1000) + 300 }) };
     if (url.endsWith('/api/link/poll')) return { ok: true, json: async () => ({ state: 'linked', token: 'token-1', account: { id: 'alice', username: 'alice' } }) };
+    if (url.includes('/api/extension/items/existing?')) {
+      const query = new URL(url).searchParams;
+      expect(query.get('folder_id')).toBe('folder-1');
+      expect(query.get('text')).toBe('标准教程');
+      expect((options?.headers as Record<string, string>).Authorization).toBe('Bearer token-1');
+      return { ok: true, json: async () => ({ id: 'sentence-1', meaning: 'giáo trình chuẩn' }) };
+    }
     if (url.endsWith('/api/extension/sync')) {
       if (!online) throw new TypeError('Failed to fetch');
       uploaded.push(JSON.parse(String(options?.body)));
@@ -45,6 +52,9 @@ test('offline save survives service worker restart and syncs once when online', 
   await link.pollAccountLink();
   await import('../src/background/service-worker');
   const send = (message: unknown) => new Promise<any>((resolve) => messageHandler(message, {}, resolve));
+
+  expect(await send({ type: 'LEARNING_FIND_SENTENCE', folder_id: 'folder-1', text: '标准教程' }))
+    .toMatchObject({ success: true, item: { id: 'sentence-1', meaning: 'giáo trình chuẩn' } });
 
   const saved = await send({ type: 'LEARNING_SAVE', choice: 'word', item: { folder_id: 'folder-1', category: 'word', text: '你好', meaning: 'xin chào' } });
   expect(saved).toMatchObject({ success: true, state: 'pending' });

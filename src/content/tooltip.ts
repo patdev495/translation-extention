@@ -405,7 +405,7 @@ export class TranslationTooltip {
       <form class="tt-save-form"><label>Thư mục học tập<select class="tt-save-folder" required><option value="">Đang tải…</option></select></label>
       <label>${choice === 'sentence' && this.saveSelection ? 'Câu chứa chữ đã chọn · kiểm tra trước khi lưu' : 'Chữ Trung'}<input class="tt-save-text" required /></label>
       <label>Nghĩa gợi ý<input class="tt-save-meaning" required placeholder="Sửa nghĩa trước khi lưu" /></label>
-      ${choice === 'both' ? '<label>Câu chứa từ · kiểm tra trước khi lưu<textarea class="tt-save-sentence" required></textarea></label><label>Nghĩa câu<input class="tt-save-sentence-meaning" required /></label>' : ''}
+      ${choice === 'both' ? '<label>Câu chứa từ · kiểm tra trước khi lưu<textarea class="tt-save-sentence" required></textarea></label><label>Nghĩa câu<input class="tt-save-sentence-meaning" required /></label><small class="tt-save-existing-sentence" role="status"></small>' : ''}
       <small class="tt-save-shortcut">Nhấn S để lưu khi không nhập liệu</small>
       <p class="tt-save-status" role="status"></p><button type="submit" class="tt-save-submit">Lưu</button></form>`;
     panel.querySelector('.tt-save-title')!.textContent = `Lưu “${text}” vào thư viện`;
@@ -414,7 +414,7 @@ export class TranslationTooltip {
     if (sentence) sentence.value = this.saveSentence;
     const form = panel.querySelector<HTMLFormElement>('form')!;
     form.addEventListener('submit', event => { event.preventDefault(); void this.submitSave(form); });
-    void this.loadSaveFolders(panel);
+    void this.loadSaveFolders(panel, choice === 'both' ? () => { void this.refreshExistingSentence(panel); } : undefined);
     const fullChineseRow = row.textContent?.trim() ?? '';
     const vietnameseRow = [...(this.tooltipEl?.querySelectorAll('.tt-section') ?? [])]
       .find(section => section !== this.saveSection && section.getAttribute('data-lang')?.toLowerCase().split('-')[0] === 'vi')
@@ -422,6 +422,7 @@ export class TranslationTooltip {
     const fillMeaning = (savedText: string, field: HTMLInputElement): void => {
       if (vietnameseRow && savedText.trim() === fullChineseRow) {
         field.value = vietnameseRow;
+        field.dataset.suggestedMeaning = vietnameseRow;
       } else {
         void this.suggestMeaning(savedText, field);
       }
@@ -435,9 +436,17 @@ export class TranslationTooltip {
     if (choice === 'both') {
       const sentenceMeaning = panel.querySelector<HTMLInputElement>('.tt-save-sentence-meaning')!;
       fillMeaning(this.saveSentence, sentenceMeaning);
+      sentenceMeaning.addEventListener('input', () => { sentenceMeaning.dataset.userEdited = '1'; });
+      panel.querySelector<HTMLSelectElement>('.tt-save-folder')!.addEventListener('change', () => {
+        sentenceMeaning.dataset.userEdited = '';
+        void this.refreshExistingSentence(panel);
+      });
       sentence!.addEventListener('change', () => {
+        sentenceMeaning.dataset.userEdited = '';
+        sentenceMeaning.dataset.suggestedMeaning = '';
         sentenceMeaning.value = '';
         fillMeaning(sentence!.value, sentenceMeaning);
+        void this.refreshExistingSentence(panel);
       });
     }
   }
@@ -446,7 +455,7 @@ export class TranslationTooltip {
     return new Promise(resolve => chrome.runtime.sendMessage(message, resolve));
   }
 
-  private async loadSaveFolders(panel: Element): Promise<void> {
+  private async loadSaveFolders(panel: Element, onLoaded?: () => void): Promise<void> {
     const result = await this.sendLearningMessage({ type: 'LEARNING_FOLDERS' });
     const status = panel.querySelector<HTMLElement>('.tt-save-status')!;
     if (!result?.success) { status.textContent = result?.error ?? 'Hãy liên kết tài khoản trong cài đặt extension.'; return; }
@@ -479,6 +488,40 @@ export class TranslationTooltip {
       .sort((a, b) => a.path.localeCompare(b.path, 'vi'));
     for (const folder of labeledFolders) select.add(new Option(folder.path, folder.id));
     select.value = folders.some(folder => folder.id === stored.defaultLearningFolder) ? stored.defaultLearningFolder : '';
+    onLoaded?.();
+  }
+
+  private async refreshExistingSentence(panel: Element): Promise<void> {
+    const form = panel.querySelector<HTMLFormElement>('.tt-save-form');
+    const folder = form?.querySelector<HTMLSelectElement>('.tt-save-folder');
+    const sentence = form?.querySelector<HTMLTextAreaElement>('.tt-save-sentence');
+    const meaning = form?.querySelector<HTMLInputElement>('.tt-save-sentence-meaning');
+    const hint = form?.querySelector<HTMLElement>('.tt-save-existing-sentence');
+    const submit = form?.querySelector<HTMLButtonElement>('.tt-save-submit');
+    if (!form || !folder || !sentence || !meaning || !hint || !submit) return;
+    const version = String(Number(panel.getAttribute('data-sentence-lookup-version') ?? '0') + 1);
+    panel.setAttribute('data-sentence-lookup-version', version);
+    const previousMeaning = meaning.dataset.existingSentenceMeaning;
+    delete meaning.dataset.existingSentenceMeaning;
+    const sentenceText = sentence.value.trim();
+    if (!folder.value || !sentenceText) { hint.textContent = ''; submit.disabled = false; return; }
+    hint.textContent = 'Đang kiểm tra câu đã lưu…';
+    submit.disabled = true;
+    const result = await this.sendLearningMessage({ type: 'LEARNING_FIND_SENTENCE', folder_id: folder.value, text: sentenceText });
+    if (!form.isConnected || panel.getAttribute('data-sentence-lookup-version') !== version) return;
+    submit.disabled = false;
+    const existingMeaning = result?.success && typeof result.item?.meaning === 'string' ? result.item.meaning : null;
+    if (existingMeaning !== null) {
+      meaning.dataset.existingSentenceMeaning = existingMeaning;
+      if (meaning.dataset.userEdited !== '1') meaning.value = existingMeaning;
+      hint.textContent = 'Câu đã có trong thư mục. Giữ nghĩa đã lưu hoặc sửa trước khi lưu.';
+    } else {
+      if (previousMeaning && meaning.dataset.userEdited !== '1' && meaning.value === previousMeaning) {
+        meaning.value = meaning.dataset.suggestedMeaning ?? '';
+        if (!meaning.value) void this.suggestMeaning(sentenceText, meaning);
+      }
+      hint.textContent = result?.success ? '' : 'Chưa kiểm tra được câu đã lưu; vẫn có thể lưu khi kết nối lại.';
+    }
   }
 
   private async suggestMeaning(text: string, field: HTMLInputElement): Promise<void> {
@@ -486,9 +529,12 @@ export class TranslationTooltip {
     if (!requestedText) return;
     field.dataset.requestedText = requestedText;
     const response = await this.sendLearningMessage({ type: 'LEARNING_SUGGEST_MEANING', text: requestedText });
-    if (!field.isConnected || field.dataset.requestedText !== requestedText || field.value) return;
+    if (!field.isConnected || field.dataset.requestedText !== requestedText || field.value || field.dataset.userEdited === '1') return;
     const meaning = typeof response?.meaning === 'string' ? response.meaning.trim() : '';
-    if (response?.success && meaning && meaning !== requestedText) field.value = meaning;
+    if (response?.success && meaning && meaning !== requestedText) {
+      field.value = meaning;
+      field.dataset.suggestedMeaning = meaning;
+    }
     else field.placeholder = response?.error ?? 'Không gợi ý được nghĩa. Hãy nhập nghĩa.';
   }
 
@@ -500,8 +546,13 @@ export class TranslationTooltip {
     const meaning = form.querySelector<HTMLInputElement>('.tt-save-meaning')!.value;
     const status = form.querySelector<HTMLElement>('.tt-save-status')!;
     if (!folder_id) { status.textContent = 'Hãy chọn thư mục học tập.'; return; }
+    const sentenceMeaningField = form.querySelector<HTMLInputElement>('.tt-save-sentence-meaning');
+    const existingSentenceMeaning = sentenceMeaningField?.dataset.existingSentenceMeaning;
     const item = this.saveChoice === 'both'
-      ? { folder_id, word_text: text, word_meaning: meaning, sentence_text: form.querySelector<HTMLTextAreaElement>('.tt-save-sentence')!.value, sentence_meaning: form.querySelector<HTMLInputElement>('.tt-save-sentence-meaning')!.value }
+      ? { folder_id, word_text: text, word_meaning: meaning, sentence_text: form.querySelector<HTMLTextAreaElement>('.tt-save-sentence')!.value.trim(),
+          sentence_meaning: sentenceMeaningField!.value.trim(),
+          update_existing_sentence_meaning: sentenceMeaningField!.dataset.userEdited === '1'
+            && (existingSentenceMeaning === undefined || sentenceMeaningField!.value.trim() !== existingSentenceMeaning) }
       : { folder_id, category: this.saveChoice, text, meaning };
     status.textContent = 'Đang lưu…';
     submitButton.disabled = true;
