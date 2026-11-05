@@ -63,6 +63,23 @@ def initialize(path: Path) -> None:
             CREATE UNIQUE INDEX IF NOT EXISTS folder_sibling_name_idx
                 ON folders(user_id, COALESCE(parent_id, ''), name_key);
             CREATE INDEX IF NOT EXISTS folders_parent_idx ON folders(user_id, parent_id);
+            CREATE TABLE IF NOT EXISTS learning_items (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                folder_id TEXT NOT NULL REFERENCES folders(id),
+                category TEXT NOT NULL CHECK (category IN ('word', 'sentence')),
+                text TEXT NOT NULL,
+                meaning TEXT NOT NULL,
+                pinyin TEXT NOT NULL,
+                created_at INTEGER NOT NULL
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS learning_item_identity
+                ON learning_items(user_id, folder_id, category, text);
+            CREATE TABLE IF NOT EXISTS learning_item_links (
+                word_id TEXT NOT NULL REFERENCES learning_items(id) ON DELETE CASCADE,
+                sentence_id TEXT NOT NULL REFERENCES learning_items(id) ON DELETE CASCADE,
+                PRIMARY KEY (word_id, sentence_id)
+            );
             """
         )
         columns = {str(row["name"]) for row in connection.execute("PRAGMA table_info(users)")}

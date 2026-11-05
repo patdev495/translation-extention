@@ -2,7 +2,7 @@ import { SettingsManager } from '../services/settings';
 import { PDF_VIEWER_PATH, shouldUseExtensionPdfViewer } from './pdf-redirect';
 import { TranslationCoordinator } from '../services/translation-coordinator';
 import { TranslationEngine } from '../services/translation';
-import { getAccountLinkStatus, startAccountLink, unlinkAccount } from './learning-account-link';
+import { getAccountLinkStatus, learningRequest, openLearningLibrary, startAccountLink, unlinkAccount } from './learning-account-link';
 
 // ─── PDF Redirect Logic ────────────────────────────────────────────────────
 
@@ -165,6 +165,39 @@ async function translateText(text: string) {
 // ─── Message Handlers ──────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'LEARNING_SUGGEST_MEANING') {
+    void (async () => {
+      const text = typeof message.text === 'string' ? message.text.trim() : '';
+      if (!text) throw new Error('Chưa có chữ Trung để gợi ý nghĩa.');
+      const { privacyConsentGranted } = await chrome.storage.local.get('privacyConsentGranted');
+      if (privacyConsentGranted !== true) throw new Error('Cần cho phép dịch trong cài đặt extension.');
+      const settings = await SettingsManager.getSettings();
+      const result = await TranslationEngine.translateWithSettings(text, 'vi', settings);
+      const meaning = result.translation.trim();
+      if (!meaning || meaning === text) throw new Error('Không tìm được nghĩa gợi ý. Hãy nhập nghĩa trước khi lưu.');
+      return meaning;
+    })().then(
+      meaning => sendResponse({ success: true, meaning }),
+      (error: unknown) => sendResponse({ success: false, error: error instanceof Error ? error.message : 'Không gợi ý được nghĩa.' }),
+    );
+    return true;
+  }
+  if (message.type === 'LEARNING_OPEN_LIBRARY') {
+    void openLearningLibrary().then(() => sendResponse({ success: true }), () => sendResponse({ success: false }));
+    return true;
+  }
+  if (message.type === 'LEARNING_FOLDERS' || message.type === 'LEARNING_SAVE') {
+    const task = message.type === 'LEARNING_FOLDERS'
+      ? learningRequest('/folders')
+      : learningRequest(message.choice === 'both' ? '/items/both' : '/items', {
+          method: 'POST', body: JSON.stringify(message.item),
+        });
+    void task.then(
+      (result) => sendResponse({ success: true, result }),
+      (error: unknown) => sendResponse({ success: false, error: error instanceof Error ? error.message : 'Không lưu được.' }),
+    );
+    return true;
+  }
   if (message.type === 'START_ACCOUNT_LINK' || message.type === 'GET_ACCOUNT_LINK_STATUS' || message.type === 'UNLINK_ACCOUNT') {
     const task = message.type === 'START_ACCOUNT_LINK'
       ? startAccountLink()

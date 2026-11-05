@@ -9,6 +9,16 @@ export interface LearningFolder {
   parent_id: string | null;
 }
 
+export interface SavedLearningItem {
+  id: string;
+  folder_id: string;
+  category: 'word' | 'sentence';
+  text: string;
+  meaning: string;
+  pinyin: string;
+  linked_item_ids: string[];
+}
+
 interface ApiErrorBody {
   detail?: unknown;
 }
@@ -78,4 +88,7 @@ export const learningApi = {
     api('/folders', { method: 'POST', body: JSON.stringify({ name, parent_id: parentId }) }),
   updateFolder: (id: string, change: { name?: string; parent_id?: string | null }): Promise<LearningFolder> =>
     api(`/folders/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(change) }),
+  items: (): Promise<SavedLearningItem[]> => api('/items'),
+  updateItem: (id: string, change: Pick<SavedLearningItem, 'folder_id' | 'category' | 'text' | 'meaning'>): Promise<SavedLearningItem> =>
+    api(`/items/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(change) }),
 };

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import { ArrowRight, BookOpen, Check, ChevronRight, CircleHelp, Folder, FolderPlus, Home, Link2, LogOut, MoveRight, Pencil, Plus, Sparkles } from '@lucide/vue';
-import { ApiError, learningApi, type Account, type LearningFolder } from './api';
+import { ApiError, learningApi, type Account, type LearningFolder, type SavedLearningItem } from './api';
 
 type EditorMode = 'create' | 'rename' | 'move';
 
@@ -26,6 +26,16 @@ const accountError = ref('');
 const folders = ref<LearningFolder[]>([]);
 const foldersLoading = ref(false);
 const folderError = ref('');
+const items = ref<SavedLearningItem[]>([]);
+const itemError = ref('');
+const itemEditor = ref<HTMLDialogElement | null>(null);
+const editingItem = ref<SavedLearningItem | null>(null);
+const editText = ref('');
+const editMeaning = ref('');
+const editCategory = ref<'word' | 'sentence'>('word');
+const editFolderId = ref('');
+const itemBusy = ref(false);
+const focusedItemId = ref<string | null>(null);
 const selectedId = ref<string | null>(null);
 const folderContextMenu = ref<FolderContextMenu | null>(null);
 const folderContextMenuElement = ref<HTMLElement | null>(null);
@@ -61,6 +71,7 @@ async function loadFolders(): Promise<void> {
   folderError.value = '';
   try {
     folders.value = await learningApi.folders();
+    items.value = await learningApi.items();
     if (selectedId.value && !folders.value.some((folder) => folder.id === selectedId.value)) {
       selectedId.value = null;
     }
@@ -137,6 +148,7 @@ async function signOut(): Promise<void> {
     username.value = '';
     password.value = '';
     folders.value = [];
+    items.value = [];
     selectedId.value = null;
     linkApproved.value = false;
   } catch (error) {
@@ -163,6 +175,43 @@ async function approveLink(): Promise<void> {
 
 const folderById = computed(() => new Map(folders.value.map((folder) => [folder.id, folder])));
 const selectedFolder = computed(() => selectedId.value ? folderById.value.get(selectedId.value) ?? null : null);
+const visibleItems = computed(() => selectedId.value ? items.value.filter(item => item.folder_id === selectedId.value) : items.value);
+const itemById = computed(() => new Map(items.value.map(item => [item.id, item])));
+
+async function openItemEditor(item: SavedLearningItem): Promise<void> {
+  editingItem.value = item;
+  editText.value = item.text;
+  editMeaning.value = item.meaning;
+  editCategory.value = item.category;
+  editFolderId.value = item.folder_id;
+  itemError.value = '';
+  itemEditor.value?.showModal();
+  await nextTick();
+  itemEditor.value?.querySelector('input')?.focus();
+}
+
+async function saveItem(): Promise<void> {
+  if (!editingItem.value) return;
+  itemBusy.value = true;
+  itemError.value = '';
+  try {
+    await learningApi.updateItem(editingItem.value.id, {
+      text: editText.value.trim(), meaning: editMeaning.value.trim(), category: editCategory.value, folder_id: editFolderId.value,
+    });
+    items.value = await learningApi.items();
+    itemEditor.value?.close();
+  } catch (error) {
+    itemError.value = errorMessage(error);
+  } finally { itemBusy.value = false; }
+}
+
+function followItem(id: string): void {
+  const target = itemById.value.get(id);
+  if (!target) return;
+  selectedId.value = target.folder_id;
+  focusedItemId.value = id;
+  void nextTick(() => document.getElementById(`learning-item-${id}`)?.focus());
+}
 const currentChildren = computed(() => folders.value
   .filter((folder) => folder.parent_id === selectedId.value)
   .sort((a, b) => a.name.localeCompare(b.name, 'vi')));
@@ -363,6 +412,17 @@ async function submitEditor(): Promise<void> {
             <div class="folder-card-actions"><button type="button" :aria-label="`Tạo thư mục con trong ${folder.name}`" title="Tạo thư mục con" @click="openEditor('create', folder.id)"><FolderPlus :size="17" /></button><button type="button" :aria-label="`Đổi tên ${folder.name}`" title="Đổi tên" @click="openEditor('rename', folder.id)"><Pencil :size="16" /></button><button type="button" :aria-label="`Chuyển ${folder.name}`" title="Chuyển thư mục" @click="openEditor('move', folder.id)"><MoveRight :size="17" /></button></div>
           </article>
         </div>
+        <section class="saved-items" aria-labelledby="saved-items-title">
+          <div class="saved-items-heading"><div><p class="overline">ĐÃ LƯU TỪ EXTENSION</p><h2 id="saved-items-title">Mục học tập</h2></div><span>{{ visibleItems.length }} mục</span></div>
+          <p v-if="visibleItems.length === 0" class="saved-items-empty">Chưa có mục học tập trong vị trí này. Lưu chữ Trung từ Translation Tooltip.</p>
+          <div v-else class="saved-items-grid">
+            <article v-for="item in visibleItems" :id="`learning-item-${item.id}`" :key="item.id" class="saved-item-card" :class="{ focused: focusedItemId === item.id }" tabindex="-1">
+              <div class="saved-item-top"><span class="saved-item-category">{{ item.category === 'word' ? 'Từ / cụm từ' : 'Câu' }}</span><button type="button" :aria-label="`Sửa ${item.text}`" @click="openItemEditor(item)"><Pencil :size="16" aria-hidden="true" /> Sửa</button></div>
+              <h3 lang="zh">{{ item.text }}</h3><p class="saved-item-pinyin">{{ item.pinyin }}</p><p class="saved-item-meaning">{{ item.meaning }}</p>
+              <div v-if="item.linked_item_ids.length" class="saved-item-links"><span>Liên kết</span><button v-for="linkedId in item.linked_item_ids" :key="linkedId" type="button" @click="followItem(linkedId)">{{ itemById.get(linkedId)?.text ?? 'Mục liên kết' }} <ArrowRight :size="14" aria-hidden="true" /></button></div>
+            </article>
+          </div>
+        </section>
       </section>
     </main>
 
@@ -375,6 +435,16 @@ async function submitEditor(): Promise<void> {
         <template v-if="editorMode === 'move'"><label for="folder-parent">Chuyển vào</label><select id="folder-parent" v-model="editorParentId"><option :value="null">Thư viện (gốc)</option><option v-for="row in moveDestinations" :key="row.folder.id" :value="row.folder.id">{{ '— '.repeat(row.depth) + row.folder.name }}</option></select></template>
         <p v-if="editorError" class="form-error" role="alert">{{ editorError }}</p>
         <div class="dialog-actions"><button class="plain-button" type="button" @click="closeEditor">Hủy</button><button class="primary-button" type="submit" :disabled="editorBusy">{{ editorBusy ? 'Đang lưu…' : editorMode === 'create' ? 'Tạo thư mục' : 'Lưu thay đổi' }}</button></div>
+      </form>
+    </dialog>
+    <dialog ref="itemEditor" class="editor-dialog item-editor" @click.self="itemEditor?.close()">
+      <form @submit.prevent="saveItem"><h2>Sửa mục học tập</h2><p>Chỉnh chữ, nghĩa, loại hoặc thư mục. Pinyin sẽ cập nhật theo chữ mới.</p>
+        <label for="item-text">Chữ Trung</label><input id="item-text" v-model="editText" required lang="zh" />
+        <label for="item-meaning">Nghĩa</label><input id="item-meaning" v-model="editMeaning" required />
+        <label for="item-category">Loại</label><select id="item-category" v-model="editCategory"><option value="word">Từ / cụm từ</option><option value="sentence">Câu</option></select>
+        <label for="item-folder">Thư mục</label><select id="item-folder" v-model="editFolderId"><option v-for="folder in folders" :key="folder.id" :value="folder.id">{{ folder.name }}</option></select>
+        <p v-if="itemError" class="form-error" role="alert">{{ itemError }}</p>
+        <div class="dialog-actions"><button type="button" class="plain-button" @click="itemEditor?.close()">Hủy</button><button type="submit" class="primary-button" :disabled="itemBusy">{{ itemBusy ? 'Đang lưu…' : 'Lưu thay đổi' }}</button></div>
       </form>
     </dialog>
   </div>

@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: done
 
 # Issue 03: Save a Chinese Row from the Translation Tooltip
 
@@ -8,11 +8,11 @@ Add a save button beside whichever Translation Tooltip row contains Chinese, whe
 
 ## Acceptance criteria
 
-- [ ] Button and keyboard paths open the same Save Choice Menu; `s` and number shortcuts do not fire while the learner types in an editable field, and only visible choices are actionable.
-- [ ] The first save requires an existing Learning Folder; if none exists, the extension directs the learner to create one on the website. Later saves reuse the last folder but allow changing it.
-- [ ] Saving works when Chinese is the original or translated row; the website shows the selected category, exact Chinese text, confirmed meaning, and Pinyin, without storing the source page or PDF address.
-- [ ] An Unlinked Save Attempt only asks the learner to link through extension settings. A Duplicate Learning Item in the same folder and category is surfaced instead of silently copied, while the same text can exist separately in another folder.
-- [ ] Meaningful end-to-end or integration tests cover the save and duplicate paths, with typed frontend and backend code.
+- [x] Button and keyboard paths open the same Save Choice Menu; `s` and number shortcuts do not fire while the learner types in an editable field, and only visible choices are actionable.
+- [x] The first save requires an existing Learning Folder; if none exists, the extension directs the learner to create one on the website. Later saves reuse the last folder but allow changing it.
+- [x] Saving works when Chinese is the original or translated row; the website shows the selected category, exact Chinese text, confirmed meaning, and Pinyin, without storing the source page or PDF address.
+- [x] An Unlinked Save Attempt only asks the learner to link through extension settings. A Duplicate Learning Item in the same folder and category is surfaced instead of silently copied, while the same text can exist separately in another folder.
+- [x] Meaningful end-to-end or integration tests cover the save and duplicate paths, with typed frontend and backend code.
 
 ## Blocked by
 

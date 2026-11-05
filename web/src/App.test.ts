@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import App from './App.vue';
-import { learningApi, type LearningFolder } from './api';
+import { learningApi, type LearningFolder, type SavedLearningItem } from './api';
 
 vi.mock('./api', async (importOriginal) => {
   const original = await importOriginal<typeof import('./api')>();
@@ -10,20 +10,28 @@ vi.mock('./api', async (importOriginal) => {
     ...original,
     learningApi: {
       me: vi.fn(), register: vi.fn(), login: vi.fn(), logout: vi.fn(),
-      approveLink: vi.fn(), folders: vi.fn(), createFolder: vi.fn(), updateFolder: vi.fn(),
+      approveLink: vi.fn(), folders: vi.fn(), createFolder: vi.fn(), updateFolder: vi.fn(), items: vi.fn(), updateItem: vi.fn(),
     },
   };
 });
 
 const api = vi.mocked(learningApi);
 let storedFolders: LearningFolder[];
+let storedItems: SavedLearningItem[];
 
 beforeEach(() => {
   window.history.replaceState({}, '', '/');
   storedFolders = [];
+  storedItems = [];
   vi.clearAllMocks();
   api.me.mockResolvedValue({ id: 'person-1', username: 'learner' });
   api.folders.mockImplementation(async () => [...storedFolders]);
+  api.items.mockImplementation(async () => [...storedItems]);
+  api.updateItem.mockImplementation(async (id, change) => {
+    const item = storedItems.find((entry) => entry.id === id)!;
+    Object.assign(item, change);
+    return { ...item };
+  });
   api.createFolder.mockImplementation(async (name, parent_id) => {
     const folder = { id: `folder-${storedFolders.length + 1}`, name, parent_id };
     storedFolders.push(folder);
@@ -39,6 +47,30 @@ beforeEach(() => {
 });
 
 afterEach(() => vi.restoreAllMocks());
+
+test('learner edits saved item and follows linked context on website', async () => {
+  storedFolders = [{ id: 'f1', name: 'HSK', parent_id: null }, { id: 'f2', name: 'Other', parent_id: null }];
+  storedItems = [
+    { id: 'w1', folder_id: 'f1', category: 'word', text: '学习', meaning: 'học', pinyin: 'xué xí', linked_item_ids: ['s1'] },
+    { id: 's1', folder_id: 'f1', category: 'sentence', text: '我学习。', meaning: 'Tôi học.', pinyin: 'wǒ xué xí 。', linked_item_ids: ['w1'] },
+  ];
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+  await page.get('button[aria-label="Mở thư mục HSK"]').trigger('click');
+  expect(page.text()).toContain('学习');
+  await page.get('button[aria-label="Sửa 学习"]').trigger('click');
+  await page.get('#item-text').setValue('学中文');
+  await page.get('#item-meaning').setValue('học tiếng Trung');
+  await page.get('#item-folder').setValue('f2');
+  await page.get('.item-editor form').trigger('submit');
+  await flushPromises();
+  expect(api.updateItem).toHaveBeenCalledWith('w1', { text: '学中文', meaning: 'học tiếng Trung', category: 'word', folder_id: 'f2' });
+  await page.get('.saved-item-links button').trigger('click');
+  await flushPromises();
+  expect(page.text()).toContain('学中文');
+  expect(page.get('#learning-item-w1').attributes('class')).toContain('focused');
+  page.unmount();
+});
 
 test('creates, browses, renames and moves a nested folder through the website', async () => {
   const page = mount(App, { attachTo: document.body });

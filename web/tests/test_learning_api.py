@@ -109,6 +109,22 @@ def test_browser_mutations_reject_other_origins(tmp_path: Path) -> None:
         ).status_code == 403
 
 
+def test_browser_mutations_accept_localhost_alias(tmp_path: Path) -> None:
+    app = create_app(tmp_path / "localhost-origin.sqlite3")
+    with TestClient(app) as client:
+        registered = client.post(
+            "/api/auth/register",
+            json={"username": "local", "password": "pass"},
+            headers={"Origin": "http://localhost:5173"},
+        )
+        assert registered.status_code == 201, registered.text
+        assert client.post("/api/auth/logout", headers={"Origin": "http://localhost:5173"}).status_code == 204
+        assert client.post(
+            "/api/auth/login", json={"username": "local", "password": "pass"},
+            headers={"Origin": "http://localhost:5174"},
+        ).status_code == 403
+
+
 def test_username_login_does_not_require_email(tmp_path: Path) -> None:
     app = create_app(tmp_path / "usernames.sqlite3")
     with TestClient(app) as client:

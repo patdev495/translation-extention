@@ -10,10 +10,12 @@ import time
 import uuid
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pwdlib import PasswordHash
+from pypinyin import Style, lazy_pinyin
 
 from .database import connect, initialize
 
@@ -88,6 +90,52 @@ class Folder(BaseModel):
     parent_id: str | None
 
 
+class ItemInput(BaseModel):
+    folder_id: str
+    category: Literal["word", "sentence"]
+    text: str = Field(min_length=1)
+    meaning: str = Field(min_length=1)
+
+    @field_validator("text", "meaning")
+    @classmethod
+    def nonblank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Value is required")
+        return value
+
+
+class ItemUpdate(BaseModel):
+    folder_id: str | None = None
+    category: Literal["word", "sentence"] | None = None
+    text: str | None = None
+    meaning: str | None = None
+
+
+class BothInput(BaseModel):
+    folder_id: str
+    word_text: str = Field(min_length=1)
+    word_meaning: str = Field(min_length=1)
+    sentence_text: str = Field(min_length=1)
+    sentence_meaning: str = Field(min_length=1)
+
+    @field_validator('word_text', 'word_meaning', 'sentence_text', 'sentence_meaning')
+    @classmethod
+    def nonblank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError('Value is required')
+        return value
+
+
+class Item(BaseModel):
+    id: str
+    folder_id: str
+    category: Literal["word", "sentence"]
+    text: str
+    meaning: str
+    pinyin: str
+    linked_item_ids: list[str]
+
+
 def _now() -> int:
     return int(time.time())
 
@@ -116,7 +164,13 @@ def create_app(database_path: Path | None = None) -> FastAPI:
     app = FastAPI(title="PolyTranslate Learning API")
 
     def require_browser_origin(request: Request) -> None:
-        if request.headers.get("origin") != web_origin:
+        origin = request.headers.get("origin")
+        parsed = urlsplit(web_origin)
+        allowed_origins = {web_origin}
+        if parsed.hostname in {"127.0.0.1", "localhost"}:
+            port = f":{parsed.port}" if parsed.port is not None else ""
+            allowed_origins.update({f"{parsed.scheme}://127.0.0.1{port}", f"{parsed.scheme}://localhost{port}"})
+        if origin not in allowed_origins:
             raise HTTPException(status_code=403, detail="Untrusted browser origin")
 
     def current_account(request: Request, kind: Literal["web", "extension"]) -> Account:
@@ -270,6 +324,97 @@ def create_app(database_path: Path | None = None) -> FastAPI:
         ).fetchone()
         if row is None:
             raise HTTPException(status_code=404, detail="Parent folder not found")
+
+    def item(connection: sqlite3.Connection, row: sqlite3.Row) -> Item:
+        links = connection.execute(
+            "SELECT sentence_id AS id FROM learning_item_links WHERE word_id = ? UNION SELECT word_id AS id FROM learning_item_links WHERE sentence_id = ?",
+            (row["id"], row["id"]),
+        ).fetchall()
+        return Item(id=row["id"], folder_id=row["folder_id"], category=row["category"],
+                    text=row["text"], meaning=row["meaning"], pinyin=row["pinyin"],
+                    linked_item_ids=[str(link["id"]) for link in links])
+
+    def require_folder(connection: sqlite3.Connection, user_id: str, folder_id: str) -> None:
+        if connection.execute("SELECT 1 FROM folders WHERE id = ? AND user_id = ?", (folder_id, user_id)).fetchone() is None:
+            raise HTTPException(status_code=404, detail="Learning Folder not found")
+
+    def create_item(connection: sqlite3.Connection, user_id: str, body: ItemInput, reuse: bool = False) -> Item:
+        require_folder(connection, user_id, body.folder_id)
+        existing = connection.execute(
+            "SELECT * FROM learning_items WHERE user_id = ? AND folder_id = ? AND category = ? AND text = ?",
+            (user_id, body.folder_id, body.category, body.text),
+        ).fetchone()
+        if existing is not None:
+            if reuse:
+                return item(connection, existing)
+            raise HTTPException(status_code=409, detail={"message": "Duplicate Learning Item", "existing_item": item(connection, existing).model_dump()})
+        item_id = _new_id()
+        pinyin = " ".join(lazy_pinyin(body.text, style=Style.TONE, errors=lambda chars: list(chars)))
+        try:
+            connection.execute(
+                "INSERT INTO learning_items (id, user_id, folder_id, category, text, meaning, pinyin, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (item_id, user_id, body.folder_id, body.category, body.text, body.meaning, pinyin, _now()),
+            )
+        except sqlite3.IntegrityError as error:
+            raise HTTPException(status_code=409, detail="Duplicate Learning Item") from error
+        row = connection.execute("SELECT * FROM learning_items WHERE id = ?", (item_id,)).fetchone()
+        assert row is not None
+        return item(connection, row)
+
+    @app.get("/api/extension/folders", response_model=list[Folder])
+    def extension_folders(account: Account = Depends(extension_account)) -> list[Folder]:
+        with connect(db_path) as connection:
+            rows = connection.execute("SELECT id, name, parent_id FROM folders WHERE user_id = ? ORDER BY name_key", (account.id,)).fetchall()
+        return [_folder(row) for row in rows]
+
+    @app.post("/api/extension/items", response_model=Item, status_code=201)
+    def extension_save_item(body: ItemInput, account: Account = Depends(extension_account)) -> Item:
+        with connect(db_path) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            return create_item(connection, account.id, body)
+
+    @app.post("/api/extension/items/both", status_code=201)
+    def extension_save_both(body: BothInput, account: Account = Depends(extension_account)) -> dict[str, Item]:
+        if body.word_text not in body.sentence_text:
+            raise HTTPException(status_code=422, detail="Sentence must contain selected text")
+        with connect(db_path) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            word = create_item(connection, account.id, ItemInput(folder_id=body.folder_id, category="word", text=body.word_text, meaning=body.word_meaning), reuse=True)
+            sentence = create_item(connection, account.id, ItemInput(folder_id=body.folder_id, category="sentence", text=body.sentence_text, meaning=body.sentence_meaning))
+            connection.execute("INSERT INTO learning_item_links (word_id, sentence_id) VALUES (?, ?)", (word.id, sentence.id))
+            word_row = connection.execute("SELECT * FROM learning_items WHERE id = ?", (word.id,)).fetchone()
+            sentence_row = connection.execute("SELECT * FROM learning_items WHERE id = ?", (sentence.id,)).fetchone()
+            assert word_row is not None and sentence_row is not None
+            return {"word": item(connection, word_row), "sentence": item(connection, sentence_row)}
+
+    @app.get("/api/items", response_model=list[Item])
+    def list_items(account: Account = Depends(web_account)) -> list[Item]:
+        with connect(db_path) as connection:
+            rows = connection.execute("SELECT * FROM learning_items WHERE user_id = ? ORDER BY created_at DESC, id", (account.id,)).fetchall()
+            return [item(connection, row) for row in rows]
+
+    @app.patch("/api/items/{item_id}", response_model=Item, dependencies=[Depends(require_browser_origin)])
+    def update_item(item_id: str, body: ItemUpdate, account: Account = Depends(web_account)) -> Item:
+        with connect(db_path) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute("SELECT * FROM learning_items WHERE id = ? AND user_id = ?", (item_id, account.id)).fetchone()
+            if row is None:
+                raise HTTPException(status_code=404, detail="Saved Learning Item not found")
+            folder_id = body.folder_id if body.folder_id is not None else row["folder_id"]
+            category = body.category if body.category is not None else row["category"]
+            text = body.text if body.text is not None else row["text"]
+            meaning = body.meaning if body.meaning is not None else row["meaning"]
+            if not text.strip() or not meaning.strip():
+                raise HTTPException(status_code=422, detail="Text and meaning are required")
+            require_folder(connection, account.id, folder_id)
+            pinyin = " ".join(lazy_pinyin(text, style=Style.TONE, errors=lambda chars: list(chars)))
+            try:
+                connection.execute("UPDATE learning_items SET folder_id = ?, category = ?, text = ?, meaning = ?, pinyin = ? WHERE id = ?", (folder_id, category, text, meaning, pinyin, item_id))
+            except sqlite3.IntegrityError as error:
+                raise HTTPException(status_code=409, detail="Duplicate Learning Item") from error
+            updated = connection.execute("SELECT * FROM learning_items WHERE id = ?", (item_id,)).fetchone()
+            assert updated is not None
+            return item(connection, updated)
 
     @app.get("/api/folders", response_model=list[Folder])
     def list_folders(account: Account = Depends(web_account)) -> list[Folder]:

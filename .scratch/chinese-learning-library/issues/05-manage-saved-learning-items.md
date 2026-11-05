@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: done
 
 # Issue 05: Manage Saved Learning Items on the Website
 
@@ -8,10 +8,10 @@ Let a learner inspect and correct Saved Learning Items on the website without cr
 
 ## Acceptance criteria
 
-- [ ] A learner can edit text, meaning, and category, move an item between their own folders, and see changes after reload; the website does not offer manual item creation.
-- [ ] Pinyin updates when Chinese text changes, and category or folder changes cannot silently create a Duplicate Learning Item in the destination folder.
-- [ ] The same Chinese text may remain as distinct items in different folders, and account boundaries prevent cross-account edits.
-- [ ] Editing, move, collision, and Pinyin behavior have meaningful tests; interfaces remain usable by keyboard and on narrow screens.
+- [x] A learner can edit text, meaning, and category, move an item between their own folders, and see changes after reload; the website does not offer manual item creation.
+- [x] Pinyin updates when Chinese text changes, and category or folder changes cannot silently create a Duplicate Learning Item in the destination folder.
+- [x] The same Chinese text may remain as distinct items in different folders, and account boundaries prevent cross-account edits.
+- [x] Editing, move, collision, and Pinyin behavior have meaningful tests; interfaces remain usable by keyboard and on narrow screens.
 
 ## Blocked by
 

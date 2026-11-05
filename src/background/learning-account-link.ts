@@ -1,6 +1,7 @@
 declare const __LEARNING_API_BASE__: string;
 
 const API_BASE = (typeof __LEARNING_API_BASE__ === 'string' ? __LEARNING_API_BASE__ : 'http://127.0.0.1:8000').replace(/\/$/, '');
+const WEB_BASE = 'http://127.0.0.1:5173';
 const ALARM_NAME = 'polytranslate-learning-link-poll';
 const PUBLIC_STATUS_KEY = 'learningAccountStatus';
 
@@ -174,6 +175,29 @@ export async function unlinkAccount(): Promise<PublicLinkStatus> {
   await writePrivateState(null);
   await chrome.alarms.clear(ALARM_NAME);
   return publishStatus({ state: 'unlinked' });
+}
+
+export async function learningRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const current = await readPrivateState();
+  if (current?.state !== 'linked') throw new Error('Hãy liên kết tài khoản trong cài đặt extension.');
+  const response = await fetch(`${API_BASE}/api/extension${path}`, {
+    ...options,
+    headers: { ...(options.body ? { 'Content-Type': 'application/json' } : {}), Authorization: `Bearer ${current.token}`, ...options.headers },
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    if (response.status === 409) {
+      const duplicate = body?.detail?.existing_item;
+      throw new Error(duplicate ? `Duplicate Learning Item: ${duplicate.text}` : 'Duplicate Learning Item');
+    }
+    if (response.status === 401) throw new Error('Liên kết hết hạn. Hãy liên kết lại trong cài đặt extension.');
+    throw new Error(typeof body.detail === 'string' ? body.detail : `Máy chủ trả lỗi ${response.status}.`);
+  }
+  return await response.json() as T;
+}
+
+export async function openLearningLibrary(): Promise<void> {
+  await chrome.tabs.create({ url: WEB_BASE });
 }
 
 chrome.alarms?.onAlarm?.addListener((alarm) => {

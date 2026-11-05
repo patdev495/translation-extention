@@ -129,6 +129,26 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .link-banner strong { font-size: 13px; }
 .link-banner p { margin: 4px 0 0; color: #616991; font-size: 12px; }
 .link-button { flex: none; min-height: 37px; padding: 0 12px; border: 0; border-radius: 8px; background: var(--indigo); color: white; font-size: 12px; font-weight: 800; }
+.saved-items { margin-top: 38px; }
+.saved-items-heading { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 15px; }
+.saved-items-heading h2 { margin: 5px 0 0; font-size: 22px; }
+.saved-items-heading > span { color: var(--muted); font-size: 13px; }
+.saved-items-empty { padding: 24px; border: 1px dashed #c7c9ed; border-radius: 12px; color: var(--muted); background: #fff; }
+.saved-items-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 14px; }
+.saved-item-card { min-width: 0; padding: 17px; border: 1px solid #e2e5f1; border-radius: 14px; background: #fff; }
+.saved-item-card.focused { outline: 2px solid var(--indigo); outline-offset: 2px; }
+.saved-item-top, .saved-item-links { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.saved-item-category { padding: 5px 8px; border-radius: 7px; background: #ecebff; color: #4f46b7; font-size: 11px; font-weight: 700; }
+.saved-item-top button, .saved-item-links button { display: inline-flex; align-items: center; gap: 4px; border: 0; background: none; color: var(--indigo); font-size: 12px; font-weight: 700; }
+.saved-item-card h3 { margin: 18px 0 5px; overflow-wrap: anywhere; font-size: 22px; line-height: 1.4; }
+.saved-item-pinyin { margin: 0 0 13px; color: #5a62a0; font-size: 13px; }
+.saved-item-meaning { min-height: 32px; margin: 0; overflow-wrap: anywhere; font-size: 13px; }
+.saved-item-links { justify-content: flex-start; flex-wrap: wrap; margin-top: 15px; padding-top: 12px; border-top: 1px solid #ebedf5; font-size: 11px; }
+.saved-item-links span { color: var(--muted); }
+.item-editor form { display: flex; flex-direction: column; }
+.item-editor form > label { margin-top: 12px; }
+.item-editor input, .item-editor select { width: 100%; }
+.item-editor .dialog-actions { align-self: flex-end; }
 
 .editor-dialog { position: fixed; inset: 0; width: min(460px, calc(100vw - 32px)); margin: auto; padding: 26px; border: 1px solid #dfe2f2; border-radius: 20px; box-shadow: 0 35px 80px #24224c40; }
 .editor-dialog::backdrop { background: #181b3899; backdrop-filter: blur(3px); }
