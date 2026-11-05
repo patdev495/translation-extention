@@ -42,7 +42,43 @@ const hanziImportChoice = document.getElementById('hanzi-import-choice') as HTML
 const hanziImportSummary = document.getElementById('hanzi-import-summary') as HTMLParagraphElement;
 const hanziImportKeepCurrent = document.getElementById('hanzi-import-keep-current') as HTMLButtonElement;
 const hanziImportUseFile = document.getElementById('hanzi-import-use-file') as HTMLButtonElement;
+const learningAccountStatus = document.getElementById('learning-account-status') as HTMLParagraphElement;
+const learningAccountLink = document.getElementById('learning-account-link') as HTMLButtonElement;
+const learningAccountUnlink = document.getElementById('learning-account-unlink') as HTMLButtonElement;
 let pendingHanziBackup: HanziLearningBackup | null = null;
+
+interface LinkStatus {
+  state: 'unlinked' | 'pending' | 'linked' | 'error';
+  username?: string;
+  message?: string;
+}
+
+function renderLinkStatus(status: LinkStatus): void {
+  learningAccountStatus.textContent = status.state === 'linked'
+    ? `Đã liên kết: ${status.username ?? 'tài khoản web'}`
+    : status.state === 'pending'
+      ? status.message ?? 'Đang chờ xác nhận trên web.'
+      : status.state === 'error'
+        ? status.message ?? 'Liên kết thất bại.'
+        : status.message ?? 'Chưa liên kết tài khoản web.';
+  learningAccountLink.hidden = status.state === 'linked';
+  learningAccountLink.textContent = status.state === 'pending' ? 'Mở lại trang liên kết' : 'Liên kết tài khoản';
+  learningAccountUnlink.hidden = status.state !== 'linked';
+}
+
+async function sendLinkMessage(type: string): Promise<LinkStatus> {
+  const response = await chrome.runtime.sendMessage({ type }) as { success?: boolean; status?: LinkStatus; error?: string };
+  if (!response?.success || !response.status) throw new Error(response?.error ?? 'Không kết nối được extension.');
+  return response.status;
+}
+
+async function refreshLinkStatus(): Promise<void> {
+  try {
+    renderLinkStatus(await sendLinkMessage('GET_ACCOUNT_LINK_STATUS'));
+  } catch {
+    learningAccountStatus.textContent = 'Chưa kiểm tra được tài khoản. Hãy thử lại.';
+  }
+}
 
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;
 let validationTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -318,6 +354,27 @@ async function finishHanziImport(choice: 'keep-current' | 'use-file'): Promise<v
 }
 hanziImportKeepCurrent.addEventListener('click', () => void finishHanziImport('keep-current'));
 hanziImportUseFile.addEventListener('click', () => void finishHanziImport('use-file'));
+learningAccountLink.addEventListener('click', async () => {
+  learningAccountLink.disabled = true;
+  learningAccountStatus.textContent = 'Đang mở trang liên kết…';
+  try {
+    renderLinkStatus(await sendLinkMessage('START_ACCOUNT_LINK'));
+  } catch (error) {
+    learningAccountStatus.textContent = error instanceof Error ? error.message : 'Không mở được trang liên kết.';
+  } finally {
+    learningAccountLink.disabled = false;
+  }
+});
+learningAccountUnlink.addEventListener('click', async () => {
+  learningAccountUnlink.disabled = true;
+  try {
+    renderLinkStatus(await sendLinkMessage('UNLINK_ACCOUNT'));
+  } catch (error) {
+    learningAccountStatus.textContent = error instanceof Error ? error.message : 'Không ngắt được liên kết.';
+  } finally {
+    learningAccountUnlink.disabled = false;
+  }
+});
 activeToggle.addEventListener('change', saveSettings);
 primaryLang.addEventListener('change', () => {
   showInputShortcutError('');
@@ -393,9 +450,13 @@ toggleDeeplKeyBtn.addEventListener('click', () => {
 // Load on startup
 document.addEventListener('DOMContentLoaded', loadSettings);
 loadSettings();
+void refreshLinkStatus();
 
 // Listen for storage changes to sync settings dynamically
 chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === 'local' && changes.learningAccountStatus?.newValue) {
+    renderLinkStatus(changes.learningAccountStatus.newValue as LinkStatus);
+  }
   if (areaName === 'local' && changes.settings) {
     const newSettings = changes.settings.newValue;
     if (newSettings && newSettings.phoneticsVisible !== undefined) {

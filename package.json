@@ -21,6 +21,7 @@
     "@tailwindcss/vite": "^4.0.0-beta.8",
     "@types/chrome": "^0.0.268",
     "@types/node": "^20.14.9",
+    "fake-indexeddb": "^6.2.7",
     "jsdom": "^26.1.0",
     "typescript": "^5.5.2",
     "vite": "^5.3.1",

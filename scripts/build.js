@@ -66,6 +66,7 @@ async function runBuild() {
     logLevel: 'silent',
     define: {
       'process.env.NODE_ENV': '"production"',
+      '__LEARNING_API_BASE__': JSON.stringify(process.env.LEARNING_API_BASE || 'http://127.0.0.1:8000'),
     },
     tsconfig: resolve(__dirname, '../tsconfig.json'),
   });

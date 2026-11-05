@@ -4,7 +4,7 @@ Use this text with the build that includes the consent gate. Keep it in sync wit
 
 ## Single purpose
 
-Translate user-selected text and text recognized from user-selected image regions between English, Vietnamese, and Chinese, with pronunciation and Hanzi learning aids.
+Translate user-selected text and text recognized from user-selected image regions between English, Vietnamese, and Chinese, with pronunciation and Hanzi learning aids, including an optional linked learning-folder website.
 
 ## Permission justifications
 
@@ -16,6 +16,7 @@ Translate user-selected text and text recognized from user-selected image region
 | `offscreen` | Run local OCR in an offscreen document for image regions the user selects on a web page. |
 | `activeTab` | Capture the visible tab after the user activates OCR selection, so the selected image region can be recognized locally. Review whether this permission is redundant with broad host access before submission. |
 | `clipboardWrite` | Copy translated text or an OCR image to the clipboard when the user invokes that feature or enables image copying. |
+| `alarms` | Poll a short-lived website account-link request after the user starts linking from extension settings, including when the popup closes. |
 | `<all_urls>` and `file://*/*` | Show translation controls on web pages and supported local PDF files and read PDF content for the extension viewer. Explain the all-sites access clearly in the listing. Review whether all declared host entries are necessary before submission. |
 | `https://translate.googleapis.com/*` | Send text chosen for translation to Google Translate. This entry may be redundant with `<all_urls>` and should be reviewed before submission. |
 
@@ -25,10 +26,10 @@ Select **No** if the submitted package is built from this source and no remote s
 
 ## Data use disclosure
 
-Disclose **website content** and **user-generated content**: the extension reads selected text, selected editable-field content, and text extracted from selected image regions. The selected content may also include **personal communications or personally identifiable information** depending on the user's selection. Disclose **authentication information** for the optional DeepL API key. Explain that the image region is processed locally and only recognized text is sent to the chosen translation provider. Settings, API key, notes, pinned images, and cached Hanzi meanings are stored locally. PDF URLs are inspected for the viewer feature but are not retained as browsing history by the extension.
+Disclose **website content** and **user-generated content**: the extension reads selected text, selected editable-field content, and text extracted from selected image regions. The selected content may also include **personal communications or personally identifiable information** depending on the user's selection. Disclose **authentication information** for the optional DeepL API key and optional companion-website link token. Explain that the image region is processed locally and only recognized text is sent to the chosen translation provider. Settings, API key, notes, pinned images, and cached Hanzi meanings are stored locally. The optional website stores account username and folder names; the link token stays in extension IndexedDB, separate from page content scripts. PDF URLs are inspected for the viewer feature but are not retained as browsing history by the extension.
 
 Certify the Limited Use statements only after checking the final release package and the published privacy policy. Do not claim that translation is fully offline: Google and DeepL requests require network access. Do not claim that DeepL keys are encrypted at rest by the extension: they are saved in `chrome.storage.local`.
 
 ## User-facing disclosure
 
-The popup explains the external transfer and requires the user to select **Tôi đồng ý và bật dịch** before any translation request. After consent, selecting text can trigger an automatic request while Auto Translate is enabled. This behavior should be stated in the Store listing as well.
+The popup explains the external transfer and requires the user to select **Tôi đồng ý và bật dịch** before any translation request. After consent, selecting text can trigger an automatic request while Auto Translate is enabled. Its optional account-link section separately explains that username and folder names are stored by the website and existing extension notes are not uploaded. This behavior should be stated in the Store listing as well.

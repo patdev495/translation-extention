@@ -8,6 +8,16 @@
 @import "../src/ui/tokens.css";
 @import "../src/ui/base.css";
 .hanzi-backup-section { margin-top: var(--space-md); padding: var(--space-md); border: 1px solid var(--color-border, #d5dce6); border-radius: 12px; }
+.learning-account-section { margin-top: var(--space-md); padding: var(--space-md); border: 1px solid #d7dcf5; border-radius: 12px; background: #f7f7ff; }
+.learning-account-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.learning-account-heading h2 { margin: 0; }
+.learning-account-badge { padding: 3px 7px; border-radius: 6px; background: #e5e3ff; color: #4f46c7; font-size: 10px; font-weight: 800; letter-spacing: .08em; }
+.learning-account-section > p { margin: 6px 0; font-size: 12px; }
+.learning-account-status { color: #4b5482; font-weight: 700; overflow-wrap: anywhere; }
+.learning-account-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.learning-account-actions button { padding: 7px 12px; border: 1px solid #b8c0e7; border-radius: 8px; background: #fff; color: #353a72; font-weight: 700; cursor: pointer; }
+.learning-account-actions button:first-child { background: #4f46e5; border-color: #4f46e5; color: #fff; }
+.learning-account-actions button:disabled { opacity: .6; cursor: wait; }
 .hanzi-backup-section h2 { margin: 0 0 4px; }
 .hanzi-backup-section p { margin: 0 0 10px; }
 .hanzi-backup-actions { display: flex; flex-wrap: wrap; gap: 8px; }

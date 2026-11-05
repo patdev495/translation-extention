@@ -3,7 +3,7 @@ import { describe, expect, test, vi } from 'vitest';
 describe('Hanzi component meaning request', () => {
   test('the background translates an English component meaning to Vietnamese', async () => {
     let listener: (message: { type: string; meaning: string }, sender: unknown, respond: (value: unknown) => void) => void = () => {};
-    const storage: Record<string, unknown> = {};
+    const storage: Record<string, unknown> = { privacyConsentGranted: true };
     vi.stubGlobal('chrome', {
       webNavigation: { onBeforeNavigate: { addListener: vi.fn() } },
       runtime: {

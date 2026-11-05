@@ -2,6 +2,7 @@ import { SettingsManager } from '../services/settings';
 import { PDF_VIEWER_PATH, shouldUseExtensionPdfViewer } from './pdf-redirect';
 import { TranslationCoordinator } from '../services/translation-coordinator';
 import { TranslationEngine } from '../services/translation';
+import { getAccountLinkStatus, startAccountLink, unlinkAccount } from './learning-account-link';
 
 // ─── PDF Redirect Logic ────────────────────────────────────────────────────
 
@@ -164,6 +165,19 @@ async function translateText(text: string) {
 // ─── Message Handlers ──────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'START_ACCOUNT_LINK' || message.type === 'GET_ACCOUNT_LINK_STATUS' || message.type === 'UNLINK_ACCOUNT') {
+    const task = message.type === 'START_ACCOUNT_LINK'
+      ? startAccountLink()
+      : message.type === 'UNLINK_ACCOUNT'
+        ? unlinkAccount()
+        : getAccountLinkStatus();
+    void task.then(
+      (status) => sendResponse({ success: true, status }),
+      (error: unknown) => sendResponse({ success: false, error: error instanceof Error ? error.message : 'Account link failed' }),
+    );
+    return true;
+  }
+
   if (message.type === 'TRANSLATE_HANZI_MEANING') {
     (async () => {
       const meaning = typeof message.meaning === 'string' ? message.meaning.trim() : '';

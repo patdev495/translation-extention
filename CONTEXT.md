@@ -218,4 +218,61 @@ _Avoid_: Screenshot float, Screenshot sticker
 The configuration setting determining whether the cropped Image Region is automatically copied to the system clipboard upon successful OCR extraction.
 _Default_: false
 
+**Learning Account**:
+The learner's account on the companion website, linked to their extension so saved learning content belongs to that learner.
+
+**Account Link**:
+The connection the learner initiates from extension settings between the extension and their Learning Account on the companion website. Saving to the Learning Library requires this link.
+
+**Learning Library**:
+The learner's personal collection of saved Chinese learning content on the companion website.
+_Avoid_: General-purpose cloud drive
+
+**Learning Folder**:
+A learner-named location in the Learning Library that can contain saved content and other Learning Folders. Learners create folders on the companion website, not in the extension.
+
+**Default Learning Folder**:
+The last Learning Folder chosen when saving from the Translation Tooltip, reused for later saves until the learner changes it. The learner chooses an existing folder on their first save; if none exists, the extension directs them to the website to create one.
+
+**Learning Trash**:
+The recoverable location for individually deleted Saved Learning Items and for deleted Learning Folders together with their nested folders and items. Its contents remain until the learner explicitly deletes them permanently or empties the trash.
+
+**Saved Learning Item**:
+A Chinese text entry created from the Translation Tooltip in a Learning Folder, regardless of where the text came from, and classified as either Word or Phrase or Sentence. Its Chinese text and meaning can be corrected on the website; it shows Pinyin for its current text and does not record a source page or PDF address.
+
+**Chinese Save Selection**:
+The part of the Chinese text row that the learner highlights inside the Translation Tooltip before saving. It determines the selected item's text and identifies the containing sentence when both are saved.
+_Avoid_: Source Text selection, Pinyin selection
+
+**Save Choice Menu**:
+The menu opened by the Chinese row's save button or by pressing `s` while the Translation Tooltip is open. It offers `1` Word or Phrase and `2` Sentence for any save, and `3` Both when a Chinese Save Selection exists; number keys activate the corresponding choices only while the learner is not typing in an editable field.
+
+**Learning Category**:
+The classification selected in the extension when creating a Saved Learning Item: either Word or Phrase or Sentence. It is independent of the Learning Folder containing the item, does not represent a physical folder on the website, and can be corrected later on the website.
+
+**Word or Phrase**:
+The Learning Category for Chinese text the learner treats as a word or phrase. The learner chooses this category whether the saved text is a Chinese Save Selection or the entire Chinese row.
+_Avoid_: Word Item
+
+**Sentence**:
+The Learning Category for Chinese text the learner treats as a sentence or longer passage. The learner chooses this category even when no Chinese Save Selection exists; without a selection, the item's text is the entire Chinese row, including multiple sentences when present.
+
+**Linked Word and Sentence**:
+Two separate Saved Learning Items created by the "both" save choice: a Word or Phrase from the Chinese Save Selection and the Sentence containing it. The items remain linked so the learner can navigate between them.
+
+**Sentence Save Preview**:
+The learner's chance to review and edit the sentence inferred to contain their Chinese Save Selection before it is saved, especially when the text lacks clear sentence punctuation.
+
+**Meaning Suggestion**:
+A proposed meaning generated for the exact Chinese text being saved, rather than borrowed from a translation of the whole surrounding sentence. The learner can edit it before confirming the save.
+
+**Pending Sync Item**:
+A Saved Learning Item accepted by the extension for a linked Learning Account while the website is unreachable, visibly awaiting addition to the Learning Library when connectivity returns.
+
+**Unlinked Save Attempt**:
+A save request made before an Account Link exists. The extension asks the learner to link an account through settings and does not create a Saved Learning Item.
+
+**Duplicate Learning Item**:
+A save attempt with the same Chinese text and Learning Category as an existing item in the chosen Learning Folder. The learner is shown the existing item and can add a new linked sentence context instead of receiving a silent duplicate; matching items in different folders remain separate.
+
 
