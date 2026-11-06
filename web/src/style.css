@@ -85,7 +85,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .tree-row.active .tree-menu-button { color: #4b43cd; }
 .trash-nav { margin-top: 16px; border-top: 1px solid #e9ebf5; border-radius: 0 0 9px 9px; }
 .tree-button svg { flex: none; }
-.tree-chevron { margin-left: -8px; margin-right: -6px; transition: transform .17s ease; }
+.tree-chevron { margin-left: auto; transition: transform .17s ease; }
 .tree-chevron.expanded { transform: rotate(90deg); }
 .folder-context-menu { position: fixed; z-index: 100; width: 225px; max-width: calc(100vw - 16px); padding: 6px; border: 1px solid #dfe2f2; border-radius: 12px; background: #fff; box-shadow: 0 14px 36px #25295829; }
 .folder-context-title { margin: 0 4px 5px; padding: 7px 8px 9px; border-bottom: 1px solid #eceef7; color: #727c99; overflow-wrap: anywhere; font-size: 12px; font-weight: 700; }

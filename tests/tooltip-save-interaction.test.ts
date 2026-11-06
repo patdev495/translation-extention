@@ -77,6 +77,29 @@ test('number keys choose visible category despite bubbling being stopped inside 
   expect(root.querySelector('.tt-save-sentence')).not.toBeNull();
 });
 
+test('x closes Save Choice Menu and save form back to original Translation Tooltip', async () => {
+  const { root, sendMessage } = setup('你好');
+  root.querySelector<HTMLButtonElement>('.tt-save-button')!.click();
+  expect(root.querySelector('.tt-save-panel')).not.toBeNull();
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'x', bubbles: true }));
+  expect(root.querySelector('.tt-save-panel')).toBeNull();
+  expect(root.querySelector('.tt-source-text')?.textContent).toBe('你好');
+  root.querySelector<HTMLButtonElement>('.tt-save-button')!.click();
+  root.querySelector<HTMLButtonElement>('[data-choice="word"]')!.click();
+  expect(root.querySelector('.tt-save-form')).not.toBeNull();
+  await vi.waitFor(() => expect((root.querySelector('.tt-save-folder') as HTMLSelectElement).options.length).toBe(2));
+  const meaning = root.querySelector<HTMLInputElement>('.tt-save-meaning')!;
+  meaning.focus();
+  meaning.dispatchEvent(new KeyboardEvent('keydown', { key: 'x', bubbles: true, composed: true }));
+  expect(root.querySelector('.tt-save-form')).not.toBeNull();
+  const folder = root.querySelector<HTMLSelectElement>('.tt-save-folder')!;
+  folder.focus();
+  folder.dispatchEvent(new KeyboardEvent('keydown', { key: 'X', bubbles: true, composed: true }));
+  expect(root.querySelector('.tt-save-panel')).toBeNull();
+  expect(root.querySelector('.tt-source-text')?.textContent).toBe('你好');
+  expect(sendMessage.mock.calls.some(([message]) => message.type === 'LEARNING_SAVE')).toBe(false);
+});
+
 test('s submits ready save form and announces success without reopening choices', async () => {
   const { root, sendMessage } = setup('你好');
   document.dispatchEvent(new KeyboardEvent('keydown', { key: 's', bubbles: true }));

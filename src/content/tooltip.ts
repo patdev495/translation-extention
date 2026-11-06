@@ -327,9 +327,14 @@ export class TranslationTooltip {
       if (activeElement instanceof Element) eventElements.push(activeElement);
       if (eventElements.some(node => node.matches('input, textarea, [contenteditable="true"]')
         || node instanceof HTMLElement && node.isContentEditable)) return;
+      if (event.ctrlKey || event.altKey || event.metaKey) return;
+      if (event.key.toLowerCase() === 'x' && !event.repeat && this.tooltipEl.querySelector('.tt-save-panel')) {
+        event.preventDefault();
+        this.closeSavePanel();
+        return;
+      }
       if (eventElements.some(node => node.matches('select'))
         && !(event.key.toLowerCase() === 's' && eventElements.some(node => node.matches('.tt-save-form .tt-save-folder')))) return;
-      if (event.ctrlKey || event.altKey || event.metaKey) return;
       if (event.key.toLowerCase() === 's' && !event.repeat) {
         const form = this.tooltipEl.querySelector<HTMLFormElement>('.tt-save-form');
         if (form) {
@@ -387,7 +392,7 @@ export class TranslationTooltip {
     panel.setAttribute('role', 'group');
     panel.setAttribute('aria-label', 'Save Choice Menu');
     panel.innerHTML = `<div class="tt-save-heading"><strong class="tt-save-title"></strong><button type="button" class="tt-save-close" aria-label="Đóng menu lưu">×</button></div>
-      <small class="tt-save-shortcut">${this.saveSelection ? 'Nhấn 1, 2 hoặc 3 để chọn' : 'Nhấn 1 hoặc 2 để chọn'}</small>
+      <small class="tt-save-shortcut">${this.saveSelection ? 'Nhấn 1, 2 hoặc 3 để chọn' : 'Nhấn 1 hoặc 2 để chọn'} · X để thoát</small>
       <button type="button" class="tt-save-choice" data-choice="word" data-key="1">1 · Từ / cụm từ</button>
       <button type="button" class="tt-save-choice" data-choice="sentence" data-key="2">2 · Câu</button>
       ${this.saveSelection ? '<button type="button" class="tt-save-choice" data-choice="both" data-key="3">3 · Cả hai</button>' : ''}`;
@@ -406,7 +411,7 @@ export class TranslationTooltip {
       <label>${choice === 'sentence' && this.saveSelection ? 'Câu chứa chữ đã chọn · kiểm tra trước khi lưu' : 'Chữ Trung'}<input class="tt-save-text" required /></label>
       <label>Nghĩa gợi ý<input class="tt-save-meaning" required placeholder="Sửa nghĩa trước khi lưu" /></label>
       ${choice === 'both' ? '<label>Câu chứa từ · kiểm tra trước khi lưu<textarea class="tt-save-sentence" required></textarea></label><label>Nghĩa câu<input class="tt-save-sentence-meaning" required /></label><small class="tt-save-existing-sentence" role="status"></small>' : ''}
-      <small class="tt-save-shortcut">Nhấn S để lưu khi không nhập liệu</small>
+      <small class="tt-save-shortcut">Nhấn S để lưu · X để thoát khi không nhập liệu</small>
       <p class="tt-save-status" role="status"></p><button type="submit" class="tt-save-submit">Lưu</button></form>`;
     panel.querySelector('.tt-save-title')!.textContent = `Lưu “${text}” vào thư viện`;
     panel.querySelector<HTMLInputElement>('.tt-save-text')!.value = text;

@@ -262,6 +262,25 @@ test('learner expands folder levels and sees child folders above direct items', 
   page.unmount();
 });
 
+test('folder arrow follows name so sibling folder icons start at same position', async () => {
+  storedFolders = [
+    { id: 'parent', name: 'HSK 1', parent_id: null },
+    { id: 'leaf', name: 'HSK-2', parent_id: null },
+    { id: 'child', name: 'Bài 01', parent_id: 'parent' },
+  ];
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+  const rows = page.get('nav[aria-label="Cây thư mục"]').findAll('.tree-row');
+  const parent = rows.find(row => row.text().includes('HSK 1'))!.get('.tree-button');
+  const leaf = rows.find(row => row.text().includes('HSK-2'))!.get('.tree-button');
+  expect(parent.element.children[0]?.classList.contains('lucide-folder')).toBe(true);
+  expect(parent.element.children[1]?.textContent).toBe('HSK 1');
+  expect(parent.element.children[2]?.classList.contains('tree-chevron')).toBe(true);
+  expect(leaf.element.children[0]?.classList.contains('lucide-folder')).toBe(true);
+  expect(leaf.element.children[1]?.textContent).toBe('HSK-2');
+  page.unmount();
+});
+
 test('folder hierarchy remains navigable after reload and through keyboard menu', async () => {
   storedFolders = [
     { id: 'root', name: 'HSK', parent_id: null },
