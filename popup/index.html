@@ -1,195 +1,137 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Translation Extension Settings</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <meta name="description" content="PolyTranslate language, reading, translation and OCR settings.">
+  <title>PolyTranslate Settings</title>
   <link rel="stylesheet" href="../src/index.css">
-  <style>
-    body {
-      font-family: 'Outfit', sans-serif;
-    }
-  </style>
+  <link rel="stylesheet" href="./popup.css">
 </head>
-<body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 text-slate-100 w-[580px] p-5 select-none antialiased min-h-[300px]">
-  <div class="flex flex-col gap-4">
-    <!-- Header -->
-    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-      <div class="flex items-center gap-2">
-        <div class="p-2 bg-blue-600/20 text-blue-400 rounded-xl border border-blue-500/10">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 21l5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 0 1 6-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138c.896.061 1.785.147 2.666.257m-2.666-2.621a9 9 0 0 1 3.224 5.29" />
-          </svg>
-        </div>
-        <div>
-          <h1 class="text-sm font-bold bg-gradient-to-r from-blue-400 to-teal-400 bg-clip-text text-transparent">PolyTranslate</h1>
-          <p class="text-[10px] text-slate-400">Multi-language Learning Tool</p>
-        </div>
+<body>
+<div class="popup-root">
+  <header class="header">
+    <div class="brand">
+      <svg class="brand-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10.5 21l5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 0 1 6-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138c.896.061 1.785.147 2.666.257m-2.666-2.621a9 9 0 0 1 3.224 5.29"/>
+      </svg>
+      <div class="brand-text">
+        <h1>PolyTranslate</h1>
+        <p class="visually-hidden">Multi-language Learning Tool</p>
       </div>
-      
-      <!-- Active Switch -->
-      <label class="relative inline-flex items-center cursor-pointer">
-        <input type="checkbox" id="active-toggle" class="sr-only peer" checked>
-        <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
+    </div>
+    <div class="header-right">
+      <label class="power-label" for="active-toggle">Extension</label>
+      <label class="toggle-wrap" title="Enable or disable translation">
+        <input type="checkbox" id="active-toggle" checked aria-label="Enable or disable translation">
+        <span class="toggle-track" aria-hidden="true"></span>
       </label>
     </div>
-
-    <!-- Settings Form: 2 Columns -->
-    <div class="grid grid-cols-2 gap-4 items-start">
-      <!-- Left Column -->
-      <div class="flex flex-col gap-4">
-        <!-- Languages Configuration -->
-        <div class="bg-slate-900/40 border border-slate-800/60 rounded-xl p-3 flex flex-col gap-3">
-          <h2 class="text-2xs font-bold text-slate-400 tracking-wider uppercase">Languages</h2>
-          
-          <div class="flex flex-col gap-2.5">
-            <!-- Primary -->
-            <div class="flex items-center justify-between gap-2">
-              <span class="text-xs font-semibold">Primary Target</span>
-              <select id="primary-lang" class="bg-slate-800 border border-slate-700 rounded-lg py-0.5 px-1.5 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer w-24">
-                <option value="vi" selected>Vietnamese</option>
-                <option value="none">Disabled</option>
-                <option value="en">English</option>
-                <option value="zh">Chinese</option>
-              </select>
-            </div>
-            
-            <!-- Secondary -->
-            <div class="flex items-center justify-between gap-2">
-              <span class="text-xs font-semibold">Secondary Target</span>
-              <select id="secondary-lang" class="bg-slate-800 border border-slate-700 rounded-lg py-0.5 px-1.5 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer w-24">
-                <option value="vi">Vietnamese</option>
-                <option value="none">Disabled</option>
-                <option value="en" selected>English</option>
-                <option value="zh">Chinese</option>
-              </select>
-            </div>
-
-            <!-- Reverse -->
-            <div class="flex items-center justify-between gap-2">
-              <span class="text-xs font-semibold">Reverse Target</span>
-              <select id="reverse-lang" class="bg-slate-800 border border-slate-700 rounded-lg py-0.5 px-1.5 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer w-24">
-                <option value="vi">Vietnamese</option>
-                <option value="none">Disabled</option>
-                <option value="en">English</option>
-                <option value="zh" selected>Chinese</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <!-- Translation Provider Configuration -->
-        <div class="bg-slate-900/40 border border-slate-800/60 rounded-xl p-3 flex flex-col gap-3">
-          <h2 class="text-2xs font-bold text-slate-400 tracking-wider uppercase">Translation Provider</h2>
-          
-          <!-- Provider Select -->
-          <div class="flex items-center justify-between gap-4">
-            <div class="flex flex-col">
-              <span class="text-xs font-semibold">Engine</span>
-              <span class="text-3xs text-slate-400">Select engine</span>
-            </div>
-            <select id="provider" class="bg-slate-800 border border-slate-700 rounded-lg py-1 px-2 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer w-28">
-              <option value="google" selected>Google</option>
-              <option value="deepl">DeepL API</option>
-            </select>
-          </div>
-
-          <!-- DeepL API Key Input (Hidden by default) -->
-          <div id="deepl-key-container" class="hidden flex flex-col gap-1 border-t border-slate-800/40 pt-2.5">
-            <label for="deepl-api-key" class="text-3xs font-medium text-slate-400">DeepL API Key</label>
-            <div class="relative flex items-center">
-              <input type="password" id="deepl-api-key" placeholder="Enter API Key..." class="bg-slate-800 border border-slate-700 rounded-lg py-1 pl-2 pr-8 text-xs text-white focus:outline-none focus:border-blue-500 w-full">
-              <button id="toggle-deepl-key" class="absolute right-2 text-slate-400 hover:text-slate-200 cursor-pointer transition-colors focus:outline-none" title="Toggle visibility" type="button">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5" id="eye-icon">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.43 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                </svg>
-              </button>
-            </div>
-            <p id="deepl-key-status" class="text-[10px] mt-1 hidden font-medium transition-opacity duration-200"></p>
-          </div>
-        </div>
+  </header>
+  <main class="settings-main">
+    <section id="privacy-consent" class="privacy-consent" aria-labelledby="privacy-consent-title">
+      <h2 id="privacy-consent-title">Trước khi dùng tính năng dịch</h2>
+      <p>PolyTranslate gửi phần văn bản bạn chọn hoặc văn bản nhận từ OCR tới Google Translate. Nếu bạn chọn DeepL, văn bản và API key của bạn được gửi tới DeepL. Ảnh OCR được xử lý trên thiết bị. Cài đặt, API key, ghi chú học chữ Hán và ảnh bạn ghim được lưu trong Chrome trên thiết bị này.</p>
+      <p><a href="../privacy-policy.html" target="_blank" rel="noopener noreferrer">Đọc chính sách quyền riêng tư</a></p>
+      <button id="privacy-consent-accept" type="button">Tôi đồng ý và bật dịch</button>
+    </section>
+    <section class="language-section" aria-labelledby="languages-title">
+      <h2 id="languages-title">Languages</h2>
+      <div class="language-grid">
+        <div class="setting-row"><label class="setting-info" for="primary-lang" title="Main output language"><span class="setting-label">Primary Target</span><span class="setting-desc">Main output language</span></label><div class="select-wrap"><select id="primary-lang"><option value="vi" selected>Vietnamese</option><option value="none">Disabled</option><option value="en">English</option><option value="zh">Chinese</option></select></div></div>
+        <div class="setting-row"><label class="setting-info" for="secondary-lang" title="Fallback language"><span class="setting-label">Secondary Target</span><span class="setting-desc">Fallback language</span></label><div class="select-wrap"><select id="secondary-lang"><option value="vi">Vietnamese</option><option value="none">Disabled</option><option value="en" selected>English</option><option value="zh">Chinese</option></select></div></div>
+        <div class="setting-row"><label class="setting-info" for="reverse-lang" title="Smart swap fallback"><span class="setting-label">Reverse Target</span><span class="setting-desc">Smart swap fallback</span></label><div class="select-wrap"><select id="reverse-lang"><option value="vi">Vietnamese</option><option value="none">Disabled</option><option value="en">English</option><option value="zh" selected>Chinese</option></select></div></div>
       </div>
-
-      <!-- Right Column -->
-      <div class="flex flex-col gap-4">
-        <!-- Behavior & Triggers Box -->
-        <div class="bg-slate-900/40 border border-slate-800/60 rounded-xl p-3 flex flex-col gap-3">
-          <h2 class="text-2xs font-bold text-slate-400 tracking-wider uppercase">Behavior & Triggers</h2>
-          
-          <!-- Hotkey Modifier -->
-          <div class="flex items-center justify-between gap-4">
-            <div class="flex flex-col">
-              <span class="text-xs font-semibold">Hotkey Modifier</span>
-              <span class="text-3xs text-slate-400">Hold key on select</span>
-            </div>
-            <select id="hotkey" class="bg-slate-800 border border-slate-700 rounded-lg py-1 px-2 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer w-24">
-              <option value="none">None</option>
-              <option value="ctrl">Ctrl</option>
-              <option value="alt">Alt</option>
-              <option value="shift">Shift</option>
-            </select>
+    </section>
+    <div class="settings-grid">
+      <section class="settings-section" aria-labelledby="translation-title">
+        <h2 id="translation-title">Translation Engine</h2>
+        <div class="setting-row"><label class="setting-info" for="provider"><span class="setting-label">Provider</span><span class="setting-desc">Active engine service</span></label><div class="select-wrap"><select id="provider"><option value="google" selected>Google</option><option value="deepl">DeepL API</option></select></div></div>
+        <div id="deepl-key-container" class="deepl-section hidden">
+          <label class="input-label" for="deepl-api-key">DeepL API Key</label>
+          <div class="input-wrap">
+            <input type="password" id="deepl-api-key" placeholder="Paste your API key…" autocomplete="off" spellcheck="false" aria-describedby="deepl-key-status">
+            <button class="eye-btn" id="toggle-deepl-key" type="button" aria-label="Toggle API key visibility">
+              <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="eye-icon">
+                <path d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.43 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/><path d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/>
+              </svg>
+            </button>
           </div>
-
-          <div class="flex items-center justify-between gap-4">
-            <div class="flex flex-col">
-              <span class="text-xs font-semibold">OCR Shortcut</span>
-              <span class="text-3xs text-slate-400">Toggle webpage OCR</span>
-            </div>
-            <select id="ocr-shortcut" class="bg-slate-800 border border-slate-700 rounded-lg py-1 px-2 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer w-28">
-              <option value="ctrl-space">Ctrl+Space</option>
-              <option value="alt-o">Alt+O</option>
-              <option value="ctrl-shift-o">Ctrl+Shift+O</option>
-              <option value="disabled">Disabled</option>
-            </select>
-          </div>
-
-          <div class="flex items-center justify-between gap-4">
-            <div class="flex flex-col">
-              <span class="text-xs font-semibold">OCR Model Size</span>
-              <span class="text-3xs text-slate-400">PP-OCRv6 model size</span>
-            </div>
-            <select id="ocr-model-tier" class="bg-slate-800 border border-slate-700 rounded-lg py-1 px-2 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer w-28">
-              <option value="tiny">Tiny (Fast/Light)</option>
-              <option value="small">Small (Balanced)</option>
-              <option value="medium">Medium (Accurate)</option>
-            </select>
-          </div>
-
-          <div class="flex items-center justify-between gap-4">
-            <div class="flex flex-col">
-              <span class="text-xs font-semibold">OCR Language</span>
-              <span class="text-3xs text-slate-400">Language engine mode</span>
-            </div>
-            <select id="ocr-language" class="bg-slate-800 border border-slate-700 rounded-lg py-1 px-2 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer w-28">
-              <option value="ch">Chinese / English</option>
-              <option value="latin">Latin / Multilingual</option>
-            </select>
-          </div>
+          <div id="deepl-key-status" role="status" aria-live="polite"></div>
         </div>
-
-        <!-- TTS Configuration -->
-        <div class="bg-slate-900/40 border border-slate-800/60 rounded-xl p-3 flex items-center justify-between">
-          <div class="flex flex-col">
-            <span class="text-xs font-semibold">TTS Pronounce</span>
-            <span class="text-3xs text-slate-400">Show speaker button</span>
-          </div>
-          <label class="relative inline-flex items-center cursor-pointer">
-            <input type="checkbox" id="tts-toggle" class="sr-only peer" checked>
-            <div class="w-8 h-4.5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[14px] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-blue-500"></div>
-          </label>
+        <div class="setting-row"><label class="setting-info" for="auto-translate"><span class="setting-label">Auto Translate</span><span class="setting-desc">On text selection</span></label><label class="toggle-wrap" title="Auto Translate"><input type="checkbox" id="auto-translate" checked aria-label="Auto Translate"><span class="toggle-track" aria-hidden="true"></span></label></div>
+        <div class="setting-row"><label class="setting-info" for="input-replacement-enabled"><span class="setting-label">Translate with shortcut</span><span class="setting-desc">Translate selection; replace text in inputs</span></label><label class="toggle-wrap" title="Translate with shortcut"><input type="checkbox" id="input-replacement-enabled" checked aria-label="Translate with shortcut"><span class="toggle-track" aria-hidden="true"></span></label></div>
+        <div class="setting-row shortcut-row">
+          <label class="setting-info" for="input-replacement-shortcut"><span class="setting-label">Translation shortcut</span><span class="setting-desc">Click, then press a key</span></label>
+          <input class="shortcut-capture" type="text" id="input-replacement-shortcut" readonly aria-label="Translation shortcut" aria-describedby="input-replacement-error">
         </div>
-      </div>
+        <p id="input-replacement-error" class="shortcut-error" role="alert"></p>
+      </section>
+      <section class="settings-section" aria-labelledby="display-title">
+        <h2 id="display-title">Tooltip &amp; Display</h2>
+        <div class="setting-row"><label class="setting-info" for="tooltip-font-size"><span class="setting-label">Font Size</span><span class="setting-desc">Tooltip text size</span></label><div class="select-wrap"><select id="tooltip-font-size"><option value="12">12px (Small)</option><option value="14" selected>14px (Normal)</option><option value="16">16px (Large)</option><option value="18">18px (XL)</option><option value="20">20px (2XL)</option><option value="24">24px (3XL)</option><option value="28">28px</option><option value="32">32px</option><option value="36">36px</option><option value="40">40px</option><option value="48">48px</option><option value="56">56px</option><option value="64">64px</option><option value="72">72px</option><option value="80">80px</option></select></div></div>
+        <div class="setting-row"><label class="setting-info" for="tts-toggle"><span class="setting-label">TTS Pronounce</span><span class="setting-desc">Speaker button</span></label><label class="toggle-wrap" title="TTS Pronounce"><input type="checkbox" id="tts-toggle" checked aria-label="TTS Pronounce"><span class="toggle-track" aria-hidden="true"></span></label></div>
+        <div class="setting-row"><label class="setting-info" for="phonetics-toggle"><span class="setting-label">Phonetics</span><span class="setting-desc">IPA / Pinyin display</span></label><label class="toggle-wrap" title="Phonetics"><input type="checkbox" id="phonetics-toggle" checked aria-label="Phonetics"><span class="toggle-track" aria-hidden="true"></span></label></div>
+        <div class="setting-row"><label class="setting-info" for="hanzi-stroke-speed"><span class="setting-label">Hanzi Stroke Speed</span><span class="setting-desc">Higher is faster</span></label><div class="select-wrap"><select id="hanzi-stroke-speed"><option value="0.5">0.5×</option><option value="1">1×</option><option value="1.5">1.5×</option><option value="2" selected>2× (Default)</option><option value="3">3×</option></select></div></div>
+        <div class="setting-row"><label class="setting-info" for="hanzi-breakdown-enabled"><span class="setting-label">Hanzi Breakdown</span><span class="setting-desc">Show components while strokes loop</span></label><label class="toggle-wrap" title="Hanzi Breakdown"><input type="checkbox" id="hanzi-breakdown-enabled" aria-label="Hanzi Breakdown"><span class="toggle-track" aria-hidden="true"></span></label></div>
+        <div class="setting-row"><label class="setting-info" for="hanzi-breakdown-language"><span class="setting-label">Breakdown Language</span><span class="setting-desc">Component explanations</span></label><div class="select-wrap"><select id="hanzi-breakdown-language"><option value="vi" selected>Vietnamese</option><option value="en">English</option></select></div></div>
+      </section>
     </div>
-
-    <!-- Status Message -->
-    <div id="status-msg" class="text-center text-[10px] text-emerald-400 font-medium opacity-0 transition-opacity duration-300">
-      Settings saved automatically
+    <section class="learning-account-section" aria-labelledby="learning-account-title">
+      <div class="learning-account-heading">
+        <h2 id="learning-account-title">Tài khoản học tập</h2>
+        <span class="learning-account-badge">WEB</span>
+      </div>
+      <p>Liên kết để quản lý thư mục học tiếng Trung trên web. Tên đăng nhập và tên thư mục lưu trên máy chủ web; ghi chú hiện có không tự tải lên.</p>
+      <p id="learning-account-status" class="learning-account-status" role="status" aria-live="polite">Đang kiểm tra liên kết…</p>
+      <div class="learning-account-actions">
+        <button id="learning-account-link" type="button">Liên kết tài khoản</button>
+        <button id="learning-account-unlink" type="button" hidden>Ngắt liên kết</button>
+      </div>
+      <div class="learning-sync-section" aria-labelledby="learning-sync-title">
+        <div class="learning-sync-heading"><h3 id="learning-sync-title">Đồng bộ mục học tập</h3><button id="learning-sync-retry" type="button">Thử lại</button></div>
+        <ul id="learning-sync-list" aria-live="polite"><li>Đang tải trạng thái…</li></ul>
+      </div>
+    </section>
+    <section class="hanzi-backup-section" aria-labelledby="hanzi-backup-title">
+      <h2 id="hanzi-backup-title">Hanzi learning backup</h2>
+      <p>Save your personal meanings and memory notes to a JSON file.</p>
+      <div class="hanzi-backup-actions">
+        <button id="hanzi-export-backup" type="button">Export JSON</button>
+        <button id="hanzi-import-backup" type="button">Import JSON</button>
+        <input id="hanzi-backup-file" type="file" accept="application/json,.json" hidden aria-label="Hanzi backup file">
+      </div>
+      <div id="hanzi-import-choice" hidden>
+        <p id="hanzi-import-summary"></p>
+        <div class="hanzi-backup-actions">
+          <button id="hanzi-import-keep-current" type="button">Keep current</button>
+          <button id="hanzi-import-use-file" type="button">Use file</button>
+        </div>
+      </div>
+      <p id="hanzi-backup-status" role="status" aria-live="polite"></p>
+    </section>
+    <section class="ocr-section" aria-labelledby="ocr-title">
+      <div class="ocr-heading">
+        <h2 id="ocr-title">Behavior &amp; OCR</h2>
+        <div class="ocr-actions">
+          <div class="setting-row"><label class="setting-info" for="ocr-pin-toggle" title="Float cropped region"><span class="setting-label">Pin OCR Image</span><span class="setting-desc">Float cropped region</span></label><label class="toggle-wrap" title="Pin OCR Image"><input type="checkbox" id="ocr-pin-toggle" aria-label="Pin OCR Image"><span class="toggle-track" aria-hidden="true"></span></label></div>
+          <div class="setting-row"><label class="setting-info" for="ocr-copy-toggle" title="Auto-copy to clipboard"><span class="setting-label">Copy OCR Image</span><span class="setting-desc">Auto-copy to clipboard</span></label><label class="toggle-wrap" title="Copy OCR Image"><input type="checkbox" id="ocr-copy-toggle" aria-label="Copy OCR Image"><span class="toggle-track" aria-hidden="true"></span></label></div>
+        </div>
+      </div>
+      <div class="ocr-fields">
+        <div class="setting-row"><label class="setting-info" for="ocr-shortcut" title="Toggle OCR mode"><span class="setting-label">OCR Shortcut</span><span class="setting-desc">Toggle OCR mode</span></label><div class="select-wrap"><select id="ocr-shortcut"><option value="ctrl-space" selected>Ctrl+Space</option><option value="alt-o">Alt+O</option><option value="ctrl-shift-o">Ctrl+Shift+O</option><option value="disabled">Disabled</option></select></div></div>
+        <div class="setting-row"><label class="setting-info" for="ocr-model-tier" title="PP-OCRv6 tier"><span class="setting-label">OCR Model</span><span class="setting-desc">PP-OCRv6 tier</span></label><div class="select-wrap"><select id="ocr-model-tier"><option value="tiny">Tiny (Fast)</option><option value="small" selected>Small (Balanced)</option><option value="medium">Medium (Accurate)</option></select></div></div>
+        <div class="setting-row"><label class="setting-info" for="ocr-language" title="Character set mode"><span class="setting-label">OCR Language</span><span class="setting-desc">Character set mode</span></label><div class="select-wrap"><select id="ocr-language"><option value="ch" selected>CJK / English</option><option value="latin">Latin / Multi</option></select></div></div>
+      </div>
+    </section>
+  </main>
+  <div class="status-footer">
+    <div id="status-msg" class="status-toast" role="status" aria-live="polite">
+      <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      Settings saved
     </div>
   </div>
-  <script type="module" src="popup.ts"></script>
+</div>
+<script type="module" src="popup.ts"></script>
 </body>
 </html>

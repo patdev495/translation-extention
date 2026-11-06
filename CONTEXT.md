@@ -24,17 +24,9 @@ _Avoid_: Screenshot translation mode, Area translate mode
 The visible feedback shown after an Image Region is selected while OCR and translation are running.
 _Avoid_: Loading spinner, Processing badge
 
-**Trigger Mode**:
-The configuration determining how the translation popup is activated upon text selection.
+**Translation Active State**:
+The enabled or disabled status of the translation feature. When enabled, text selections are automatically translated and displayed in the Translation Tooltip. When disabled, webpage text translation is skipped.
 
-**Auto Mode**:
-A Trigger Mode where the translation popup appears immediately after the user selects text.
-
-**Icon Mode**:
-A Trigger Mode where a small icon button appears near the selected text, which the user must click to show the translation popup.
-
-**Hotkey**:
-A modifier key (e.g., Ctrl, Alt, Shift) that the user must hold while selecting text to trigger the translation.
 
 **OCR Shortcut**:
 The configurable keyboard shortcut that toggles OCR Selection Mode.
@@ -59,6 +51,42 @@ _Avoid_: Bundled OCR model, Temporary model download
 **Primary Target Language**:
 The user's preferred language for receiving translations (typically Vietnamese).
 
+**Direct Primary Translation**:
+Translation explicitly requested into the Primary Target Language, without changing the target according to the detected Source Language. It requires an enabled Primary Target Language.
+_Avoid_: Automatic target selection, Fallback translation
+
+**Input Replacement Translation**:
+The translation of a selected text segment directly inside an editable field, replacing only that selected segment with text in the Primary Target Language.
+_Avoid_: Input translation, Inline translation, Replace all text
+
+**Editable Field**:
+A text input, textarea, or contenteditable region in which Input Replacement Translation may replace a selected text segment. Password fields are excluded.
+_Avoid_: Input box, Text box, Password field
+
+**Eligible Input Selection**:
+A non-empty text selection inside an Editable Field that can be replaced by Input Replacement Translation.
+_Avoid_: Empty selection, Cursor position
+
+**Input Replacement Shortcut**:
+The configurable key combination that triggers Input Replacement Translation. When Input Replacement Translation is enabled, a shortcut is mandatory; selecting Disabled turns off the feature.
+_Avoid_: Auto-translate shortcut, Optional shortcut
+
+**Left-Control Tap**:
+The default Input Replacement Shortcut: pressing and releasing the left Control key without pressing another key while it is held.
+_Avoid_: Ctrl+Left Arrow, Control-key combination
+
+**Stale Input Translation**:
+An Input Replacement Translation result whose original Editable Field, focus, or selected text has changed before the result is ready. It is discarded without modifying the field.
+_Avoid_: Delayed translation, Pending replacement
+
+**Input Translation Status**:
+The short visual feedback displayed beside an Editable Field while Input Replacement Translation is in progress or when it fails.
+_Avoid_: Translation tooltip, Persistent notification
+
+**Undoable Input Replacement**:
+An Input Replacement Translation applied as one editable operation that the user can reverse to restore the original selected text.
+_Avoid_: Permanent replacement, Multi-step edit
+
 **Secondary Target Language**:
 The fallback language used for translation when the detected Source Language is the same as the Primary Target Language (typically English or Chinese).
 
@@ -71,8 +99,23 @@ The text-to-speech capability (audio button) that reads aloud the Source Text.
 **Phonetic Transcription**:
 The pronunciation representation (IPA for English, Pinyin for Chinese) shown in the Translation Tooltip.
 
+**Reading Focus**:
+The emphasis that links selected Chinese characters or English words in a Translation Tooltip section to their corresponding Phonetic Transcription. Selecting either the text or its transcription emphasizes the matching parts in both rows.
+_Avoid_: Selected text, Translation highlight
+
+**Phonetics Visibility State**:
+The configuration setting determining whether Phonetic Transcription is displayed inside the Translation Tooltip.
+_Default_: true
+_Avoid_: Pronunciation toggle, Phonetics switch
+
+
 **Translation Tooltip**:
 The floating popup card displayed near the selected Source Text containing the translation, Phonetic Transcription, and TTS controls.
+
+**Tooltip Font Size**:
+The configuration determining the font size of the text (Source Text, translations, and phonetics) rendered inside the Translation Tooltip.
+_Default_: 14px
+
 
 **Dual Translation**:
 The execution of translating the Source Text into two distinct target languages simultaneously and displaying both in the Translation Tooltip.
@@ -95,6 +138,64 @@ The offline Chinese-to-Pinyin conversion library (`pinyin-pro`) integrated into 
 **Dictionary Integration**:
 The quick-access buttons in the Translation Tooltip pointing to external dictionaries (Cambridge Dictionary for English, Hanzii for Chinese) for deep learning.
 
+**Hanzi Stroke Order Animation**:
+A visual demonstration that draws one Chinese character stroke by stroke in its writing order.
+_Avoid_: Animated word image, Static stroke diagram
+
+**Hanzi Component Breakdown**:
+A learning view that first shows a Chinese character's immediate identifiable parts, including parts that suggest meaning or sound, and explains each known part. Selecting a part reveals its own parts one level deeper in the same view, with a way back; unknown parts are identified as unknown rather than given an invented meaning, and the parts have no separate stroke animation.
+_Avoid_: Stroke order for components
+
+**Hanzi Component**:
+An identifiable part of a Chinese character that can contribute to its written form, meaning, or sound. A component may be the character's dictionary radical, but the other components also belong in a Hanzi Component Breakdown.
+_Avoid_: Radical as a name for every component
+
+**Unidentified Hanzi Strokes**:
+All strokes of the character in view that the breakdown source cannot assign to named Hanzi Components, grouped into one visual even when the source contains multiple unknown slots. They can have one learner-written explanation specific to that character; without one they are labeled "Chưa xác định". They are not assumed to form a meaningful component shared with other characters.
+_Avoid_: The literal ？ as a reusable component
+
+**Personal Hanzi Meaning**:
+The learner's own meaning for one exact Chinese character in one Hanzi Breakdown Language, available wherever that character appears in a Hanzi Component Breakdown, including as a component of another character. It remains separate from the original meaning, meanings in the other language, and meanings for other written forms of that character.
+_Avoid_: Meaning specific to one parent character
+
+**Original Hanzi Meaning**:
+The supplied meaning for a Chinese character in a Hanzi Breakdown Language, retained independently of any Personal Hanzi Meaning so the learner can switch between them.
+_Avoid_: Personal Hanzi Meaning
+
+**Hanzi Meaning View**:
+The learner's choice to show either the Original Hanzi Meaning or Personal Hanzi Meaning for one character or component in a Hanzi Component Breakdown. Each displayed character has its own choice, with the personal meaning shown first whenever it exists.
+_Avoid_: Toggle for every meaning in the tooltip at once
+
+**Hanzi Memory Note**:
+Free-form text the learner writes to remember one exact Chinese character, shown when that character's breakdown is in view, including when reached by opening a component. It is shared across Hanzi Breakdown Languages but separate for different written forms of a character.
+_Avoid_: Component meaning, Dictionary definition
+
+**Hanzi Component Breakdown Visibility State**:
+The setting that determines whether starting a character's looping Hanzi Stroke Order Animation also reveals its Hanzi Component Breakdown. Stopping that character's loop closes its breakdown when it is the Focused Hanzi Breakdown.
+_Default_: Off
+_Avoid_: Replacing stroke animation with component details
+
+**Hanzi Breakdown Language**:
+The independent setting that selects whether all explanatory text in the Hanzi Breakdown Tooltip is shown in Vietnamese or English. Chinese characters and Pinyin remain in their original forms.
+_Default_: Vietnamese
+_Avoid_: Primary Target Language
+
+**Focused Hanzi Breakdown**:
+The single Hanzi Component Breakdown shown for the most recently selected character when breakdowns are enabled. Other characters may continue looping their stroke animations without showing their own breakdowns.
+_Avoid_: One breakdown per looping character
+
+**Hanzi Breakdown Tooltip**:
+A separate, independently draggable floating card with its own close control that displays the Focused Hanzi Breakdown. It is independent of the Translation Tooltip's layout, but closes when the Translation Tooltip or the focused character's loop closes; closing only this card does not stop a character's looping stroke animation.
+_Avoid_: A section inside the Translation Tooltip
+
+**Looping Hanzi**:
+A character in the Hanzi Stroke Order Animation that the user has chosen for repeated playback. Multiple characters can be Looping Hanzi at the same time.
+_Avoid_: Selected text, Highlighted word
+
+**Hanzi Stroke Speed**:
+The user setting that controls the pace of the Hanzi Stroke Order Animation.
+_Default_: 2×
+
 **Shadow DOM Isolation**:
 The encapsulation mechanism used to render the Translation Tooltip, ensuring its glassmorphism styles are unaffected by the styles of the host webpage.
 
@@ -105,10 +206,85 @@ The user interaction capability enabling the Translation Tooltip to be dragged a
 The quick-copy action button in the Tooltip allowing the user to copy the source text or translation to their clipboard.
 
 **TTS Voice Diagnostics**:
-The logging system in the console that outputs warning diagnostics if no matching system voice is found for the required locale during text-to-speech playback.
+The logging system in the console that outputs warning diagnostics if no matching system voice is found for the required locale during text-to-speech playback.**OCR Pin Image**:
+The configuration setting determining whether the cropped Image Region is displayed as a pinned floating card on the screen.
+_Default_: false
 
+**Pinned Snippet Panel**:
+The draggable, persistent floating card displaying the cropped Image Region on the screen when OCR Pin Image is enabled, synchronized and replicated across all active browser tabs using local storage.
+_Avoid_: Screenshot float, Screenshot sticker
 
+**OCR Copy to Clipboard**:
+The configuration setting determining whether the cropped Image Region is automatically copied to the system clipboard upon successful OCR extraction.
+_Default_: false
 
+**Learning Account**:
+The learner's account on the companion website, linked to their extension so saved learning content belongs to that learner.
 
+**Account Link**:
+The connection the learner initiates from extension settings between the extension and their Learning Account on the companion website. Saving to the Learning Library requires this link.
+
+**Learning Library**:
+The learner's personal collection of saved Chinese learning content on the companion website.
+_Avoid_: General-purpose cloud drive
+
+**Learning Folder**:
+A learner-named location in the Learning Library that directly contains saved learning items and may contain child Learning Folders. Each item has one direct folder and is also within the tree of that folder's ancestors. Learners create folders on the companion website, not in the extension.
+
+**Default Learning Folder**:
+The last Learning Folder chosen when saving from the Translation Tooltip, reused for later saves until the learner changes it. The learner chooses an existing folder on their first save; if none exists, the extension directs them to the website to create one.
+
+**Learning Trash**:
+The recoverable location for individually deleted Saved Learning Items and for deleted Learning Folders together with their nested folders and items. Its contents remain until the learner explicitly deletes them permanently or empties the trash.
+
+**Saved Learning Item**:
+A learner-owned entry in one Learning Folder, classified as Word or Phrase, Sentence, Grammar, or Note. It does not record a source page or PDF address.
+
+**Chinese Save Selection**:
+The part of the Chinese text row that the learner highlights inside the Translation Tooltip before saving. It determines the selected item's text and identifies the containing sentence when both are saved.
+_Avoid_: Source Text selection, Pinyin selection
+
+**Save Choice Menu**:
+The menu opened by the Chinese row's save button or by pressing `s` while the Translation Tooltip is open. It offers `1` Word or Phrase and `2` Sentence for any save, and `3` Both when a Chinese Save Selection exists; number keys activate the corresponding choices only while the learner is not typing in an editable field.
+
+**Learning Category**:
+The classification of a Saved Learning Item as Word or Phrase, Sentence, Grammar, or Note. It is independent of the Learning Folder containing the item and does not represent a physical folder.
+
+**Word or Phrase**:
+The Learning Category for Chinese text the learner treats as a word or phrase, with a meaning confirmed by the learner even when a suggestion is offered. The learner chooses this category whether the saved text is a Chinese Save Selection or the entire Chinese row.
+_Avoid_: Word Item
+
+**Grammar**:
+The Learning Category for a Chinese language pattern recorded with a required learner-written structure and description. The structure is free-form text that may mix Chinese and Vietnamese and has no Pinyin. Example Sentences are optional and may be added later in any number.
+
+**Note**:
+The Learning Category for a learner-written title and note body kept in a Learning Folder. Notes have no Learning Links, and identical titles or bodies may be saved separately.
+
+**Sentence**:
+The Learning Category for Chinese text the learner treats as a sentence or longer passage, with a meaning confirmed by the learner. It may stand alone or be linked to multiple Words or Phrases and Grammar entries.
+
+**Example Sentence**:
+A Sentence linked to a Word or Phrase or Grammar entry as an example of its use. It remains a Sentence in its own right and may be an example for multiple entries; each entry may have multiple Example Sentences.
+
+**Learning Link**:
+An association between a Sentence and a Word or Phrase or Grammar entry. Links may cross Learning Folders without changing either item's direct folder, and each entry may have multiple links.
+
+**Linked Word and Sentence**:
+Two separate learning entries, a Word or Phrase and a Sentence containing it, connected by a Learning Link.
+
+**Sentence Save Preview**:
+The learner's chance to review and edit the sentence inferred to contain their Chinese Save Selection before it is saved, especially when the text lacks clear sentence punctuation.
+
+**Meaning Suggestion**:
+A proposed meaning generated for the exact Chinese text being saved, rather than borrowed from a translation of the whole surrounding sentence. The learner can edit it before confirming the save.
+
+**Pending Sync Item**:
+A Saved Learning Item accepted by the extension for a linked Learning Account while the website is unreachable, visibly awaiting addition to the Learning Library when connectivity returns.
+
+**Unlinked Save Attempt**:
+A save request made before an Account Link exists. The extension asks the learner to link an account through settings and does not create a Saved Learning Item.
+
+**Duplicate Learning Item**:
+An attempt to save a new Word or Phrase, Sentence, or Grammar entry with the same complete text and Learning Category as an active item in the same Learning Folder. For Grammar, the compared text is its learner-written structure; matching items in different folders remain distinct. Notes are exempt.
 
 

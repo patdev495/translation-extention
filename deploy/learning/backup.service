@@ -1,0 +1,8 @@
+[Unit]
+Description=Back up PolyTranslate Learning SQLite database
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/polytranslate-learning/deploy/learning/backup.sh

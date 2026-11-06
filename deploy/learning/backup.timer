@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily backup of PolyTranslate Learning
+
+[Timer]
+OnCalendar=*-*-* 03:20:00
+Persistent=true
+Unit=polytranslate-learning-backup.service
+
+[Install]
+WantedBy=timers.target

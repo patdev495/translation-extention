@@ -1,0 +1,6 @@
+/* Hallmark · shape: app screen · genre: modern-minimal · theme: Coral · redesign: full · v2.0.0 */
+/* Hallmark · pre-emit critique: P4 H4 E4 S4 R5 V4 · weakest: E, source field feedback uses the shared reading surface */
+@import "./tokens.css";
+
+:host { display: block; padding: var(--space-xs) var(--space-sm); border-radius: var(--radius-input); background: var(--color-cotton); color: var(--color-ink); box-shadow: var(--shadow-panel); font-family: var(--font-body); font-size: var(--text-sm); line-height: 1.5; }
+:host([data-state="error"]) { color: var(--color-error); }

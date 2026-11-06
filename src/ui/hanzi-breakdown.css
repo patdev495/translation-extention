@@ -1,0 +1,47 @@
+.hanzi-breakdown-card {
+  position: relative;
+  box-sizing: border-box;
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid rgba(130, 145, 165, .35);
+  border-radius: 16px;
+  background: #fff;
+  color: #182131;
+  box-shadow: 0 16px 48px rgba(16, 24, 40, .2);
+  font: 14px/1.4 system-ui, sans-serif;
+}
+.hanzi-breakdown-card [hidden] { display: none !important; }
+.hanzi-breakdown-card h2 { margin: 0 0 12px; font-size: 24px; }
+.hanzi-breakdown-definition { margin: -6px 0 12px; color: #465269; }
+.hanzi-breakdown-heading { margin: 0 0 4px; color: #5a6680; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; cursor: move; user-select: none; }
+.hanzi-breakdown-close { position: absolute; top: 8px; right: 10px; border: 0; background: transparent; color: inherit; font-size: 26px; line-height: 1; cursor: pointer; }
+.hanzi-breakdown-component { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; padding: 8px 0; border-top: 1px solid #e5e9ef; }
+.hanzi-breakdown-component small { flex-basis: 100%; margin-left: 42px; color: #5a6680; }
+.hanzi-breakdown-component strong { min-width: 30px; font-size: 23px; }
+.hanzi-breakdown-component button { min-width: 30px; padding: 0; border: 0; background: transparent; color: #1e5fb5; font: 700 23px/1.2 system-ui, sans-serif; cursor: pointer; }
+.hanzi-breakdown-pinyin { color: #61708a; font-size: 13px; }
+.hanzi-breakdown-back { margin: 0 0 8px; padding: 0; border: 0; background: transparent; color: #1e5fb5; cursor: pointer; }
+.hanzi-breakdown-note { display: block; margin-top: 14px; padding-top: 12px; border-top: 1px solid #e5e9ef; color: #5a6680; font-size: 13px; font-weight: 600; }
+.hanzi-breakdown-note textarea { display: block; box-sizing: border-box; width: 100%; min-height: 72px; margin-top: 6px; padding: 8px 10px; resize: vertical; border: 1px solid #c8d1dd; border-radius: 8px; background: #fff; color: #182131; font: 14px/1.4 system-ui, sans-serif; }
+.hanzi-breakdown-save-status { display: block; min-height: 18px; margin-top: 4px; font-size: 11px; font-weight: 400; }
+.hanzi-breakdown-card .hanzi-breakdown-meaning-action { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; width: 26px; min-width: 26px; height: 26px; margin-left: 4px; padding: 0; vertical-align: middle; border: 1px solid transparent; border-radius: 6px; background: transparent; color: #1e5fb5; cursor: pointer; }
+.hanzi-breakdown-meaning-action svg { width: 16px; height: 16px; flex: 0 0 auto; }
+.hanzi-breakdown-meaning-action:hover { background: rgba(30, 95, 181, .1); }
+.hanzi-breakdown-meaning-action:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.hanzi-breakdown-meaning-input { display: block; box-sizing: border-box; width: 100%; margin-top: 6px; padding: 6px 8px; border: 1px solid #c8d1dd; border-radius: 6px; background: #fff; color: #182131; font: 14px/1.4 system-ui, sans-serif; }
+.hanzi-breakdown-component-meaning { flex: 1 1 100px; min-width: 0; }
+.hanzi-breakdown-unidentified textarea, .hanzi-breakdown-unidentified .hanzi-breakdown-save-status { flex-basis: 100%; }
+.hanzi-breakdown-unidentified > svg { width: 44px; height: 44px; fill: currentColor; color: #1e5fb5; flex: 0 0 auto; }
+@media (prefers-color-scheme: dark) {
+  .hanzi-breakdown-card { background: #1d2533; color: #f3f6fb; border-color: #475467; }
+  .hanzi-breakdown-definition, .hanzi-breakdown-heading, .hanzi-breakdown-pinyin, .hanzi-breakdown-component small { color: #b5c0d0; }
+  .hanzi-breakdown-component { border-color: #475467; }
+  .hanzi-breakdown-component button, .hanzi-breakdown-back { color: #91c6ff; }
+  .hanzi-breakdown-note { border-color: #475467; color: #b5c0d0; }
+  .hanzi-breakdown-note textarea { background: #111827; border-color: #475467; color: #f3f6fb; }
+  .hanzi-breakdown-meaning-input { background: #111827; border-color: #475467; color: #f3f6fb; }
+  .hanzi-breakdown-card .hanzi-breakdown-meaning-action { color: #91c6ff; }
+}

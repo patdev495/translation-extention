@@ -4,20 +4,29 @@ import type { Settings } from '../src/services/settings';
 
 const baseSettings: Settings = {
   primaryTargetLang: 'vi',
-  secondaryTargetLang: 'en',
-  reverseTargetLang: 'zh',
-  hotkey: 'none',
+  secondaryTargetLang: 'zh',
+  reverseTargetLang: 'en',
+  inputReplacementEnabled: true,
+  inputReplacementShortcut: 'ControlLeft',
   ocrShortcut: 'ctrl-space',
-  ocrModelTier: 'small',
+  ocrModelTier: 'medium',
   ocrLanguage: 'ch',
   ttsEnabled: true,
   provider: 'google',
   deeplApiKey: '',
+  tooltipFontSize: '16',
+  hanziStrokeSpeed: 2,
+  hanziBreakdownEnabled: false,
+  hanziBreakdownLanguage: 'vi',
+  ocrPinImage: false,
+  ocrCopyToClipboard: true,
+  autoTranslate: true,
+  phoneticsVisible: true,
 };
 
 describe('translation target planning', () => {
   test('uses the first enabled target for detection', () => {
-    expect(getDetectionTarget({ ...baseSettings, primaryTargetLang: 'none' })).toBe('en');
+    expect(getDetectionTarget({ ...baseSettings, primaryTargetLang: 'none' })).toBe('zh');
     expect(getDetectionTarget({
       ...baseSettings,
       primaryTargetLang: 'none',

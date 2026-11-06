@@ -4,27 +4,45 @@ export interface Settings {
   primaryTargetLang: TargetLanguage;
   secondaryTargetLang: TargetLanguage;
   reverseTargetLang: TargetLanguage;
-  hotkey: 'none' | 'ctrl' | 'alt' | 'shift';
+  inputReplacementEnabled: boolean;
+  inputReplacementShortcut: string;
   ocrShortcut: 'disabled' | 'ctrl-space' | 'alt-o' | 'ctrl-shift-o';
   ocrModelTier: 'tiny' | 'small' | 'medium';
   ocrLanguage: 'ch' | 'latin';
   ttsEnabled: boolean;
   provider: 'google' | 'deepl';
   deeplApiKey: string;
+  tooltipFontSize: '12' | '14' | '16' | '18' | '20' | '24' | '28' | '32' | '36' | '40' | '48' | '56' | '64' | '72' | '80';
+  hanziStrokeSpeed: 0.5 | 1 | 1.5 | 2 | 3;
+  hanziBreakdownEnabled: boolean;
+  hanziBreakdownLanguage: 'vi' | 'en';
+  ocrPinImage: boolean;
+  ocrCopyToClipboard: boolean;
+  autoTranslate: boolean;
+  phoneticsVisible: boolean;
 }
 
 export class SettingsManager {
   static readonly DEFAULT_SETTINGS: Settings = {
     primaryTargetLang: 'vi',
-    secondaryTargetLang: 'en',
-    reverseTargetLang: 'zh',
-    hotkey: 'none',
+    secondaryTargetLang: 'zh',
+    reverseTargetLang: 'en',
+    inputReplacementEnabled: true,
+    inputReplacementShortcut: 'ControlLeft',
     ocrShortcut: 'ctrl-space',
-    ocrModelTier: 'small',
-    ocrLanguage: 'ch',
+    ocrModelTier: 'medium',
+    ocrLanguage: 'latin',
     ttsEnabled: true,
     provider: 'google',
     deeplApiKey: '',
+    tooltipFontSize: '16',
+    hanziStrokeSpeed: 2,
+    hanziBreakdownEnabled: false,
+    hanziBreakdownLanguage: 'vi',
+    ocrPinImage: false,
+    ocrCopyToClipboard: true,
+    autoTranslate: true,
+    phoneticsVisible: true,
   };
 
   static async getSettings(): Promise<Settings> {

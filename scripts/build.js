@@ -2,7 +2,7 @@ import { build } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { copyFileSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync } from 'fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -66,6 +66,8 @@ async function runBuild() {
     logLevel: 'silent',
     define: {
       'process.env.NODE_ENV': '"production"',
+      '__LEARNING_API_BASE__': JSON.stringify(process.env.LEARNING_API_BASE || 'http://127.0.0.1:8000'),
+      '__LEARNING_WEB_BASE__': JSON.stringify(process.env.LEARNING_WEB_BASE || 'http://127.0.0.1:5173'),
     },
     tsconfig: resolve(__dirname, '../tsconfig.json'),
   });
@@ -145,6 +147,46 @@ async function runBuild() {
     }
   }
   console.log('Copied ONNX Runtime Web WASM assets to dist/onnxruntime-web/');
+
+  // 7. Copy stroke data by character so content scripts can load it offline on demand.
+  console.log('\n--- Copying Hanzi stroke data ---');
+  const hanziSrcDir = resolve(__dirname, '../node_modules/hanzi-writer-data');
+  const hanziDstDir = resolve(distPath, 'hanzi-data');
+  mkdirSync(hanziDstDir, { recursive: true });
+  let hanziCount = 0;
+  for (const file of readdirSync(hanziSrcDir)) {
+    if (!file.endsWith('.json')) continue;
+    const character = file.slice(0, -'.json'.length);
+    if ([...character].length !== 1) continue;
+    const codePoint = character.codePointAt(0).toString(16).toUpperCase();
+    copyFileSync(resolve(hanziSrcDir, file), resolve(hanziDstDir, `${codePoint}.json`));
+    hanziCount++;
+  }
+  copyFileSync(resolve(hanziSrcDir, 'ARPHICPL.TXT'), resolve(hanziDstDir, 'ARPHICPL.TXT'));
+  const licenseDir = resolve(distPath, 'licenses');
+  mkdirSync(licenseDir, { recursive: true });
+  copyFileSync(resolve(__dirname, '../node_modules/hanzi-writer/LICENSE'), resolve(licenseDir, 'hanzi-writer-MIT.txt'));
+  copyFileSync(resolve(__dirname, '../node_modules/hanzi-writer/COPYING.md'), resolve(licenseDir, 'hanzi-writer-attribution.md'));
+  console.log(`Copied ${hanziCount} Hanzi characters + license to dist/hanzi-data/`);
+
+  // 8. Package Make Me a Hanzi dictionary records separately from stroke graphics.
+  const dictionarySource = resolve(__dirname, '../third_party/makemeahanzi');
+  const dictionaryDest = resolve(distPath, 'hanzi-dictionary');
+  mkdirSync(dictionaryDest, { recursive: true });
+  let dictionaryCount = 0;
+  for (const line of readFileSync(resolve(dictionarySource, 'dictionary.txt'), 'utf8').split(/\r?\n/)) {
+    if (!line) continue;
+    const record = JSON.parse(line);
+    if ([...record.character].length !== 1) continue;
+    const codePoint = record.character.codePointAt(0).toString(16).toUpperCase();
+    writeFileSync(resolve(dictionaryDest, `${codePoint}.json`), JSON.stringify(record));
+    dictionaryCount++;
+  }
+  copyFileSync(resolve(dictionarySource, 'LGPL'), resolve(licenseDir, 'makemeahanzi-LGPL.txt'));
+  copyFileSync(resolve(dictionarySource, 'COPYING'), resolve(licenseDir, 'makemeahanzi-COPYING.txt'));
+  copyFileSync(resolve(dictionarySource, 'dictionary.txt'), resolve(licenseDir, 'makemeahanzi-dictionary-source.txt'));
+  copyFileSync(resolve(dictionarySource, 'PROVENANCE.md'), resolve(licenseDir, 'makemeahanzi-PROVENANCE.md'));
+  console.log(`Packaged ${dictionaryCount} Hanzi dictionary records`);
 
   console.log('\nBuild completed successfully!');
 }

@@ -6,7 +6,9 @@ import {
   matchesOcrShortcut,
 } from '../content/translation-init';
 import { recognizeImageRegion } from '../services/ocr';
+import { PinnedSnippetPanel, addPinnedSnippet, initPinnedSnippetsSync } from '../content/pinned-panel';
 import { createPdfPasswordResolver } from './password';
+import { OcrSelectionOverlay } from '../content/ocr-selection-overlay';
 
 // pdfjs-dist is loaded at runtime via chrome.runtime.getURL() to avoid
 // bundling the entire library (~3MB) into the viewer chunk.
@@ -58,13 +60,7 @@ let currentPage = 1;
 const translationCtx = createTranslationContext();
 let ocrSelectionMode = false;
 let ocrBusy = false;
-let ocrSelection: {
-  pageWrapper: HTMLElement;
-  pageCanvas: HTMLCanvasElement;
-  boxEl: HTMLDivElement;
-  startX: number;
-  startY: number;
-} | null = null;
+let ocrSelectionOverlay: OcrSelectionOverlay | null = null;
 
 // Per-page render state: tracks running render tasks and rendered canvases
 const pageRendered = new Map<number, boolean>();
@@ -317,48 +313,33 @@ function updateCurrentPageFromScroll() {
 
 function setOcrSelectionMode(enabled: boolean) {
   ocrSelectionMode = enabled;
+  translationCtx.tooltip.setPointerPassthrough(enabled);
   document.body.classList.toggle('ocr-selection-mode', enabled);
   $btnOcrRegion.classList.toggle('active', enabled);
   $btnOcrRegion.setAttribute('aria-pressed', String(enabled));
   $btnOcrRegion.title = enabled
     ? 'OCR region selection is active'
     : 'Select image region for OCR translation (Ctrl+Space)';
-}
 
-function getPointInPage(wrapper: HTMLElement, event: MouseEvent) {
-  const rect = wrapper.getBoundingClientRect();
-  return {
-    x: Math.max(0, Math.min(event.clientX - rect.left, rect.width)),
-    y: Math.max(0, Math.min(event.clientY - rect.top, rect.height)),
-  };
-}
-
-function updateSelectionBox(boxEl: HTMLElement, startX: number, startY: number, endX: number, endY: number) {
-  const left = Math.min(startX, endX);
-  const top = Math.min(startY, endY);
-  const width = Math.abs(endX - startX);
-  const height = Math.abs(endY - startY);
-  boxEl.style.left = `${left}px`;
-  boxEl.style.top = `${top}px`;
-  boxEl.style.width = `${width}px`;
-  boxEl.style.height = `${height}px`;
-}
-
-function removeOcrProgress() {
-  document.querySelectorAll('.ocr-progress-indicator').forEach((el) => el.remove());
-}
-
-function showOcrProgress(wrapper: HTMLElement, rect: DOMRect, message: string) {
-  removeOcrProgress();
-  const indicator = document.createElement('div');
-  indicator.className = 'ocr-progress-indicator';
-  indicator.innerHTML = '<span class="mini-spinner"></span><span></span>';
-  const textEl = indicator.querySelector('span:last-child')!;
-  textEl.textContent = message;
-  indicator.style.left = `${rect.left}px`;
-  indicator.style.top = `${Math.max(8, rect.top - 34)}px`;
-  wrapper.appendChild(indicator);
-  return indicator;
+  if (enabled) {
+    if (!ocrSelectionOverlay) {
+      ocrSelectionOverlay = new OcrSelectionOverlay($viewerContainer, {
+        isPdfMode: true,
+        onSelectionComplete: async (rect, extra) => {
+          if (!extra || !extra.canvas || !extra.wrapper) return;
+          await translateOcrRegion(extra.wrapper, extra.canvas, new DOMRect(rect.left, rect.top, rect.width, rect.height));
+        },
+        onCancel: () => {
+          setOcrSelectionMode(false);
+        }
+      });
+    }
+    ocrSelectionOverlay.start();
+  } else {
+    if (ocrSelectionOverlay) {
+      ocrSelectionOverlay.stop();
+    }
+  }
 }
 
 function cropPageCanvas(pageCanvas: HTMLCanvasElement, wrapper: HTMLElement, rect: DOMRect): HTMLCanvasElement {
@@ -381,87 +362,51 @@ async function translateOcrRegion(wrapper: HTMLElement, pageCanvas: HTMLCanvasEl
   if (ocrBusy || rect.width < 8 || rect.height < 8) return;
   ocrBusy = true;
 
-  const progress = showOcrProgress(wrapper, rect, 'Preparing OCR...');
+  ocrSelectionOverlay?.showProgress('Preparing OCR...', { left: rect.left, top: rect.top });
+
   try {
     const cropCanvas = cropPageCanvas(pageCanvas, wrapper, rect);
+    const croppedDataUrl = (translationCtx.settings?.ocrPinImage || translationCtx.settings?.ocrCopyToClipboard)
+      ? cropCanvas.toDataURL('image/png')
+      : null;
+
     const tier = translationCtx.settings?.ocrModelTier ?? 'small';
     const lang = translationCtx.settings?.ocrLanguage ?? 'ch';
     const text = await recognizeImageRegion(cropCanvas, tier, lang, (state) => {
-      const textEl = progress.querySelector('span:last-child');
-      if (textEl) textEl.textContent = state.message;
+      ocrSelectionOverlay?.updateProgressText(state.message);
     });
 
     if (!text) {
-      const textEl = progress.querySelector('span:last-child');
-      if (textEl) textEl.textContent = 'No text found in this region.';
-      window.setTimeout(removeOcrProgress, 1800);
+      ocrSelectionOverlay?.updateProgressText('No text found in this region.');
+      await new Promise((r) => setTimeout(r, 1800));
+      ocrSelectionOverlay?.removeProgress();
       return;
     }
 
     const wrapperRect = wrapper.getBoundingClientRect();
     const x = wrapperRect.left + window.scrollX + rect.left + rect.width / 2;
     const y = wrapperRect.top + window.scrollY + rect.top;
-    removeOcrProgress();
-    performTranslation(translationCtx, text, x, y);
+    ocrSelectionOverlay?.removeProgress();
+    performTranslation(translationCtx, text, x, y, rect.width);
+
+    if (translationCtx.settings?.ocrPinImage && croppedDataUrl) {
+      addPinnedSnippet(croppedDataUrl, rect.left, rect.top, rect.width, rect.height);
+    }
+
+    if (translationCtx.settings?.ocrCopyToClipboard && croppedDataUrl) {
+      copyImageToClipboard(croppedDataUrl).catch((err) => {
+        console.error('Failed to copy image to clipboard in PDF viewer:', err);
+      });
+    }
   } catch (err) {
-    const textEl = progress.querySelector('span:last-child');
-    if (textEl) textEl.textContent = err instanceof Error ? err.message : 'OCR failed.';
-    window.setTimeout(removeOcrProgress, 3000);
+    const message = err instanceof Error ? err.message : 'OCR failed.';
+    ocrSelectionOverlay?.updateProgressText(message);
+    await new Promise((r) => setTimeout(r, 3000));
+    ocrSelectionOverlay?.removeProgress();
   } finally {
     ocrBusy = false;
     setOcrSelectionMode(false);
   }
-}
-
-function startOcrSelection(event: MouseEvent) {
-  if (!ocrSelectionMode || ocrBusy) return;
-
-  const wrapper = (event.target as Element | null)?.closest('.page-wrapper') as HTMLElement | null;
-  if (!wrapper) return;
-  const pageCanvas = wrapper.querySelector('canvas') as HTMLCanvasElement | null;
-  if (!pageCanvas) return;
-
-  event.preventDefault();
-  event.stopPropagation();
-  window.getSelection()?.removeAllRanges();
-
-  const point = getPointInPage(wrapper, event);
-  const boxEl = document.createElement('div');
-  boxEl.className = 'ocr-selection-box';
-  wrapper.appendChild(boxEl);
-  updateSelectionBox(boxEl, point.x, point.y, point.x, point.y);
-
-  ocrSelection = {
-    pageWrapper: wrapper,
-    pageCanvas,
-    boxEl,
-    startX: point.x,
-    startY: point.y,
-  };
-}
-
-function moveOcrSelection(event: MouseEvent) {
-  if (!ocrSelection) return;
-  event.preventDefault();
-  const point = getPointInPage(ocrSelection.pageWrapper, event);
-  updateSelectionBox(ocrSelection.boxEl, ocrSelection.startX, ocrSelection.startY, point.x, point.y);
-}
-
-function finishOcrSelection(event: MouseEvent) {
-  if (!ocrSelection) return;
-  event.preventDefault();
-
-  const selection = ocrSelection;
-  ocrSelection = null;
-  const point = getPointInPage(selection.pageWrapper, event);
-  const rect = new DOMRect(
-    Math.min(selection.startX, point.x),
-    Math.min(selection.startY, point.y),
-    Math.abs(point.x - selection.startX),
-    Math.abs(point.y - selection.startY)
-  );
-  selection.boxEl.remove();
-  translateOcrRegion(selection.pageWrapper, selection.pageCanvas, rect);
 }
 
 $btnPrev.addEventListener('click', () => {
@@ -512,27 +457,18 @@ $btnZoomFit.addEventListener('click', async () => {
 
 $btnOcrRegion.addEventListener('click', () => {
   if (ocrBusy) return;
+  if (!translationCtx.active || !translationCtx.settings) return;
   setOcrSelectionMode(!ocrSelectionMode);
 });
 
 document.addEventListener('keydown', (event) => {
+  if (!translationCtx.active || !translationCtx.settings) return;
   if (matchesOcrShortcut(translationCtx, event)) {
     event.preventDefault();
     if (!ocrBusy) setOcrSelectionMode(!ocrSelectionMode);
     return;
   }
-
-  if (event.key === 'Escape' && ocrSelectionMode) {
-    event.preventDefault();
-    ocrSelection?.boxEl.remove();
-    ocrSelection = null;
-    setOcrSelectionMode(false);
-  }
 });
-
-$viewerContainer.addEventListener('mousedown', startOcrSelection, true);
-$viewerContainer.addEventListener('mousemove', moveOcrSelection, true);
-document.addEventListener('mouseup', finishOcrSelection, true);
 
 $viewerContainer.addEventListener('scroll', updateCurrentPageFromScroll);
 
@@ -545,9 +481,17 @@ $btnFileAccess.addEventListener('click', () => {
 // ─── Translation init ──────────────────────────────────────────────────────
 
 loadSettings(translationCtx);
+initPinnedSnippetsSync(document);
 
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === 'SETTINGS_UPDATED') {
+    loadSettings(translationCtx);
+  }
+});
+
+// Listen for storage changes to sync settings dynamically
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === 'local' && (changes.settings || changes.active)) {
     loadSettings(translationCtx);
   }
 });
@@ -585,3 +529,10 @@ initTranslationListeners(translationCtx, document);
 
   await loadPdf(url);
 })();
+
+async function copyImageToClipboard(dataUrl: string): Promise<void> {
+  const res = await fetch(dataUrl);
+  const blob = await res.blob();
+  const item = new ClipboardItem({ 'image/png': blob });
+  await navigator.clipboard.write([item]);
+}

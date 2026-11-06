@@ -1,8 +1,8 @@
-import { TranslationEngine } from '../services/translation';
 import { SettingsManager } from '../services/settings';
-import { PhoneticEngine } from '../services/phonetics';
 import { PDF_VIEWER_PATH, shouldUseExtensionPdfViewer } from './pdf-redirect';
-import { getDetectionTarget, getTranslationTargets } from '../services/translation-plan';
+import { TranslationCoordinator } from '../services/translation-coordinator';
+import { TranslationEngine } from '../services/translation';
+import { getAccountLinkStatus, learningRequest, listSyncItems, openLearningLibrary, retryFailedItems, saveLearningItem, startAccountLink, unlinkAccount } from './learning-account-link';
 
 // ─── PDF Redirect Logic ────────────────────────────────────────────────────
 
@@ -19,6 +19,9 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
 
   const { url, tabId } = details;
   if (!shouldUseExtensionPdfViewer(url)) return;
+
+  const { privacyConsentGranted } = await chrome.storage.local.get('privacyConsentGranted');
+  if (privacyConsentGranted !== true) return;
 
   // Check if extension is active
   const res = await chrome.storage.local.get('active');
@@ -45,7 +48,8 @@ chrome.webRequest?.onHeadersReceived?.addListener(
     if (!contentType?.value?.includes('application/pdf')) return;
 
     // Use tabs API asynchronously (non-blocking)
-    chrome.storage.local.get('active').then((res) => {
+    chrome.storage.local.get(['active', 'privacyConsentGranted']).then((res) => {
+      if (res.privacyConsentGranted !== true) return;
       const active = res.active !== undefined ? res.active : true;
       if (!active) return;
       const viewerUrl = buildViewerUrl(details.url);
@@ -93,63 +97,164 @@ async function ensureOffscreenDocument(): Promise<void> {
   creatingOffscreen = null;
 }
 
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  const len = bytes.byteLength;
+  const chunk = 8192;
+  for (let i = 0; i < len; i += chunk) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk) as any);
+  }
+  return btoa(binary);
+}
+
+async function cropScreenshot(
+  dataUrl: string,
+  rect: { x: number; y: number; width: number; height: number },
+  viewport: { width: number; height: number }
+): Promise<string> {
+  const response = await fetch(dataUrl);
+  const blob = await response.blob();
+  const imgBitmap = await createImageBitmap(blob);
+
+  const scaleX = imgBitmap.width / viewport.width;
+  const scaleY = imgBitmap.height / viewport.height;
+  const sx = rect.x * scaleX;
+  const sy = rect.y * scaleY;
+  const sw = rect.width * scaleX;
+  const sh = rect.height * scaleY;
+
+  const cropW = Math.max(1, Math.round(sw));
+  const cropH = Math.max(1, Math.round(sh));
+
+  const canvas = new OffscreenCanvas(cropW, cropH);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    throw new Error('Failed to get 2d context for OffscreenCanvas');
+  }
+
+  ctx.drawImage(
+    imgBitmap,
+    sx,
+    sy,
+    sw,
+    sh,
+    0,
+    0,
+    cropW,
+    cropH
+  );
+
+  imgBitmap.close();
+
+  const croppedBlob = await canvas.convertToBlob({ type: 'image/png' });
+  const arrayBuffer = await croppedBlob.arrayBuffer();
+  const base64 = arrayBufferToBase64(arrayBuffer);
+  return `data:image/png;base64,${base64}`;
+}
+
 // ─── Translation Helper ─────────────────────────────────────────────────────
 
 async function translateText(text: string) {
+  const { privacyConsentGranted } = await chrome.storage.local.get('privacyConsentGranted');
+  if (privacyConsentGranted !== true) throw new Error('Open PolyTranslate settings and agree to data use before translating.');
   const settings = await SettingsManager.getSettings();
-
-  // 1. Use the first enabled target to detect the source language. If all
-  // targets are none, skip translation and show only the source block.
-  const detectionTarget = getDetectionTarget(settings);
-  const firstRes = detectionTarget
-    ? await TranslationEngine.translateWithSettings(text, detectionTarget, settings)
-    : null;
-  const detectedLang = firstRes?.detectedLang ?? 'auto';
-
-  // 2. Determine visible target languages, omitting disabled slots.
-  const targetLangs = getTranslationTargets(settings, detectedLang);
-  const translations = await Promise.all(
-    targetLangs.map(async ({ lang }) => {
-      const result = firstRes && lang === detectionTarget
-        ? firstRes
-        : await TranslationEngine.translateWithSettings(text, lang, settings);
-
-      let phonetics = '';
-      if (lang === 'en') {
-        phonetics = PhoneticEngine.getEnglishIPA(result.translation);
-      } else if (lang === 'zh') {
-        phonetics = PhoneticEngine.getPinyin(result.translation);
-      }
-
-      return {
-        lang,
-        text: result.translation,
-        phonetics
-      };
-    })
-  );
-
-  // 3. Generate Phonetics (IPA/Pinyin)
-  let sourcePhonetics = '';
-  const isSourceChinese = ['zh', 'zh-CN', 'zh-TW', 'zh-cn', 'zh-tw'].includes(detectedLang);
-  const isSourceEnglish = detectedLang === 'en';
-
-  if (isSourceEnglish) {
-    sourcePhonetics = PhoneticEngine.getEnglishIPA(text);
-  } else if (isSourceChinese) {
-    sourcePhonetics = PhoneticEngine.getPinyin(text);
-  }
-
-  return {
-    detectedLang,
-    sourcePhonetics,
-    translations
-  };
+  return TranslationCoordinator.translate(text, settings);
 }
 
 // ─── Message Handlers ──────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'LEARNING_SUGGEST_MEANING') {
+    void (async () => {
+      const text = typeof message.text === 'string' ? message.text.trim() : '';
+      if (!text) throw new Error('Chưa có chữ Trung để gợi ý nghĩa.');
+      const { privacyConsentGranted } = await chrome.storage.local.get('privacyConsentGranted');
+      if (privacyConsentGranted !== true) throw new Error('Cần cho phép dịch trong cài đặt extension.');
+      const settings = await SettingsManager.getSettings();
+      const result = await TranslationEngine.translateWithSettings(text, 'vi', settings);
+      const meaning = result.translation.trim();
+      if (!meaning || meaning === text) throw new Error('Không tìm được nghĩa gợi ý. Hãy nhập nghĩa trước khi lưu.');
+      return meaning;
+    })().then(
+      meaning => sendResponse({ success: true, meaning }),
+      (error: unknown) => sendResponse({ success: false, error: error instanceof Error ? error.message : 'Không gợi ý được nghĩa.' }),
+    );
+    return true;
+  }
+  if (message.type === 'LEARNING_OPEN_LIBRARY') {
+    void openLearningLibrary().then(() => sendResponse({ success: true }), () => sendResponse({ success: false }));
+    return true;
+  }
+  if (message.type === 'LEARNING_FIND_SENTENCE') {
+    const query = new URLSearchParams({ folder_id: message.folder_id, text: message.text });
+    void learningRequest(`/items/existing?${query.toString()}`, { signal: AbortSignal.timeout(5000) }).then(
+      (item) => sendResponse({ success: true, item }),
+      (error: unknown) => sendResponse({ success: false, error: error instanceof Error ? error.message : 'Không kiểm tra được câu đã lưu.' }),
+    );
+    return true;
+  }
+  if (message.type === 'LEARNING_SYNC_STATUS') {
+    void listSyncItems().then(result => sendResponse({ success: true, result }), () => sendResponse({ success: false }));
+    return true;
+  }
+  if (message.type === 'LEARNING_SYNC_RETRY') {
+    void retryFailedItems().then(() => listSyncItems()).then(result => sendResponse({ success: true, result }), () => sendResponse({ success: false }));
+    return true;
+  }
+  if (message.type === 'LEARNING_FOLDERS' || message.type === 'LEARNING_SAVE') {
+    const task = message.type === 'LEARNING_FOLDERS'
+      ? learningRequest('/folders')
+      : saveLearningItem(message.choice, message.item);
+    void task.then(
+      (result) => sendResponse(message.type === 'LEARNING_SAVE' ? { success: true, state: (result as { state: string }).state, result } : { success: true, result }),
+      (error: unknown) => sendResponse({ success: false, error: error instanceof Error ? error.message : 'Không lưu được.' }),
+    );
+    return true;
+  }
+  if (message.type === 'START_ACCOUNT_LINK' || message.type === 'GET_ACCOUNT_LINK_STATUS' || message.type === 'UNLINK_ACCOUNT') {
+    const task = message.type === 'START_ACCOUNT_LINK'
+      ? startAccountLink()
+      : message.type === 'UNLINK_ACCOUNT'
+        ? unlinkAccount()
+        : getAccountLinkStatus();
+    void task.then(
+      (status) => sendResponse({ success: true, status }),
+      (error: unknown) => sendResponse({ success: false, error: error instanceof Error ? error.message : 'Account link failed' }),
+    );
+    return true;
+  }
+
+  if (message.type === 'TRANSLATE_HANZI_MEANING') {
+    (async () => {
+      const meaning = typeof message.meaning === 'string' ? message.meaning.trim() : '';
+      if (!meaning) {
+        sendResponse({ success: false, meaning: '' });
+        return;
+      }
+      try {
+        const { privacyConsentGranted } = await chrome.storage.local.get('privacyConsentGranted');
+        if (privacyConsentGranted !== true) throw new Error('Privacy consent required');
+        const cacheKey = `hanziMeaning:${meaning}`;
+        const stored = await chrome.storage.local.get(cacheKey);
+        const cached = stored[cacheKey] as string | undefined;
+        if (cached) {
+          sendResponse({ success: true, meaning: cached });
+          return;
+        }
+        const settings = await SettingsManager.getSettings();
+        const result = await TranslationEngine.translateWithSettings(meaning, 'vi', settings);
+        const translated = result.translation.trim();
+        if (!translated) throw new Error('Empty translated meaning');
+        await chrome.storage.local.set({ [cacheKey]: translated });
+        sendResponse({ success: true, meaning: translated });
+      } catch {
+        sendResponse({ success: false, meaning });
+      }
+    })();
+    return true;
+  }
+
   // Open Chrome extension settings page so user can enable "Allow access to file URLs"
   if (message.type === 'OPEN_EXTENSION_SETTINGS') {
     chrome.tabs.create({
@@ -174,26 +279,50 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // Keep message channel open for async response
   }
 
-  if (message.type === 'CAPTURE_TAB') {
-    const { rect } = message;
+  if (message.type === 'TRANSLATE_DIRECT_PRIMARY') {
+    const { text } = message;
 
     (async () => {
       try {
+        const { privacyConsentGranted } = await chrome.storage.local.get('privacyConsentGranted');
+        if (privacyConsentGranted !== true) throw new Error('Privacy consent required');
+        const settings = await SettingsManager.getSettings();
+        const data = await TranslationCoordinator.translateDirectToPrimary(text, settings);
+        sendResponse({ success: true, data });
+      } catch (error: any) {
+        sendResponse({ success: false, error: error.message });
+      }
+    })();
+
+    return true;
+  }
+
+  if (message.type === 'CAPTURE_TAB') {
+    const { rect, viewport } = message;
+
+    (async () => {
+      try {
+        const { privacyConsentGranted } = await chrome.storage.local.get('privacyConsentGranted');
+        if (privacyConsentGranted !== true) throw new Error('Privacy consent required');
         // 1. Capture the screen viewport of the current active tab
         const dataUrl = await chrome.tabs.captureVisibleTab(chrome.windows.WINDOW_ID_CURRENT, { format: 'png' });
+
+        // Crop screenshot in service worker first using OffscreenCanvas
+        const croppedDataUrl = await cropScreenshot(dataUrl, rect, viewport);
 
         // 2. Ensure Offscreen Document is opened
         await ensureOffscreenDocument();
         resetOffscreenTimeout();
 
-        // 3. Request OCR processing from the Offscreen Document
+        // 3. Request OCR from the Offscreen Document on the pre-cropped image
         const settings = await SettingsManager.getSettings();
         const ocrResponse = await chrome.runtime.sendMessage({
           type: 'RUN_OCR',
-          dataUrl,
-          rect,
+          dataUrl: croppedDataUrl,
+          rect: null,
+          viewport: null,
           tier: settings.ocrModelTier ?? 'small',
-          language: settings.ocrLanguage ?? 'ch'
+          language: settings.ocrLanguage ?? 'ch',
         });
 
         if (!ocrResponse || !ocrResponse.success) {
@@ -201,6 +330,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
 
         const text = ocrResponse.text;
+
         if (!text) {
           sendResponse({ success: true, data: null });
           return;
@@ -213,6 +343,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           success: true,
           data: {
             text,
+            croppedDataUrl,
             ...data
           }
         });

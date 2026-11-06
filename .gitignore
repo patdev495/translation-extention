@@ -1,5 +1,12 @@
 # Dependencies
 node_modules/
+web/node_modules/
+web/.venv/
+web/dist/
+web/data/
+web/.pytest_cache/
+__pycache__/
+*.pyc
 
 # Production build output
 dist/

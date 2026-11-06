@@ -40,36 +40,45 @@ describe('SettingsManager', () => {
     const settings = await SettingsManager.getSettings();
     expect(settings).toEqual({
       primaryTargetLang: 'vi',
-      secondaryTargetLang: 'en',
-      reverseTargetLang: 'zh',
-      hotkey: 'none',
+      secondaryTargetLang: 'zh',
+      reverseTargetLang: 'en',
+      inputReplacementEnabled: true,
+      inputReplacementShortcut: 'ControlLeft',
       ocrShortcut: 'ctrl-space',
-      ocrModelTier: 'small',
-      ocrLanguage: 'ch',
+      ocrModelTier: 'medium',
+      ocrLanguage: 'latin',
       ttsEnabled: true,
       provider: 'google',
       deeplApiKey: '',
+      tooltipFontSize: '16',
+      hanziStrokeSpeed: 2,
+      hanziBreakdownEnabled: false,
+      hanziBreakdownLanguage: 'vi',
+      ocrPinImage: false,
+      ocrCopyToClipboard: true,
+      autoTranslate: true,
+      phoneticsVisible: true,
     });
   });
 
   test('should update settings and retrieve updated values', async () => {
     const updated = await SettingsManager.updateSettings({
       primaryTargetLang: 'en',
-      hotkey: 'ctrl',
       ocrShortcut: 'alt-o',
+      autoTranslate: false,
     });
     expect(updated.primaryTargetLang).toBe('en');
-    expect(updated.hotkey).toBe('ctrl');
     expect(updated.ocrShortcut).toBe('alt-o');
+    expect(updated.autoTranslate).toBe(false);
 
     const retrieved = await SettingsManager.getSettings();
     expect(retrieved.primaryTargetLang).toBe('en');
-    expect(retrieved.secondaryTargetLang).toBe('en');
-    expect(retrieved.reverseTargetLang).toBe('zh');
-    expect(retrieved.hotkey).toBe('ctrl');
+    expect(retrieved.secondaryTargetLang).toBe('zh');
+    expect(retrieved.reverseTargetLang).toBe('en');
     expect(retrieved.ocrShortcut).toBe('alt-o');
     expect(retrieved.provider).toBe('google');
     expect(retrieved.deeplApiKey).toBe('');
+    expect(retrieved.autoTranslate).toBe(false);
   });
 
   test('should allow disabling individual translation targets', async () => {
@@ -82,5 +91,24 @@ describe('SettingsManager', () => {
     expect(updated.primaryTargetLang).toBe('none');
     expect(updated.secondaryTargetLang).toBe('none');
     expect(updated.reverseTargetLang).toBe('none');
+  });
+
+  test('persists the Input Replacement Translation setting and shortcut', async () => {
+    const updated = await SettingsManager.updateSettings({
+      inputReplacementEnabled: false,
+      inputReplacementShortcut: 'KeyQ',
+    });
+
+    expect(updated.inputReplacementEnabled).toBe(false);
+    expect(updated.inputReplacementShortcut).toBe('KeyQ');
+    expect((await SettingsManager.getSettings()).inputReplacementShortcut).toBe('KeyQ');
+  });
+
+  test('persists Hanzi stroke drawing speed and uses the current speed by default', async () => {
+    expect((await SettingsManager.getSettings()).hanziStrokeSpeed).toBe(2);
+
+    await SettingsManager.updateSettings({ hanziStrokeSpeed: 0.5 });
+
+    expect((await SettingsManager.getSettings()).hanziStrokeSpeed).toBe(0.5);
   });
 });

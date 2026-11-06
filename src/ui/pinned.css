@@ -1,0 +1,20 @@
+/* Hallmark · shape: app screen · genre: modern-minimal · theme: Coral · redesign: full · signature: Pinned Snippet Panel · v2.0.0 */
+/* Hallmark · pre-emit critique: P4 H4 E4 S4 R5 V4 · weakest: R, image is the only framed content */
+/* Hallmark · finish-review: subagent · viewport and close target resolved */
+/* Hallmark · reworded "OCR Pinned" to "Pinned image" · 67 names the tracked capital label */
+@import "./tokens.css";
+@import "./base.css";
+
+.pinned-card { width: max-content; max-width: calc(100dvw - 48px); max-height: calc(100dvh - 32px); overflow: auto; padding: var(--space-xs); border-radius: var(--radius-card); background: var(--color-cotton); color: var(--color-ink); font-family: var(--font-body); box-shadow: var(--shadow-panel); user-select: none; }
+.drag-handle { display: flex; align-items: center; justify-content: space-between; gap: var(--space-lg); cursor: move; padding: 0 var(--space-2xs) var(--space-xs) var(--space-xs); }
+.pinned-title { display: flex; align-items: center; gap: var(--space-xs); font-size: var(--text-sm); color: var(--color-muted); }
+.pinned-title svg { width: 16px; height: 16px; }
+.close-btn { width: 36px; height: 36px; position: relative; display: grid; place-items: center; border: 0; border-radius: var(--radius-input); color: var(--color-muted); background: var(--color-transparent); }
+.close-btn::before { content: ""; position: absolute; inset: -4px; }
+.close-btn svg { width: 16px; height: 16px; }
+.close-btn:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.close-btn:active { background: var(--color-paper-3); }
+.close-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.snippet-image { max-width: 100%; overflow: clip; border-radius: var(--radius-input); }
+.snippet-image img { display: block; object-fit: contain; max-width: 100%; height: auto; pointer-events: none; }
+@media (hover: hover) { .close-btn:hover { background: var(--color-paper-2); color: var(--color-ink); } }
