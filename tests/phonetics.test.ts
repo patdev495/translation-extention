@@ -25,6 +25,11 @@ global.fetch = async (url: any) => {
 import { PhoneticEngine } from '../src/services/phonetics';
 
 describe('PhoneticEngine - Chinese Pinyin', () => {
+  test('shows every available reading when the source text is one isolated Hanzi', () => {
+    expect(PhoneticEngine.getPinyin('重')).toBe('重 zhòng / chóng');
+    expect(PhoneticEngine.getPinyin('重建')).toBe('重建 chóng jiàn');
+  });
+
   test('should convert Chinese words to grouped Pinyin with tone marks', () => {
     const result = PhoneticEngine.getPinyin('\u6211\u559c\u6b22\u5b66\u4e60\u6c49\u8bed');
     expect(result).toBe('\u6211 w\u01d2 \u00b7 \u559c\u6b22 x\u01d0 huan \u00b7 \u5b66\u4e60 xu\u00e9 x\u00ed \u00b7 \u6c49\u8bed h\u00e0n y\u01d4');

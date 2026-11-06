@@ -127,9 +127,28 @@ def test_both_links_existing_word_and_edit_rechecks_collisions(tmp_path: Path) -
         two = browser.post("/api/folders", json={"name": "Two"}, headers=ORIGIN).json()["id"]
         bearer = link(browser, extension)
         word = extension.post("/api/extension/items", json={"folder_id": one, "category": "word", "text": "学习", "meaning": "học"}, headers=bearer).json()
-        both = extension.post("/api/extension/items/both", json={"folder_id": one, "word_text": "学习", "word_meaning": "học", "sentence_text": "我喜欢学习中文。", "sentence_meaning": "Tôi thích học tiếng Trung."}, headers=bearer)
+        both = extension.post("/api/extension/items/both", json={"folder_id": one, "word_text": "学习", "word_meaning": "nghĩa gợi ý khác", "sentence_text": "我喜欢学习中文。", "sentence_meaning": "Tôi thích học tiếng Trung."}, headers=bearer)
         assert both.status_code == 201, both.text
         assert both.json()["word"]["id"] == word["id"]
+        assert both.json()["word"]["meaning"] == "học"
+        corrected = extension.post("/api/extension/sync", json={
+            "request_id": "corrected-word", "choice": "both", "item": {
+                "folder_id": one, "word_text": "学习", "word_meaning": "học tập",
+                "sentence_text": "我喜欢学习中文。", "sentence_meaning": "Tôi thích học tiếng Trung.",
+                "update_existing_word_meaning": True,
+            },
+        }, headers=bearer)
+        assert corrected.status_code == 201, corrected.text
+        assert corrected.json()["word"]["id"] == word["id"]
+        assert corrected.json()["word"]["meaning"] == "học tập"
+        assert extension.post("/api/extension/sync", json={
+            "request_id": "corrected-word", "choice": "both", "item": {
+                "folder_id": one, "word_text": "学习", "word_meaning": "học tập",
+                "sentence_text": "我喜欢学中文。", "sentence_meaning": "Tôi thích học tiếng Trung.",
+                "update_existing_word_meaning": True,
+            },
+        }, headers=bearer).status_code == 409
+        assert next(item for item in browser.get("/api/items").json() if item["id"] == word["id"])["meaning"] == "học tập"
         sentence = both.json()["sentence"]
         assert word["id"] in sentence["linked_item_ids"]
         changed = browser.patch(f"/api/items/{word['id']}", json={"text": "学中文", "meaning": "học tiếng Trung", "folder_id": two}, headers=ORIGIN)

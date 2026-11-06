@@ -63,6 +63,40 @@ function setupTooltip(character = '妈'): TranslationTooltip {
 }
 
 describe('Hanzi Breakdown Tooltip', () => {
+  test('a standalone polyphonic character lists every available reading', async () => {
+    const tooltip = setupTooltip('重');
+    tooltip.updateHanziBreakdownSettings(true, 'en');
+    document.getElementById('translation-extension-root')!.shadowRoot!
+      .querySelector<HTMLButtonElement>('.tt-hanzi-button')!.click();
+    const card = () => document.getElementById('translation-extension-hanzi-breakdown-root')?.shadowRoot;
+    await vi.waitFor(() => expect(card()?.querySelector('h2')?.textContent).toBe('重 zhòng / chóng'));
+    expect(card()?.querySelector('.hanzi-breakdown-reading-note')).toBeNull();
+  });
+
+  test('a polyphonic character uses its word reading while dictionary meanings stay clearly labeled', async () => {
+    const tooltip = setupTooltip('重建');
+    tooltip.updateHanziBreakdownSettings(true, 'en');
+    const sourceRoot = document.getElementById('translation-extension-root')!.shadowRoot!;
+    const text = sourceRoot.querySelector('.tt-translation-text')!;
+    const range = document.createRange();
+    range.setStart(text.firstChild!, 0);
+    range.setEnd(text.firstChild!, 1);
+    vi.mocked(window.getSelection).mockReturnValue({
+      isCollapsed: false, rangeCount: 1, anchorNode: text.firstChild,
+      focusNode: text.firstChild, toString: () => '重', getRangeAt: () => range,
+    } as unknown as Selection);
+    text.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, composed: true }));
+    const firstButton = sourceRoot.querySelector<HTMLButtonElement>('.tt-hanzi-button')!;
+    expect(firstButton.dataset.reading).toBe('chóng');
+    firstButton.click();
+    const card = () => document.getElementById('translation-extension-hanzi-breakdown-root')!.shadowRoot!;
+    await vi.waitFor(() => expect(card().querySelector('h2')?.textContent).toBe('重 chóng'));
+    expect(card().querySelector('.hanzi-breakdown-reading-note')?.textContent).toContain('zhòng');
+    expect(card().querySelector('.hanzi-breakdown-meaning-label')?.textContent)
+      .toContain('may span multiple readings');
+    expect(card().querySelector('.hanzi-breakdown-definition')?.textContent).toContain('to repeat');
+  });
+
   test('the breakdown opens beside the translation tooltip when there is room on the right', async () => {
     const tooltip = setupTooltip();
     tooltip.updateHanziBreakdownSettings(true, 'en');

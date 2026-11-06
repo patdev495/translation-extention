@@ -8,7 +8,7 @@ test('popup shows pending, completed, failed saves and retries failures', async 
   const html = readFileSync(resolve(__dirname, '../popup/index.html'), 'utf8');
   document.body.innerHTML = new DOMParser().parseFromString(html, 'text/html').body.innerHTML;
   const sendMessage = vi.fn(async (message: { type: string }) => {
-    if (message.type === 'GET_ACCOUNT_LINK_STATUS') return { success: true, status: { state: 'linked', username: 'learner' } };
+    if (message.type === 'GET_ACCOUNT_LINK_STATUS') return { success: true, status: { state: 'linked', username: 'learner', webUrl: 'https://custom.example' } };
     if (message.type === 'LEARNING_SYNC_STATUS' || message.type === 'LEARNING_SYNC_RETRY') return { success: true, result: [
       { id: 'one', account_id: 'user-1', choice: 'word', item: { text: '你好' }, state: 'pending' },
       { id: 'two', account_id: 'user-1', choice: 'word', item: { text: '学习' }, state: 'completed' },
@@ -24,6 +24,9 @@ test('popup shows pending, completed, failed saves and retries failures', async 
   await import('../popup/popup');
 
   await vi.waitFor(() => expect(document.getElementById('learning-sync-list')?.textContent).toContain('你好'));
+  const webLink = document.getElementById('learning-account-web-url') as HTMLAnchorElement;
+  expect(webLink.href).toBe('https://custom.example/');
+  expect(webLink.textContent).toBe('https://custom.example/');
   const text = document.getElementById('learning-sync-list')!.textContent!;
   expect(text).toContain('Chờ đồng bộ');
   expect(text).toContain('Đã đồng bộ');

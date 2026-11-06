@@ -15,6 +15,8 @@
 }
 .hanzi-breakdown-card [hidden] { display: none !important; }
 .hanzi-breakdown-card h2 { margin: 0 0 12px; font-size: 24px; }
+.hanzi-breakdown-reading-note { margin: -8px 0 12px; color: #5a6680; font-size: 12px; }
+.hanzi-breakdown-meaning-label { margin: 0 0 8px; color: #5a6680; font-size: 12px; font-weight: 600; }
 .hanzi-breakdown-definition { margin: -6px 0 12px; color: #465269; }
 .hanzi-breakdown-heading { margin: 0 0 4px; color: #5a6680; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; cursor: move; user-select: none; }
 .hanzi-breakdown-close { position: absolute; top: 8px; right: 10px; border: 0; background: transparent; color: inherit; font-size: 26px; line-height: 1; cursor: pointer; }
@@ -37,7 +39,7 @@
 .hanzi-breakdown-unidentified > svg { width: 44px; height: 44px; fill: currentColor; color: #1e5fb5; flex: 0 0 auto; }
 @media (prefers-color-scheme: dark) {
   .hanzi-breakdown-card { background: #1d2533; color: #f3f6fb; border-color: #475467; }
-  .hanzi-breakdown-definition, .hanzi-breakdown-heading, .hanzi-breakdown-pinyin, .hanzi-breakdown-component small { color: #b5c0d0; }
+  .hanzi-breakdown-definition, .hanzi-breakdown-heading, .hanzi-breakdown-pinyin, .hanzi-breakdown-reading-note, .hanzi-breakdown-meaning-label, .hanzi-breakdown-component small { color: #b5c0d0; }
   .hanzi-breakdown-component { border-color: #475467; }
   .hanzi-breakdown-component button, .hanzi-breakdown-back { color: #91c6ff; }
   .hanzi-breakdown-note { border-color: #475467; color: #b5c0d0; }

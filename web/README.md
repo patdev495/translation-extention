@@ -16,9 +16,9 @@ python web/dev.py
 
 Script cuối chạy cả API (`http://127.0.0.1:8000`) lẫn web (`http://127.0.0.1:5173`) trong một terminal. Nhấn Ctrl+C để dừng cả hai.
 
-Để thử liên kết extension: chạy script, build extension bằng `npm run build` ở thư mục gốc, nạp `dist/` vào Chrome, rồi bấm **Liên kết tài khoản** trong popup. Đăng ký hoặc đăng nhập trên trang web và bấm **Xác nhận liên kết**. Sau tối đa khoảng 30 giây, popup sẽ hiển thị email đã liên kết.
+Để thử liên kết extension với máy chủ dev: chạy script, đặt `$env:LEARNING_API_BASE='http://127.0.0.1:8000'` và `$env:LEARNING_WEB_BASE='http://127.0.0.1:5173'` trong terminal build, rồi chạy `npm run build` ở thư mục gốc và nạp `dist/` vào Chrome. Bấm **Liên kết tài khoản** trong popup, đăng ký hoặc đăng nhập trên trang web và bấm **Xác nhận liên kết**. Sau tối đa khoảng 30 giây, popup sẽ hiển thị tên đăng nhập đã liên kết.
 
-Khi dùng API khác địa chỉ dev, build extension với `LEARNING_API_BASE` và `LEARNING_WEB_BASE` trỏ tới URL HTTPS của website. Đặt `POLY_WEB_ORIGIN` thành origin HTTPS của frontend và `POLY_SECURE_COOKIES=1` khi chạy trên HTTPS. Mặc định dev chỉ lắng nghe `127.0.0.1`.
+Mặc định extension build kết nối `https://learning.peebot.shop`. Khi dùng máy chủ khác, đặt `LEARNING_API_BASE` và `LEARNING_WEB_BASE` trước khi build. Đặt `POLY_WEB_ORIGIN` thành origin HTTPS của frontend và `POLY_SECURE_COOKIES=1` khi chạy trên HTTPS. Máy chủ dev chỉ lắng nghe `127.0.0.1`.
 
 ## Kiểm tra
 
@@ -35,7 +35,7 @@ Stack ở `deploy/learning/compose.yml`: Vue được build thành static site t
 
 Sau khi đồng bộ source vào `/opt/polytranslate-learning`, tạo `/var/lib/polytranslate-learning` với UID 10001, rồi chạy `docker compose -f deploy/learning/compose.yml up -d --build`. Nếu xuất source bằng `git archive` trên Windows, dùng `git -c core.autocrlf=false archive` để giữ LF cho shell script. Cài backup service/timer trong `deploy/learning/` vào systemd dưới tên `polytranslate-learning-backup.service` và `.timer`. Backup được giữ 14 ngày tại `/var/backups/polytranslate-learning`; chạy `systemctl start polytranslate-learning-backup.service` để kiểm tra ngay. Bản sao này vẫn nằm trên cùng VPS, nên không bảo vệ trước sự cố mất toàn bộ máy.
 
-Để build extension cài thủ công, đặt cả `LEARNING_API_BASE` và `LEARNING_WEB_BASE` thành `https://learning.peebot.shop`, rồi chạy `npm run build` ở thư mục gốc. Đóng gói nội dung `dist/` thành ZIP hoặc nạp `dist/` vào Chrome. Sau khi cập nhật extension, thử liên kết tài khoản với website thật.
+Để build extension cài thủ công, chạy `npm run build` ở thư mục gốc. Đóng gói nội dung `dist/` thành ZIP hoặc nạp `dist/` vào Chrome. Sau khi cập nhật extension, thử liên kết tài khoản với website thật.
 
 Trước mỗi lần cập nhật backend, tạo backup và kiểm tra `GET /api/health`. Nếu cần quay về bản cũ, triển khai lại source/ảnh Docker trước đó nhưng giữ nguyên volume; nếu schema đã đổi, khôi phục bản SQLite tương ứng từ bản sao đã kiểm tra.
 

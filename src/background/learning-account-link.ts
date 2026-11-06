@@ -2,8 +2,8 @@ declare const __LEARNING_API_BASE__: string;
 declare const __LEARNING_WEB_BASE__: string;
 import { pinyin } from 'pinyin-pro';
 
-const API_BASE = (typeof __LEARNING_API_BASE__ === 'string' ? __LEARNING_API_BASE__ : 'http://127.0.0.1:8000').replace(/\/$/, '');
-const WEB_BASE = (typeof __LEARNING_WEB_BASE__ === 'string' ? __LEARNING_WEB_BASE__ : 'http://127.0.0.1:5173').replace(/\/$/, '');
+const API_BASE = (typeof __LEARNING_API_BASE__ === 'string' ? __LEARNING_API_BASE__ : 'https://learning.peebot.shop').replace(/\/$/, '');
+const WEB_BASE = (typeof __LEARNING_WEB_BASE__ === 'string' ? __LEARNING_WEB_BASE__ : 'https://learning.peebot.shop').replace(/\/$/, '');
 const ALARM_NAME = 'polytranslate-learning-link-poll';
 const PUBLIC_STATUS_KEY = 'learningAccountStatus';
 const SYNC_ALARM_NAME = 'polytranslate-learning-sync';
@@ -42,6 +42,7 @@ type PrivateLinkState = PendingLink | LinkedAccount;
 
 export interface PublicLinkStatus {
   state: 'unlinked' | 'pending' | 'linked' | 'error';
+  webUrl: string;
   username?: string;
   message?: string;
 }
@@ -171,9 +172,10 @@ async function writePrivateState(value: PrivateLinkState | null): Promise<void> 
   });
 }
 
-async function publishStatus(status: PublicLinkStatus): Promise<PublicLinkStatus> {
-  await chrome.storage.local.set({ [PUBLIC_STATUS_KEY]: status });
-  return status;
+async function publishStatus(status: Omit<PublicLinkStatus, 'webUrl'>): Promise<PublicLinkStatus> {
+  const publicStatus = { ...status, webUrl: WEB_BASE };
+  await chrome.storage.local.set({ [PUBLIC_STATUS_KEY]: publicStatus });
+  return publicStatus;
 }
 
 async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -264,7 +266,7 @@ export async function getAccountLinkStatus(): Promise<PublicLinkStatus> {
   }
   const stored = await chrome.storage.local.get(PUBLIC_STATUS_KEY);
   const previous = stored[PUBLIC_STATUS_KEY] as PublicLinkStatus | undefined;
-  return previous?.state === 'error' ? previous : publishStatus({ state: 'unlinked' });
+  return previous?.state === 'error' ? publishStatus(previous) : publishStatus({ state: 'unlinked' });
 }
 
 export async function unlinkAccount(): Promise<PublicLinkStatus> {

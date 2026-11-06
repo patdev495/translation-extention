@@ -762,6 +762,8 @@ test('asks for sign in and approves an extension link for the signed in account'
   await flushPromises();
   expect(api.approveLink).toHaveBeenCalledWith('request-1');
   expect(page.text()).toContain('Đã liên kết');
+  expect(page.find('.link-banner').exists()).toBe(false);
+  expect(window.location.search).toBe('');
   page.unmount();
 });
 

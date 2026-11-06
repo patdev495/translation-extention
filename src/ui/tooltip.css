@@ -29,6 +29,9 @@
 .tt-source-text { color: var(--color-ink-2); }
 .tt-translation-text { font-weight: 500; }
 .tt-phonetic { display: block; color: var(--color-muted); font-family: var(--font-body); font-size: max(12px, 0.875em); line-height: 1.6; overflow-wrap: break-word; white-space: pre-wrap; }
+.tt-selection-gloss { display: block; margin-top: 2px; color: var(--color-ink-2); line-height: 1.5; overflow-wrap: anywhere; }
+.tt-selection-gloss strong { font-weight: 800; }
+.tt-selection-gloss-pronunciation { color: var(--color-muted); font-size: .92em; }
 .tt-reading-focus { font-weight: 800; color: var(--color-ink); }
 .phonetics-container { margin-top: var(--space-xs); }
 .tt-sep { height: 1px; background: var(--color-rule); }
@@ -39,6 +42,11 @@
 .tt-save-button svg { width: 19px !important; height: 19px !important; }
 .tt-btn.tt-save-button:hover, .tt-btn.tt-save-button:focus-visible { background: var(--color-accent); color: var(--color-accent-ink); }
 .tt-save-panel { display: grid; gap: 8px; margin-top: 12px; padding: 14px; border: 1px solid var(--color-rule); border-radius: var(--radius-card); background: var(--color-paper-2); color: var(--color-ink); box-shadow: var(--shadow-card); }
+.tt-save-unlinked { position: relative; border: 2px solid #e35d35; background: #fff2e9; color: #7e2411; box-shadow: 0 8px 24px #7e241133; }
+.tt-save-unlinked > strong { padding-right: 28px; font-size: 16px; }
+.tt-save-unlinked p { margin: 0; font-size: 13px; line-height: 1.5; }
+.tt-save-unlinked .tt-save-link-account { min-height: 40px; border: 0; border-radius: var(--radius-input); background: #b9351b; color: #fff; font-weight: 800; cursor: pointer; }
+.tt-save-unlinked .tt-save-close { position: absolute; right: 9px; top: 7px; }
 .tt-save-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; }
 .tt-save-title { min-width: 0; overflow-wrap: anywhere; font-size: 14px; line-height: 1.4; }
 .tt-save-shortcut { color: var(--color-muted); font-size: 11px; }

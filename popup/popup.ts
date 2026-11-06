@@ -43,6 +43,7 @@ const hanziImportSummary = document.getElementById('hanzi-import-summary') as HT
 const hanziImportKeepCurrent = document.getElementById('hanzi-import-keep-current') as HTMLButtonElement;
 const hanziImportUseFile = document.getElementById('hanzi-import-use-file') as HTMLButtonElement;
 const learningAccountStatus = document.getElementById('learning-account-status') as HTMLParagraphElement;
+const learningAccountWebUrl = document.getElementById('learning-account-web-url') as HTMLAnchorElement;
 const learningAccountLink = document.getElementById('learning-account-link') as HTMLButtonElement;
 const learningAccountUnlink = document.getElementById('learning-account-unlink') as HTMLButtonElement;
 const learningSyncList = document.getElementById('learning-sync-list') as HTMLUListElement;
@@ -51,11 +52,16 @@ let pendingHanziBackup: HanziLearningBackup | null = null;
 
 interface LinkStatus {
   state: 'unlinked' | 'pending' | 'linked' | 'error';
+  webUrl?: string;
   username?: string;
   message?: string;
 }
 
 function renderLinkStatus(status: LinkStatus): void {
+  if (status.webUrl) {
+    learningAccountWebUrl.href = `${status.webUrl.replace(/\/$/, '')}/`;
+    learningAccountWebUrl.textContent = learningAccountWebUrl.href;
+  }
   learningAccountStatus.textContent = status.state === 'linked'
     ? `Đã liên kết: ${status.username ?? 'tài khoản web'}`
     : status.state === 'pending'

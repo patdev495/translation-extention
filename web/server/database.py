@@ -109,6 +109,19 @@ def initialize(path: Path) -> None:
                 result_json TEXT NOT NULL,
                 PRIMARY KEY (user_id, request_id)
             );
+            CREATE TABLE IF NOT EXISTS review_sessions (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                kind TEXT NOT NULL CHECK (kind IN ('vocabulary', 'grammar')),
+                questions_json TEXT NOT NULL,
+                created_at INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS recall_results (
+                session_id TEXT NOT NULL REFERENCES review_sessions(id) ON DELETE CASCADE,
+                item_id TEXT NOT NULL REFERENCES learning_items(id) ON DELETE CASCADE,
+                result TEXT NOT NULL CHECK (result IN ('remembered', 'not_yet')),
+                PRIMARY KEY (session_id, item_id)
+            );
             """
         )
         columns = {str(row["name"]) for row in connection.execute("PRAGMA table_info(users)")}

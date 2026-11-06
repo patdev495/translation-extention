@@ -30,6 +30,14 @@ export interface TrashEntry {
   folder_id: string | null;
 }
 
+export type RecallResult = 'remembered' | 'not_yet';
+export interface ReviewQuestion { sentence: SavedLearningItem | null; item_ids: string[]; items: SavedLearningItem[] }
+export interface ReviewSession { id: string; kind: 'vocabulary' | 'grammar'; questions: ReviewQuestion[]; ineligible_count: number; ineligible_item_ids?: string[] }
+export interface ReviewOverview {
+  entries: { id: string; category: 'word' | 'grammar'; text: string; remembered: number; not_yet: number }[];
+  totals: { remembered: number; not_yet: number };
+}
+
 interface ApiErrorBody {
   detail?: unknown;
 }
@@ -87,6 +95,11 @@ async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export const learningApi = {
+  reviewOverview: (folderId: string | null): Promise<ReviewOverview> => api(`/review/overview${folderId ? `?folder_id=${encodeURIComponent(folderId)}` : ''}`),
+  startReview: (kind: ReviewSession['kind'], folderId: string | null): Promise<ReviewSession> =>
+    api('/review/sessions', { method: 'POST', body: JSON.stringify({ kind, folder_id: folderId }) }),
+  recordRecall: (sessionId: string, itemId: string, result: RecallResult): Promise<{ item_id: string; result: RecallResult }> =>
+    api(`/review/sessions/${encodeURIComponent(sessionId)}/results/${encodeURIComponent(itemId)}`, { method: 'PUT', body: JSON.stringify({ result }) }),
   me: (): Promise<Account> => api('/auth/me'),
   register: (username: string, password: string): Promise<Account> =>
     api('/auth/register', { method: 'POST', body: JSON.stringify({ username, password }) }),

@@ -297,3 +297,26 @@ body:has(.new-item-editor[open]) { overflow: hidden; }
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
 .note-body { white-space: pre-wrap; }
+.review-page { min-width: 0; padding: 32px clamp(18px, 4vw, 52px) 64px; color: #1d2340; }
+.review-page h1 { margin: 0 0 6px; font-size: 30px; }
+.review-page h2 { margin: 0 0 12px; font-size: 20px; }
+.review-page header p { margin: 0 0 24px; color: var(--muted); }
+.review-controls { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+.review-controls label, .review-question label { display: grid; gap: 7px; color: var(--muted); font-size: 13px; font-weight: 700; }
+.review-controls select, .review-question textarea { min-height: 42px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 9px; background: #fff; color: #1d2340; font: inherit; }
+.review-page button { min-height: 40px; padding: 8px 14px; border: 1px solid #d9deef; border-radius: 9px; background: #fff; color: var(--indigo); font-weight: 700; cursor: pointer; }
+.review-page button:hover { background: #f2f1ff; }
+.review-page button:disabled { opacity: .5; cursor: default; }
+.review-controls > button, .review-navigation > button:last-child { background: var(--indigo); color: #fff; }
+.review-statistics, .review-question, .review-summary, .review-empty, .review-missing { max-width: 780px; margin: 0 0 18px; padding: 22px; border: 1px solid var(--border); border-radius: 15px; background: #fff; }
+.review-statistics ul { max-height: 210px; overflow: auto; margin: 12px 0 0; padding-left: 20px; }
+.review-statistics li { margin: 5px 0; }
+.review-front { margin: 18px 0; padding: 30px; border-radius: 12px; background: #f6f5ff; font-size: clamp(25px, 4vw, 40px); text-align: center; overflow-wrap: anywhere; }
+.review-answer { margin: 16px 0; padding: 18px; border-left: 3px solid var(--indigo); background: #f8f8ff; }
+.review-answer > div { margin-top: 12px; }
+.review-answer strong { font-size: 18px; }
+.review-answer p { margin: 6px 0 10px; }
+.review-answer button { margin-right: 8px; }
+.review-question textarea { width: 100%; min-height: 90px; resize: vertical; }
+.review-navigation { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 18px; }
+.review-missing button { display: block; margin: 8px 0; }

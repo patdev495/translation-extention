@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import { ArrowRight, BookOpen, Check, ChevronRight, Ellipsis, Folder, FolderPlus, Home, Link2, LogOut, MoveRight, Pencil, RotateCcw, Sparkles, Trash2 } from '@lucide/vue';
+import { ArrowRight, BookOpen, ChevronRight, Ellipsis, Folder, FolderPlus, Home, Link2, LogOut, MoveRight, Pencil, RotateCcw, Sparkles, Trash2 } from '@lucide/vue';
 import { ApiError, learningApi, type Account, type ExampleSentenceDraft, type LearningFolder, type SavedLearningItem, type TrashEntry } from './api';
+import Review from './Review.vue';
 
 type EditorMode = 'create' | 'rename' | 'move';
 
@@ -45,6 +46,7 @@ const folderError = ref('');
 const items = ref<SavedLearningItem[]>([]);
 const trash = ref<TrashEntry[]>([]);
 const showTrash = ref(false);
+const showReview = ref(false);
 const trashBusy = ref(false);
 const feedback = ref('');
 let feedbackTimer: ReturnType<typeof setTimeout> | undefined;
@@ -140,10 +142,9 @@ const editorParentId = ref<string | null>(null);
 const editorBusy = ref(false);
 const editorError = ref('');
 const editorInput = ref<HTMLInputElement | null>(null);
-const linkRequest = new URLSearchParams(window.location.search).get('link');
+const linkRequest = ref(new URLSearchParams(window.location.search).get('link'));
 const linkBusy = ref(false);
 const linkMessage = ref('');
-const linkApproved = ref(false);
 
 function errorMessage(error: unknown): string {
   if (!(error instanceof ApiError)) return 'Đã có lỗi xảy ra. Hãy thử lại.';
@@ -181,12 +182,14 @@ async function loadTrash(): Promise<void> {
 }
 
 async function openTrash(): Promise<void> {
+  showReview.value = false;
   showTrash.value = true;
   selectedId.value = null;
   try { await loadTrash(); } catch (error) { feedback.value = errorMessage(error); }
 }
 
 function openLibrary(folderId: string | null): void {
+  showReview.value = false;
   showTrash.value = false;
   selectedId.value = folderId;
   if (folderId) {
@@ -201,6 +204,7 @@ function openLibrary(folderId: string | null): void {
 }
 
 function openSidebarFolder(folderId: string): void {
+  showReview.value = false;
   showTrash.value = false;
   selectedId.value = folderId;
   const expanded = new Set(expandedFolderIds.value);
@@ -336,7 +340,6 @@ async function signOut(): Promise<void> {
     trash.value = [];
     showTrash.value = false;
     selectedId.value = null;
-    linkApproved.value = false;
   } catch (error) {
     folderError.value = errorMessage(error);
   } finally {
@@ -345,13 +348,16 @@ async function signOut(): Promise<void> {
 }
 
 async function approveLink(): Promise<void> {
-  if (!linkRequest) return;
+  if (!linkRequest.value) return;
   linkBusy.value = true;
   linkMessage.value = '';
   try {
-    await learningApi.approveLink(linkRequest);
-    linkApproved.value = true;
-    linkMessage.value = 'Đã liên kết. Quay lại extension để xem trạng thái tài khoản.';
+    await learningApi.approveLink(linkRequest.value);
+    feedback.value = 'Đã liên kết. Quay lại extension để xem trạng thái tài khoản.';
+    const url = new URL(window.location.href);
+    url.searchParams.delete('link');
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+    linkRequest.value = null;
   } catch (error) {
     linkMessage.value = errorMessage(error);
   } finally {
@@ -758,6 +764,7 @@ async function submitEditor(): Promise<void> {
           <div class="tree-row" :class="{ active: selectedId === null && !showTrash }"><button class="tree-button" :class="{ active: selectedId === null && !showTrash }" type="button" :aria-current="selectedId === null && !showTrash ? 'page' : undefined" @click="openLibrary(null)" @contextmenu.prevent="showFolderContextMenu(null, $event.clientX, $event.clientY)" @keydown="handleFolderContextKey($event, null)"><Home :size="17" aria-hidden="true" /> Tất cả thư mục</button><button class="tree-menu-button" type="button" aria-label="Tùy chọn Thư viện" title="Tùy chọn Thư viện" @mouseenter="hoverFolderMenuFromButton(null, $event)" @mouseleave="scheduleFolderMenuClose" @click="openFolderMenuFromButton(null, $event)"><Ellipsis :size="17" aria-hidden="true" /></button></div>
           <div v-for="row in treeRows" :key="row.folder.id" class="tree-row" :class="{ active: selectedId === row.folder.id && !showTrash }"><button class="tree-button" :class="{ active: selectedId === row.folder.id && !showTrash }" :style="{ paddingLeft: `${14 + row.depth * 18}px` }" type="button" :aria-current="selectedId === row.folder.id && !showTrash ? 'page' : undefined" :aria-expanded="folders.some(folder => folder.parent_id === row.folder.id) ? expandedFolderIds.has(row.folder.id) : undefined" @click="openSidebarFolder(row.folder.id)" @contextmenu.prevent="showFolderContextMenu(row.folder.id, $event.clientX, $event.clientY)" @keydown="handleFolderContextKey($event, row.folder.id)"><Folder :size="17" aria-hidden="true" /> <span class="truncate">{{ row.folder.name }}</span><ChevronRight v-if="folders.some(folder => folder.parent_id === row.folder.id)" :size="14" class="tree-chevron" :class="{ expanded: expandedFolderIds.has(row.folder.id) }" aria-hidden="true" /></button><button class="tree-menu-button" type="button" :aria-label="`Tùy chọn ${row.folder.name}`" :title="`Tùy chọn ${row.folder.name}`" @mouseenter="hoverFolderMenuFromButton(row.folder.id, $event)" @mouseleave="scheduleFolderMenuClose" @click="openFolderMenuFromButton(row.folder.id, $event)"><Ellipsis :size="17" aria-hidden="true" /></button></div>
         </nav>
+        <button class="tree-button trash-nav" :class="{ active: showReview }" type="button" aria-label="Mở ôn tập" :aria-current="showReview ? 'page' : undefined" @click="showTrash = false; showReview = true"><BookOpen :size="17" aria-hidden="true" /> Ôn tập</button>
         <button class="tree-button trash-nav" :class="{ active: showTrash }" type="button" aria-label="Mở thùng rác" :aria-current="showTrash ? 'page' : undefined" @click="openTrash"><Trash2 :size="17" aria-hidden="true" /> Thùng rác</button>
       </aside>
 
@@ -775,7 +782,8 @@ async function submitEditor(): Promise<void> {
         </template>
       </div>
 
-      <section v-if="showTrash" class="library-main trash-main" aria-labelledby="trash-title">
+      <Review v-if="showReview" :folders="folders" @open-item="id => { const entry = items.find(item => item.id === id); if (entry) openItemEditor(entry); }" />
+      <section v-else-if="showTrash" class="library-main trash-main" aria-labelledby="trash-title">
         <div class="library-header"><div><p class="overline">CÓ THỂ KHÔI PHỤC</p><h1 id="trash-title">Thùng rác</h1><p class="library-subtitle">Mục chỉ bị xóa vĩnh viễn khi bạn chọn.</p></div><button v-if="trash.length" type="button" class="danger-button" :disabled="trashBusy" @click="askToDelete('Xóa vĩnh viễn toàn bộ thùng rác? Thao tác này không thể hoàn tác.', () => learningApi.emptyTrash(), 'Đã xóa vĩnh viễn toàn bộ thùng rác.')">Dọn sạch thùng rác</button></div>
         <p v-if="feedback" class="trash-feedback" role="status">{{ feedback }}</p>
         <p v-if="!trash.length" class="saved-items-empty">Thùng rác trống.</p>
@@ -792,9 +800,8 @@ async function submitEditor(): Promise<void> {
         <p v-if="feedback" class="trash-feedback" role="status">{{ feedback }}</p>
         <div v-if="linkRequest" class="link-banner" role="status">
           <div class="link-banner-icon"><Link2 :size="20" aria-hidden="true" /></div>
-          <div><strong>Liên kết extension với tài khoản này?</strong><p>{{ linkApproved ? linkMessage : 'Chỉ xác nhận nếu chính bạn đã bắt đầu liên kết từ cài đặt extension.' }}</p></div>
-          <button v-if="!linkApproved" class="link-button" type="button" :disabled="linkBusy" @click="approveLink">{{ linkBusy ? 'Đang liên kết…' : 'Xác nhận liên kết' }}</button>
-          <Check v-else :size="20" aria-hidden="true" />
+          <div><strong>Liên kết extension với tài khoản này?</strong><p>{{ linkMessage || 'Chỉ xác nhận nếu chính bạn đã bắt đầu liên kết từ cài đặt extension.' }}</p></div>
+          <button class="link-button" type="button" :disabled="linkBusy" @click="approveLink">{{ linkBusy ? 'Đang liên kết…' : 'Xác nhận liên kết' }}</button>
         </div>
         <nav class="breadcrumb" aria-label="Đường dẫn thư mục">
           <div class="breadcrumb-trail"><button type="button" :aria-current="selectedId === null ? 'page' : undefined" @click="openLibrary(null)">Thư viện</button><template v-for="(crumb, index) in breadcrumbs" :key="crumb.id"><ChevronRight :size="15" aria-hidden="true" /><button type="button" :aria-current="index === breadcrumbs.length - 1 ? 'page' : undefined" @click="openLibrary(crumb.id)">{{ crumb.name }}</button></template><span class="breadcrumb-count" aria-label="Thống kê vị trí hiện tại">({{ currentStats.words }} từ · {{ currentStats.sentences }} câu)</span></div>

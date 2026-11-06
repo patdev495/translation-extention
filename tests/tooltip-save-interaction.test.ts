@@ -2,6 +2,13 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { TranslationTooltip } from '../src/content/tooltip';
 
+function stubLinkedChrome(value: any): void {
+  const send = value.runtime.sendMessage;
+  value.runtime.sendMessage = (message: any, callback: (response: any) => void) => message.type === 'GET_ACCOUNT_LINK_STATUS'
+    ? callback({ success: true, status: { state: 'linked' } }) : send(message, callback);
+  vi.stubGlobal('chrome', value);
+}
+
 afterEach(() => { document.body.innerHTML = ''; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 function setup(text = '我喜欢学习。你呢？') {
@@ -10,7 +17,7 @@ function setup(text = '我喜欢学习。你呢？') {
   const sendMessage = vi.fn((message, callback) => callback(message.type === 'LEARNING_FOLDERS'
     ? { success: true, result: [{ id: 'folder', name: 'HSK', parent_id: null }] }
     : message.type === 'LEARNING_SUGGEST_MEANING' ? { success: true, meaning: 'học' } : { success: true }));
-  vi.stubGlobal('chrome', { runtime: { getURL: (path: string) => path, sendMessage }, storage: { local: { get: vi.fn(async () => ({ defaultLearningFolder: 'folder' })), set: vi.fn(async () => {}) } } });
+  stubLinkedChrome( { runtime: { getURL: (path: string) => path, sendMessage }, storage: { local: { get: vi.fn(async () => ({ defaultLearningFolder: 'folder' })), set: vi.fn(async () => {}) } } });
   const tooltip = new TranslationTooltip();
   tooltip.show(0, 0, text, { detectedLang: 'zh', sourcePhonetics: '我 wǒ · 喜欢 xǐ huān · 学习 xué xí · 你 nǐ · 呢 ne', translations: [] });
   return { root: document.getElementById('translation-extension-root')!.shadowRoot!, sendMessage };

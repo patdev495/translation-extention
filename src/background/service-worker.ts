@@ -2,6 +2,8 @@ import { SettingsManager } from '../services/settings';
 import { PDF_VIEWER_PATH, shouldUseExtensionPdfViewer } from './pdf-redirect';
 import { TranslationCoordinator } from '../services/translation-coordinator';
 import { TranslationEngine } from '../services/translation';
+import { PhoneticEngine } from '../services/phonetics';
+import { pinyin } from 'pinyin-pro';
 import { getAccountLinkStatus, learningRequest, listSyncItems, openLearningLibrary, retryFailedItems, saveLearningItem, startAccountLink, unlinkAccount } from './learning-account-link';
 
 // ─── PDF Redirect Logic ────────────────────────────────────────────────────
@@ -165,6 +167,24 @@ async function translateText(text: string) {
 // ─── Message Handlers ──────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'TRANSLATE_SELECTION') {
+    void (async () => {
+      const text = typeof message.text === 'string' ? message.text.trim() : '';
+      const targetLang = message.targetLang;
+      if (!text || text.length > 500 || !['vi', 'en', 'zh'].includes(targetLang)) throw new Error('Invalid selection translation request');
+      const { privacyConsentGranted } = await chrome.storage.local.get('privacyConsentGranted');
+      if (privacyConsentGranted !== true) throw new Error('Privacy consent required');
+      const settings = await SettingsManager.getSettings();
+      const translation = (await TranslationEngine.translateWithSettings(text, targetLang, settings)).translation.trim();
+      const phonetics = targetLang === 'zh' ? pinyin(translation, { nonZh: 'consecutive' }).trim()
+        : targetLang === 'en' ? await PhoneticEngine.getEnglishIPA(translation) : '';
+      return { translation, phonetics: phonetics === translation ? '' : phonetics };
+    })().then(
+      result => sendResponse({ success: true, ...result }),
+      (error: unknown) => sendResponse({ success: false, error: error instanceof Error ? error.message : 'Translation unavailable' }),
+    );
+    return true;
+  }
   if (message.type === 'LEARNING_SUGGEST_MEANING') {
     void (async () => {
       const text = typeof message.text === 'string' ? message.text.trim() : '';
