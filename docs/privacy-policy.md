@@ -1,14 +1,14 @@
 # PolyTranslate Privacy Policy
 
-Last updated: November 5, 2026
+Last updated: November 6, 2026
 
 PolyTranslate translates text selected on web pages and PDFs, translates selected text in editable fields, and recognizes text in image regions selected by the user. The optional PolyTranslate Learning website lets you create an account and organize learning folders. This policy describes both the Chrome extension and the companion website.
 
 ## Data used to provide translation
 
-When translation is enabled, PolyTranslate sends the text you select, type and explicitly choose to translate, or extract from a selected image region to your chosen translation provider over HTTPS. The default provider is Google Translate (`translate.googleapis.com`). If you select DeepL, the extension sends the text to DeepL (`api-free.deepl.com` or `api.deepl.com`). Selected text may contain personal information, communications, or other sensitive material, depending on what you select. Automatic translation of selected text is on by default after you agree to the disclosure in the extension popup; you can turn it off or disable the extension there.
+When translation is enabled, PolyTranslate sends the text you select, type and explicitly choose to translate, or extract from a selected image region to your chosen translation provider over HTTPS. The default provider is Google Translate (`translate.googleapis.com`). DeepL Web sends text to `oneshot-free.www.deepl.com` without an API key. DeepL API sends text to `api-free.deepl.com` or `api.deepl.com` with your key. Selected text may contain personal information, communications, or other sensitive material, depending on what you select. Automatic translation of selected text is on by default after you agree to the disclosure in the extension popup; you can turn it off or disable the extension there.
 
-If you enter a DeepL API key, PolyTranslate stores it in Chrome's local extension storage on your device. The key is sent to DeepL over HTTPS when checking its validity or making a DeepL translation request. It is not sent to Google Translate.
+If you enter a DeepL API key, PolyTranslate stores it in Chrome's local extension storage on your device. The key is sent to DeepL over HTTPS when checking its validity or making a DeepL API translation request. It is not sent to Google Translate or the DeepL Web endpoint.
 
 The chosen translation provider may process and retain requests according to its own privacy terms: [Google Privacy Policy](https://policies.google.com/privacy) and [DeepL Privacy Policy](https://www.deepl.com/privacy). PolyTranslate does not control those providers' retention practices.
 

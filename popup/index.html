@@ -31,7 +31,7 @@
   <main class="settings-main">
     <section id="privacy-consent" class="privacy-consent" aria-labelledby="privacy-consent-title">
       <h2 id="privacy-consent-title">Trước khi dùng tính năng dịch</h2>
-      <p>PolyTranslate gửi phần văn bản bạn chọn hoặc văn bản nhận từ OCR tới Google Translate. Nếu bạn chọn DeepL, văn bản và API key của bạn được gửi tới DeepL. Ảnh OCR được xử lý trên thiết bị. Cài đặt, API key, ghi chú học chữ Hán và ảnh bạn ghim được lưu trong Chrome trên thiết bị này.</p>
+      <p>PolyTranslate gửi phần văn bản bạn chọn hoặc văn bản nhận từ OCR tới Google Translate. Nếu bạn chọn DeepL Web, văn bản được gửi tới DeepL mà không dùng API key; nếu chọn DeepL API, văn bản và API key được gửi tới DeepL. Ảnh OCR được xử lý trên thiết bị. Cài đặt, API key, ghi chú học chữ Hán và ảnh bạn ghim được lưu trong Chrome trên thiết bị này.</p>
       <p><a href="../privacy-policy.html" target="_blank" rel="noopener noreferrer">Đọc chính sách quyền riêng tư</a></p>
       <button id="privacy-consent-accept" type="button">Tôi đồng ý và bật dịch</button>
     </section>
@@ -46,7 +46,7 @@
     <div class="settings-grid">
       <section class="settings-section" aria-labelledby="translation-title">
         <h2 id="translation-title">Translation Engine</h2>
-        <div class="setting-row"><label class="setting-info" for="provider"><span class="setting-label">Provider</span><span class="setting-desc">Active engine service</span></label><div class="select-wrap"><select id="provider"><option value="google" selected>Google</option><option value="deepl">DeepL API</option></select></div></div>
+        <div class="setting-row"><label class="setting-info" for="provider"><span class="setting-label">Provider</span><span class="setting-desc">Active engine service</span></label><div class="select-wrap"><select id="provider"><option value="google" selected>Google</option><option value="deepl-free">DeepL Web (no key)</option><option value="deepl">DeepL API</option></select></div></div>
         <div id="deepl-key-container" class="deepl-section hidden">
           <label class="input-label" for="deepl-api-key">DeepL API Key</label>
           <div class="input-wrap">

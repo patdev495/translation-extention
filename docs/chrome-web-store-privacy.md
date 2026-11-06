@@ -19,6 +19,7 @@ Translate user-selected text and text recognized from user-selected image region
 | `alarms` | Poll a short-lived website account-link request after the user starts linking from extension settings, including when the popup closes. |
 | `<all_urls>` and `file://*/*` | Show translation controls on web pages and supported local PDF files and read PDF content for the extension viewer. Explain the all-sites access clearly in the listing. Review whether all declared host entries are necessary before submission. |
 | `https://translate.googleapis.com/*` | Send text chosen for translation to Google Translate. This entry may be redundant with `<all_urls>` and should be reviewed before submission. |
+| `https://oneshot-free.www.deepl.com/*` | Send text chosen for translation to DeepL Web when selected. This entry may be redundant with `<all_urls>` and should be reviewed before submission. |
 
 ## Remote code
 

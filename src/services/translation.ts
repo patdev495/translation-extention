@@ -4,7 +4,7 @@ export interface TranslationResult {
 }
 
 export interface TranslationSettings {
-  provider: 'google' | 'deepl';
+  provider: 'google' | 'deepl' | 'deepl-free';
   deeplApiKey: string;
 }
 
@@ -87,6 +87,38 @@ export class DeepLTranslationProvider implements TranslationProvider {
   }
 }
 
+export class DeepLFreeTranslationProvider implements TranslationProvider {
+  async translate(text: string, targetLang: string): Promise<TranslationResult> {
+    const language = targetLang.toLowerCase().split('-')[0];
+    const target = language === 'zh' ? 'zh-Hans' : language === 'en' ? 'en-US' : language;
+    const response = await fetch('https://oneshot-free.www.deepl.com/v1/translate', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'None',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text: [text], target_lang: target }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`DeepL Free translation failed. Status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const item = data?.translations?.[0];
+    if (typeof item?.text !== 'string' || !item.text.trim()) {
+      throw new Error('DeepL Free translation returned empty result.');
+    }
+
+    return {
+      translation: item.text,
+      detectedLang: typeof item.detected_source_language === 'string'
+        ? item.detected_source_language.toLowerCase()
+        : 'auto',
+    };
+  }
+}
+
 export class TranslationEngine {
   // Original translation method preserved for tests & compatibility
   static async translate(
@@ -111,6 +143,8 @@ export class TranslationEngine {
     let provider: TranslationProvider;
     if (settings.provider === 'deepl') {
       provider = new DeepLTranslationProvider(settings.deeplApiKey);
+    } else if (settings.provider === 'deepl-free') {
+      provider = new DeepLFreeTranslationProvider();
     } else {
       provider = new GoogleTranslationProvider();
     }

@@ -305,7 +305,7 @@ async function saveSettings() {
       ocrModelTier: ocrModelTier.value as 'tiny' | 'small' | 'medium',
       ocrLanguage: ocrLanguage.value as 'ch' | 'latin',
       ttsEnabled: ttsToggle.checked,
-      provider: providerSelect.value as 'google' | 'deepl',
+      provider: providerSelect.value as 'google' | 'deepl' | 'deepl-free',
       deeplApiKey: deeplApiKeyInput.value,
       tooltipFontSize: tooltipFontSizeSelect.value as '12' | '14' | '16' | '18' | '20' | '24' | '28' | '32' | '36' | '40',
       hanziStrokeSpeed: Number(hanziStrokeSpeedSelect.value) as 0.5 | 1 | 1.5 | 2 | 3,
