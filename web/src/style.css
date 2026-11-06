@@ -376,3 +376,62 @@ body:has(.new-item-editor[open]) { overflow: hidden; }
 @media (max-width: 680px) { .review-page { padding: 16px 16px 50px; } .review-page header p { display: none; } .review-card-scene { height: 280px; } }
 @media (max-width: 420px) { .review-controls { grid-template-columns: minmax(0, 1fr); } }
 @media (prefers-reduced-motion: reduce) { .review-page .review-card { transition: none; } }
+
+/* Phone practice keeps the learning controls within one comfortable reach. */
+.review-mobile-library { display: none; }
+.practice-setup { margin: 14px 0; border: 1px solid var(--border); border-radius: 13px; background: #fff; }
+.practice-setup > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 10px 14px; color: #343b68; font-size: 13px; font-weight: 750; cursor: pointer; }
+.practice-setup > summary::after { content: '⌄'; color: var(--muted); }
+.practice-setup > summary span { flex: 1; overflow: hidden; text-align: right; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; font-weight: 500; }
+.practice-setup[open] > summary { border-bottom: 1px solid var(--border); }
+.practice-setup .review-controls { grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; border: 0; box-shadow: none; }
+.practice-setup .review-controls > button { grid-column: 1 / -1; }
+.review-page button { min-height: 44px; touch-action: manipulation; }
+.practice-progress { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: -2px 0 8px; }
+.practice-progress p { margin: 0; color: #68728f; font-size: 13px; font-weight: 800; }
+.practice-progress p span { margin-left: 9px; font-size: 10px; letter-spacing: .08em; }
+.review-page .practice-progress button { border: 0; background: transparent; color: var(--muted); font-size: 12px; }
+.practice-audio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.practice-audio button { min-width: 0; padding: 10px 6px; font-size: 13px; }
+.practice-audio button[aria-pressed="true"] { border-color: #e7a1a8; background: #fff0f1; color: #a12538; }
+.practice-audio .practice-autoplay { display: flex; align-items: center; justify-content: center; grid-column: 1 / -1; gap: 8px; min-height: 44px; color: var(--muted); font-size: 12px; font-weight: 600; cursor: pointer; }
+.practice-autoplay input { width: 18px; height: 18px; accent-color: var(--indigo); }
+.practice-recording-note { margin: 8px 0 0; min-height: 18px; color: var(--muted); font-size: 11px; text-align: center; }
+.practice-feedback { padding: 10px 12px; border-radius: 9px; background: #fff7e8; color: #78521a; font-size: 13px; line-height: 1.5; }
+.review-navigation { display: grid; grid-template-columns: minmax(44px, .7fr) repeat(2, minmax(0, 1.2fr)) minmax(44px, .7fr); gap: 8px; margin-top: 12px; padding: 8px 0; background: #fff; }
+.review-navigation button { min-width: 0; padding: 10px 4px; font-size: 13px; }
+.review-page .review-navigation > button:last-child { background: #f6f5ff; color: var(--indigo); }
+.review-page .practice-remembered { border-color: #298261; background: #298261; color: #fff; }
+.review-page .practice-remembered:hover { background: #20694e; }
+.review-page .practice-not-yet { border-color: #efcdb0; background: #fff6ee; color: #8d5421; }
+.practice-current-result { margin: 0 0 6px; text-align: center; color: var(--muted); font-size: 12px; }
+.practice-scratchpad { margin-top: 8px; border-top: 1px solid var(--border); }
+.practice-scratchpad > summary { display: flex; justify-content: space-between; gap: 8px; min-height: 44px; padding: 12px 0; color: var(--muted); font-size: 12px; cursor: pointer; }
+.practice-scratchpad > summary span { color: #8790a7; }
+.practice-resume { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 0; padding: 16px; border: 1px solid #c6dfd3; border-radius: 14px; background: #f1fbf5; }
+.practice-resume strong { color: #245d45; }
+.practice-resume p { margin: 6px 0 0; color: #546f60; font-size: 12px; }
+.review-card-face .review-front, .review-card-face .review-back { flex: 0 1 auto; min-height: 0; max-height: 100%; overflow: auto; overscroll-behavior: contain; }
+.review-card-eyebrow, .review-card-hint { flex-shrink: 0; }
+@media (max-width: 680px) {
+  .review-workspace .sidebar { display: none; }
+  .review-mobile-library { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 14px; }
+  .review-mobile-library button { min-height: 44px; padding: 8px 10px; border: 0; background: transparent; color: var(--indigo); font-size: 13px; font-weight: 700; }
+  .review-mobile-library span { color: var(--muted); font-size: 11px; }
+  .review-page { min-width: 0; padding: 8px 12px calc(18px + env(safe-area-inset-bottom)); }
+  .review-page header h1 { font-size: 23px; }
+  .practice-setup { margin: 10px 0; }
+  .practice-setup .review-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 12px; }
+  .review-controls select, .review-question textarea { font-size: 16px; }
+  .review-controls select { min-height: 44px; padding: 8px; }
+  .review-question { padding: 8px 12px 12px; border-radius: 16px; }
+  .review-card-scene { height: clamp(210px, 32svh, 290px); margin-bottom: 14px; }
+  .review-card-face { gap: 10px; padding: 18px; border-radius: 15px; }
+  .review-front { font-size: clamp(25px, 7vw, 36px); line-height: 1.4; }
+  .review-back { font-size: 25px; line-height: 1.45; }
+  .review-card-eyebrow { font-size: 9px; letter-spacing: .09em; }
+  .review-navigation { position: sticky; bottom: 0; z-index: 5; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+  .practice-resume { align-items: stretch; flex-direction: column; }
+  .practice-resume button { width: 100%; }
+  .review-statistics > summary { padding: 12px; font-size: 12px; }
+}

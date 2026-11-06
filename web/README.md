@@ -29,6 +29,24 @@ npm test
 npm run build
 ```
 
+## Flashcard trên điện thoại
+
+Mở website bằng Safari trên iPhone, đăng nhập cùng Learning Account và chọn **Ôn tập**. Chọn thư mục, **Từ/cụm**, **Câu** hoặc **Cả hai**, rồi dùng flashcard thường, **Nghe và nói theo** hoặc **Nhìn nghĩa và tự nói**. Thiết lập tự thu gọn khi bắt đầu; ô nháp có thể mở khi cần.
+
+**Nhớ / Chưa nhớ** ghi kết quả và sang thẻ kế; **Lùi / Tiếp** chỉ chuyển thẻ. **Tiếp tục bài dở** khôi phục đúng thứ tự, vị trí và kết quả. Phần nghe mẫu dùng giọng tiếng Trung phổ thông của thiết bị; nếu chưa có giọng hoặc trình duyệt chặn tự phát, trang hướng dẫn thử lại bằng nút Nghe mẫu.
+
+Thu âm yêu cầu HTTPS và quyền micro. Mỗi thẻ giữ một bản thu mới nhất trong bộ nhớ trang, không tải âm thanh lên server hoặc lưu vào bộ nhớ bền vững. Chuyển ứng dụng/khóa màn hình dừng micro; kết thúc luyện, rời trang hoặc tải lại sẽ xóa các bản thu. Tiếp tục bài dở không khôi phục bản thu.
+
+Kiểm tra luồng trình duyệt với API và SQLite tạm riêng:
+
+```powershell
+cd web
+npx playwright install chromium webkit
+npm run test:e2e
+```
+
+Tests chạy bản build production, không dùng dữ liệu học thật. WebKit trên Windows không cung cấp các API media nên luồng media ở đó dùng test double tại ranh giới thiết bị; Chromium kiểm tra thu, encode và playback native với thiết bị micro giả của trình duyệt. Kiểm tra này không thay thế việc thử micro/loa trên iPhone thật.
+
 ## Production trên VPS
 
 Stack ở `deploy/learning/compose.yml`: Vue được build thành static site trong Nginx, FastAPI chỉ nằm trong mạng Compose, và host chỉ bind frontend vào `127.0.0.1:8070`. Nginx của VPS dùng `deploy/learning/host-nginx.conf` để phục vụ `https://learning.peebot.shop`. File SQLite nằm ở `/var/lib/polytranslate-learning/learning.sqlite3`, tách khỏi container.

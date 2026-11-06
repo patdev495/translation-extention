@@ -791,7 +791,7 @@ async function submitEditor(): Promise<void> {
       </section>
     </main>
 
-    <main v-else class="workspace">
+    <main v-else class="workspace" :class="{ 'review-workspace': showReview }">
       <aside class="sidebar" aria-label="Thư mục học tập">
         <div class="sidebar-heading"><span>THƯ VIỆN</span></div>
         <nav aria-label="Cây thư mục">
@@ -816,6 +816,7 @@ async function submitEditor(): Promise<void> {
         </template>
       </div>
 
+      <div v-if="showReview" class="review-mobile-library"><button type="button" @click="openLibrary(null)">← Thư viện</button><span>Luyện theo nhịp của bạn</span></div>
       <Review v-if="showReview" :folders="folders" @open-item="id => { const entry = items.find(item => item.id === id); if (entry) openItemEditor(entry); }" />
       <section v-else-if="showTrash" class="library-main trash-main" aria-labelledby="trash-title">
         <div class="library-header"><div><p class="overline">CÓ THỂ KHÔI PHỤC</p><h1 id="trash-title">Thùng rác</h1><p class="library-subtitle">Mục chỉ bị xóa vĩnh viễn khi bạn chọn.</p></div><button v-if="trash.length" type="button" class="danger-button" :disabled="trashBusy" @click="askToDelete('Xóa vĩnh viễn toàn bộ thùng rác? Thao tác này không thể hoàn tác.', () => learningApi.emptyTrash(), 'Đã xóa vĩnh viễn toàn bộ thùng rác.')">Dọn sạch thùng rác</button></div>

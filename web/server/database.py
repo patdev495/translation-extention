@@ -133,6 +133,10 @@ def initialize(path: Path) -> None:
                 connection.execute(f"ALTER TABLE {table} ADD COLUMN deleted_at INTEGER")
             if "trash_root_id" not in existing:
                 connection.execute(f"ALTER TABLE {table} ADD COLUMN trash_root_id TEXT")
+        review_columns = {str(row["name"]) for row in connection.execute("PRAGMA table_info(review_sessions)")}
+        for name, definition in (("settings_json", "TEXT"), ("position", "INTEGER NOT NULL DEFAULT 0"), ("completed_at", "INTEGER")):
+            if name not in review_columns:
+                connection.execute(f"ALTER TABLE review_sessions ADD COLUMN {name} {definition}")
         connection.executescript(
             """
             DROP INDEX IF EXISTS folder_sibling_name_idx;

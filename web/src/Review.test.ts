@@ -1,10 +1,15 @@
 // @vitest-environment jsdom
-import { expect, test, vi } from 'vitest';
+import { beforeEach, expect, test, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import Review from './Review.vue';
 import { learningApi } from './api';
 
-vi.mock('./api', () => ({ learningApi: { reviewOverview: vi.fn(), startReview: vi.fn(), recordRecall: vi.fn() } }));
+vi.mock('./api', () => ({ learningApi: { reviewOverview: vi.fn(), startReview: vi.fn(), recordRecall: vi.fn(), currentReview: vi.fn(), progressReview: vi.fn() } }));
+beforeEach(() => {
+  localStorage.clear();
+  vi.mocked(learningApi.currentReview).mockResolvedValue(null);
+  vi.mocked(learningApi.progressReview).mockResolvedValue({ id: 'progress', kind: 'vocabulary', questions: [], ineligible_count: 0 });
+});
 
 test('learner reviews vocabulary with flip, scratchpad, correction and summary', async () => {
   const api = vi.mocked(learningApi);
@@ -24,13 +29,14 @@ test('learner reviews vocabulary with flip, scratchpad, correction and summary',
   expect(page.text()).toContain('nǐ hǎo');
   await page.get('button[aria-label="Chưa nhớ"]').trigger('click');
   await flushPromises();
-  expect(api.recordRecall).toHaveBeenCalledWith('session', 'one', 'not_yet');
+  expect(api.recordRecall).toHaveBeenCalledWith('session', 'one', 'not_yet', 1);
   expect(page.text()).toContain('Tóm tắt ôn tập');
   await page.get('button[aria-label="Lùi"]').trigger('click');
+  await flushPromises();
   expect((page.get('textarea[aria-label="Ô nháp ôn tập"]').element as HTMLTextAreaElement).value).toBe('my answer');
   await page.get('button[aria-label="Tiếp"]').trigger('click');
   await flushPromises();
-  expect(api.recordRecall).toHaveBeenCalledWith('session', 'one', 'remembered');
+  expect(page.text()).toContain('Đã nhớ: 0 · Chưa nhớ: 1');
   page.unmount();
 });
 
@@ -90,7 +96,8 @@ test('Space advances outside editable fields but types inside scratchpad', async
   expect(api.recordRecall).not.toHaveBeenCalled();
   document.body.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', bubbles: true, cancelable: true }));
   await flushPromises();
-  expect(api.recordRecall).toHaveBeenCalledWith('space-session', 'one', 'remembered');
+  expect(api.recordRecall).not.toHaveBeenCalled();
+  expect(page.text()).toContain('Đã nhớ: 0 · Chưa nhớ: 0');
   page.unmount();
 });
 
@@ -110,7 +117,7 @@ test('review scope and three flashcard prompt modes change visible front', async
   expect(api.reviewOverview).toHaveBeenCalledWith('root');
   await page.get('button[aria-label="Bắt đầu ôn tập"]').trigger('click');
   await flushPromises();
-  expect(api.startReview).toHaveBeenCalledWith('vocabulary', 'root');
+  expect(api.startReview).toHaveBeenCalledWith('vocabulary', 'root', { category: 'all', practice: 'classic', prompt_mode: 'meaning', autoplay: true });
   expect(page.get('.review-front').text()).toBe('xin chào');
   await page.get('select[aria-label="Mặt trước flashcard"]').setValue('chinese');
   expect(page.get('.review-front').text()).toBe('你好');
