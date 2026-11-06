@@ -10,7 +10,8 @@ vi.mock('./api', async (importOriginal) => {
     ...original,
     learningApi: {
       me: vi.fn(), register: vi.fn(), login: vi.fn(), logout: vi.fn(),
-      approveLink: vi.fn(), folders: vi.fn(), createFolder: vi.fn(), updateFolder: vi.fn(), items: vi.fn(), updateItem: vi.fn(),
+      approveLink: vi.fn(), folders: vi.fn(), createFolder: vi.fn(), updateFolder: vi.fn(), items: vi.fn(), createItem: vi.fn(), suggestMeaning: vi.fn(), updateItem: vi.fn(),
+      addItemLink: vi.fn(), removeItemLink: vi.fn(), createItemWithExamples: vi.fn(), updateItemWithExamples: vi.fn(),
       trash: vi.fn(), trashItem: vi.fn(), trashFolder: vi.fn(), restoreItem: vi.fn(), restoreFolder: vi.fn(),
       permanentlyDeleteItem: vi.fn(), permanentlyDeleteFolder: vi.fn(), emptyTrash: vi.fn(),
     },
@@ -229,6 +230,194 @@ test('folder items show immediately and can be filtered by word or sentence', as
   page.unmount();
 });
 
+test('learner expands folder levels and sees child folders above direct items', async () => {
+  storedFolders = [
+    { id: 'root', name: 'HSK', parent_id: null },
+    { id: 'other', name: 'Du lịch', parent_id: null },
+    { id: 'child', name: 'Bài 01', parent_id: 'root' },
+    { id: 'grandchild', name: 'Từ mới', parent_id: 'child' },
+  ];
+  storedItems = [
+    { id: 'root-word', folder_id: 'root', category: 'word', text: '学习', meaning: 'học', pinyin: 'xué xí', created_at: 1700000000000, linked_item_ids: [] },
+    { id: 'child-word', folder_id: 'child', category: 'word', text: '中文', meaning: 'tiếng Trung', pinyin: 'zhōng wén', created_at: 1700000000001, linked_item_ids: [] },
+  ];
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+  const sidebar = page.get('nav[aria-label="Cây thư mục"]');
+  expect(sidebar.text()).toContain('HSK');
+  expect(sidebar.text()).not.toContain('Bài 01');
+  expect(sidebar.text()).not.toContain('Từ mới');
+
+  await sidebar.findAll('.tree-button').find(button => button.text().includes('HSK'))!.trigger('click');
+  expect(sidebar.text()).toContain('Bài 01');
+  expect(sidebar.text()).not.toContain('Từ mới');
+  expect(page.get('.child-folder-grid').text()).toContain('Bài 01');
+  expect(page.get('#learning-item-root-word').text()).toContain('学习');
+  expect(page.find('#learning-item-child-word').exists()).toBe(false);
+
+  await sidebar.findAll('.tree-button').find(button => button.text().includes('Bài 01'))!.trigger('click');
+  expect(sidebar.text()).toContain('Từ mới');
+  expect(page.get('.child-folder-grid').text()).toContain('Từ mới');
+  expect(page.get('#learning-item-child-word').text()).toContain('中文');
+  page.unmount();
+});
+
+test('folder hierarchy remains navigable after reload and through keyboard menu', async () => {
+  storedFolders = [
+    { id: 'root', name: 'HSK', parent_id: null },
+    { id: 'child', name: 'Bài 01', parent_id: 'root' },
+  ];
+  const first = mount(App, { attachTo: document.body });
+  await flushPromises();
+  await first.get('nav[aria-label="Cây thư mục"]').findAll('.tree-button')[1]!.trigger('click');
+  expect(first.get('nav[aria-label="Cây thư mục"]').text()).toContain('Bài 01');
+  first.unmount();
+
+  const reopened = mount(App, { attachTo: document.body });
+  await flushPromises();
+  const sidebar = reopened.get('nav[aria-label="Cây thư mục"]');
+  expect(sidebar.text()).not.toContain('Bài 01');
+  await sidebar.findAll('.tree-button')[1]!.trigger('click');
+  const child = sidebar.findAll('.tree-button').find(button => button.text().includes('Bài 01'))!;
+  await child.trigger('keydown', { key: 'ContextMenu' });
+  await flushPromises();
+  expect(reopened.get('[role="menu"]').text()).toContain('Bài 01');
+  reopened.unmount();
+});
+
+test('learner creates a Word or Phrase from a folder menu', async () => {
+  storedFolders = [{ id: 'f1', name: 'HSK', parent_id: null }];
+  api.createItem.mockImplementation(async payload => {
+    const item: SavedLearningItem = { id: 'new-word', ...payload, pinyin: 'xué xí', created_at: 1700000000000, linked_item_ids: [] };
+    storedItems.push(item);
+    return item;
+  });
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+  await page.get('button[aria-label="Tùy chọn HSK"]').trigger('click');
+  await page.findAll('[role="menuitem"]').find(button => button.text() === 'Thêm')!.trigger('click');
+  await page.findAll('[role="menuitem"]').find(button => button.text() === 'Từ / cụm từ')!.trigger('click');
+  await page.get('#new-item-text').setValue('学习');
+  await page.get('#new-item-meaning').setValue('học');
+  await page.get('.new-item-editor form').trigger('submit');
+  await flushPromises();
+  expect(api.createItem).toHaveBeenCalledWith({ folder_id: 'f1', category: 'word', text: '学习', meaning: 'học' });
+  expect(page.get('#learning-item-new-word').text()).toContain('xué xí');
+  page.unmount();
+});
+
+test('learner can correct a Word or Phrase meaning suggestion before saving', async () => {
+  storedFolders = [{ id: 'f1', name: 'HSK', parent_id: null }];
+  api.suggestMeaning.mockResolvedValue({ meaning: 'học tập' });
+  api.createItem.mockImplementation(async payload => ({ id: 'new-word', ...payload, pinyin: 'xué xí', created_at: 1700000000000, linked_item_ids: [] }));
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+  await page.get('button[aria-label="Tùy chọn HSK"]').trigger('click');
+  await page.findAll('[role="menuitem"]').find(button => button.text() === 'Thêm')!.trigger('click');
+  await page.findAll('[role="menuitem"]').find(button => button.text() === 'Từ / cụm từ')!.trigger('click');
+  await page.get('#new-item-text').setValue('学习');
+  await page.get('#new-item-text').trigger('change');
+  await flushPromises();
+  expect((page.get('#new-item-meaning').element as HTMLInputElement).value).toBe('học tập');
+  await page.get('#new-item-meaning').setValue('học');
+  await page.get('.new-item-editor form').trigger('submit');
+  await flushPromises();
+  expect(api.createItem).toHaveBeenCalledWith({ folder_id: 'f1', category: 'word', text: '学习', meaning: 'học' });
+  page.unmount();
+});
+
+test('new Word or Phrase form clears an unfinished meaning suggestion', async () => {
+  storedFolders = [{ id: 'f1', name: 'HSK', parent_id: null }];
+  let finishSuggestion!: (value: { meaning: string }) => void;
+  api.suggestMeaning.mockImplementation(() => new Promise(resolve => { finishSuggestion = resolve; }));
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+  await page.get('button[aria-label="Tùy chọn HSK"]').trigger('click');
+  await page.findAll('[role="menuitem"]').find(button => button.text() === 'Thêm')!.trigger('click');
+  await page.findAll('[role="menuitem"]').find(button => button.text() === 'Từ / cụm từ')!.trigger('click');
+  await page.get('#new-item-text').setValue('学习');
+  await page.get('#new-item-text').trigger('change');
+  expect(page.get('.new-item-editor [role="status"]').text()).toContain('Đang gợi ý');
+  await page.get('.new-item-editor .plain-button').trigger('click');
+  await page.get('button[aria-label="Tùy chọn HSK"]').trigger('click');
+  await page.findAll('[role="menuitem"]').find(button => button.text() === 'Thêm')!.trigger('click');
+  await page.findAll('[role="menuitem"]').find(button => button.text() === 'Từ / cụm từ')!.trigger('click');
+  expect(page.find('.new-item-editor [role="status"]').exists()).toBe(false);
+  finishSuggestion({ meaning: 'học tập' });
+  await flushPromises();
+  page.unmount();
+});
+
+test('learner creates a standalone Sentence from a folder context menu', async () => {
+  storedFolders = [{ id: 'f1', name: 'Bài học', parent_id: null }];
+  api.createItem.mockImplementation(async payload => {
+    const item: SavedLearningItem = { id: 'new-sentence', ...payload, pinyin: 'wǒ xǐ huān xué xí zhōng wén', created_at: 1700000000000, linked_item_ids: [] };
+    storedItems.push(item);
+    return item;
+  });
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+  const folderButton = page.get('nav[aria-label="Cây thư mục"]').findAll('.tree-button')[1]!;
+  await folderButton.trigger('contextmenu', { clientX: 30, clientY: 30 });
+  await page.findAll('[role="menuitem"]').find(button => button.text() === 'Thêm')!.trigger('click');
+  await page.findAll('[role="menuitem"]').find(button => button.text() === 'Câu')!.trigger('click');
+  expect(page.get('#new-item-text').element.tagName).toBe('TEXTAREA');
+  await page.get('.new-item-editor .plain-button').trigger('click');
+  expect(api.createItem).not.toHaveBeenCalled();
+
+  await folderButton.trigger('contextmenu', { clientX: 30, clientY: 30 });
+  await page.findAll('[role="menuitem"]').find(button => button.text() === 'Thêm')!.trigger('click');
+  await page.findAll('[role="menuitem"]').find(button => button.text() === 'Câu')!.trigger('click');
+  await page.get('#new-item-text').setValue('我喜欢学习中文。');
+  await page.get('#new-item-meaning').setValue('Tôi thích học tiếng Trung.');
+  await page.get('.new-item-editor form').trigger('submit');
+  await flushPromises();
+  expect(api.createItem).toHaveBeenCalledWith({ folder_id: 'f1', category: 'sentence', text: '我喜欢学习中文。', meaning: 'Tôi thích học tiếng Trung.' });
+  expect(page.get('#learning-item-new-sentence').text()).toContain('我喜欢学习中文。');
+  page.unmount();
+});
+
+test('duplicate Word or Phrase stays in the form with a clear message', async () => {
+  storedFolders = [{ id: 'f1', name: 'HSK', parent_id: null }];
+  api.createItem.mockRejectedValue(new ApiError(409, 'Duplicate Learning Item'));
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+  await page.get('button[aria-label="Tùy chọn HSK"]').trigger('click');
+  await page.findAll('[role="menuitem"]').find(button => button.text() === 'Thêm')!.trigger('click');
+  await page.findAll('[role="menuitem"]').find(button => button.text() === 'Từ / cụm từ')!.trigger('click');
+  await page.get('#new-item-text').setValue('学习');
+  await page.get('#new-item-meaning').setValue('học');
+  await page.get('.new-item-editor form').trigger('submit');
+  await flushPromises();
+  expect(page.get('.new-item-editor[open] [role="alert"]').text()).toContain('đã có trong thư mục');
+  page.unmount();
+});
+
+test('learner can add an item from a child folder card', async () => {
+  storedFolders = [
+    { id: 'root', name: 'HSK', parent_id: null },
+    { id: 'child', name: 'Bài 01', parent_id: 'root' },
+  ];
+  api.createItem.mockImplementation(async payload => {
+    const item: SavedLearningItem = { id: 'child-word', ...payload, pinyin: 'nǐ hǎo', created_at: 1700000000000, linked_item_ids: [] };
+    storedItems.push(item);
+    return item;
+  });
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+  await page.get('nav[aria-label="Cây thư mục"]').findAll('.tree-button')[1]!.trigger('click');
+  await page.get('.child-folder-card').trigger('contextmenu', { clientX: 100, clientY: 100 });
+  expect(page.get('[role="menu"]').text()).toContain('Thêm');
+  await page.findAll('[role="menuitem"]').find(button => button.text() === 'Thêm')!.trigger('click');
+  await page.findAll('[role="menuitem"]').find(button => button.text() === 'Từ / cụm từ')!.trigger('click');
+  await page.get('#new-item-text').setValue('你好');
+  await page.get('#new-item-meaning').setValue('xin chào');
+  await page.get('.new-item-editor form').trigger('submit');
+  await flushPromises();
+  expect(api.createItem).toHaveBeenCalledWith({ folder_id: 'child', category: 'word', text: '你好', meaning: 'xin chào' });
+  page.unmount();
+});
+
 test('learner edits saved item and follows linked context on website', async () => {
   storedFolders = [{ id: 'f1', name: 'HSK', parent_id: null }, { id: 'f2', name: 'Other', parent_id: null }];
   storedItems = [
@@ -251,6 +440,134 @@ test('learner edits saved item and follows linked context on website', async () 
   await flushPromises();
   expect(page.text()).toContain('学中文');
   expect(page.get('#learning-item-w1').attributes('class')).toContain('focused');
+  page.unmount();
+});
+
+test('learner manages cross-folder Learning Links from item editor', async () => {
+  storedFolders = [{ id: 'f1', name: 'Words', parent_id: null }, { id: 'f2', name: 'Sentences', parent_id: null }];
+  storedItems = [
+    { id: 'w1', folder_id: 'f1', category: 'word', text: '学习', meaning: 'học', pinyin: '', created_at: 1, linked_item_ids: [] },
+    { id: 's1', folder_id: 'f2', category: 'sentence', text: '天气好。', meaning: 'Trời đẹp.', pinyin: '', created_at: 2, linked_item_ids: [] },
+  ];
+  api.addItemLink.mockImplementation(async (id, linkedId) => {
+    storedItems.find(entry => entry.id === id)!.linked_item_ids.push(linkedId);
+    storedItems.find(entry => entry.id === linkedId)!.linked_item_ids.push(id);
+  });
+  api.removeItemLink.mockImplementation(async (id, linkedId) => {
+    for (const entry of storedItems) entry.linked_item_ids = entry.linked_item_ids.filter(value => value !== id && value !== linkedId);
+  });
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+  await page.get('button[aria-label="Sửa 学习"]').trigger('click');
+  await page.get('#item-link-target').setValue('s1');
+  await page.get('button[aria-label="Thêm liên kết"]').trigger('click');
+  await flushPromises();
+  expect(page.get('.item-editor').text()).toContain('天气好。');
+  await page.get('button[aria-label="Gỡ liên kết 天气好。"]').trigger('click');
+  await flushPromises();
+  expect(page.find('button[aria-label="Gỡ liên kết 天气好。"]').exists()).toBe(false);
+  page.unmount();
+});
+
+test('word form drafts multiple new and existing Example Sentences until save', async () => {
+  storedFolders = [{ id: 'f1', name: 'Words', parent_id: null }, { id: 'f2', name: 'Sentences', parent_id: null }];
+  storedItems = [{ id: 's1', folder_id: 'f2', category: 'sentence', text: '你好。', meaning: 'Xin chào.', pinyin: '', created_at: 1, linked_item_ids: [] }];
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+  await page.get('button[aria-label="Tùy chọn Words"]').trigger('click');
+  await page.findAll('[role="menuitem"]').find(button => button.text() === 'Thêm')!.trigger('click');
+  await page.findAll('[role="menuitem"]').find(button => button.text() === 'Từ / cụm từ')!.trigger('click');
+  await page.get('#new-item-text').setValue('你');
+  await page.get('#new-item-meaning').setValue('bạn');
+  await page.get('#example-text').setValue('你好吗？');
+  await page.get('#example-meaning').setValue('Bạn khỏe không?');
+  await page.get('button[aria-label="Thêm câu mới"]').trigger('click');
+  await page.get('#example-existing').setValue('s1');
+  await page.get('button[aria-label="Chọn câu đã lưu"]').trigger('click');
+  expect(api.createItemWithExamples).not.toHaveBeenCalled();
+  await page.get('.new-item-editor form').trigger('submit');
+  await flushPromises();
+  expect(api.createItemWithExamples).toHaveBeenCalledWith({ item: { folder_id: 'f1', category: 'word', text: '你', meaning: 'bạn' }, examples: [{ text: '你好吗？', meaning: 'Bạn khỏe không?' }, { item_id: 's1' }] });
+  page.unmount();
+});
+
+test('learner creates Grammar without Pinyin and filters it in folder', async () => {
+  storedFolders = [{ id: 'f1', name: 'HSK', parent_id: null }];
+  api.createItem.mockImplementation(async body => {
+    const created = { id: 'g1', ...body, pinyin: '', created_at: 3, linked_item_ids: [] };
+    storedItems.push(created);
+    return created;
+  });
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+  await page.get('button[aria-label="Tùy chọn HSK"]').trigger('click');
+  await page.findAll('[role="menuitem"]').find(button => button.text() === 'Thêm')!.trigger('click');
+  await page.findAll('[role="menuitem"]').find(button => button.text() === 'Ngữ pháp')!.trigger('click');
+  await page.get('#new-item-text').setValue('把 + đồ vật');
+  await page.get('#new-item-meaning').setValue('Chuyển đồ vật');
+  await page.get('.new-item-editor form').trigger('submit');
+  await flushPromises();
+  expect(page.get('#learning-item-g1').text()).toContain('把 + đồ vật');
+  expect(page.get('#learning-item-g1').find('.saved-item-pinyin').exists()).toBe(false);
+  expect(page.get('.breadcrumb-count').text()).toContain('0 từ · 0 câu');
+  await page.get('select[aria-label="Lọc mục học tập"]').setValue('grammar');
+  expect(page.find('#learning-item-g1').exists()).toBe(true);
+  page.unmount();
+});
+
+test('learner creates Note with multiline body from visible folder menu', async () => {
+  storedFolders = [{ id: 'f1', name: 'HSK', parent_id: null }];
+  api.createItem.mockImplementation(async body => {
+    const created = { id: 'n1', ...body, pinyin: '', created_at: 3, linked_item_ids: [] };
+    storedItems.push(created);
+    return created;
+  });
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+  await page.get('button[aria-label="Tùy chọn HSK"]').trigger('click');
+  await page.findAll('[role="menuitem"]').find(button => button.text() === 'Thêm')!.trigger('click');
+  await page.findAll('[role="menuitem"]').find(button => button.text() === 'Ghi chú')!.trigger('click');
+  await page.get('#new-item-text').setValue('Nhắc nhớ');
+  await page.get('#new-item-meaning').setValue('Dòng 1\n**Dòng 2**');
+  await page.get('.new-item-editor form').trigger('submit');
+  await flushPromises();
+  expect(page.get('#learning-item-n1').text()).toContain('Dòng 1\n**Dòng 2**');
+  expect(page.get('#learning-item-n1').find('.saved-item-pinyin').exists()).toBe(false);
+  expect(page.get('#learning-item-n1').find('strong').exists()).toBe(false);
+  page.unmount();
+});
+
+test('learner adds new Example Sentence while editing Grammar', async () => {
+  storedFolders = [{ id: 'f1', name: 'HSK', parent_id: null }];
+  storedItems = [{ id: 'g1', folder_id: 'f1', category: 'grammar', text: '把 + N', meaning: 'Mô tả', pinyin: '', created_at: 1, linked_item_ids: [] }];
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+  await page.get('button[aria-label="Sửa 把 + N"]').trigger('click');
+  await page.get('#edit-example-text').setValue('把门关上。');
+  await page.get('#edit-example-meaning').setValue('Đóng cửa.');
+  await page.get('button[aria-label="Thêm câu ví dụ vào bản nháp"]').trigger('click');
+  expect(api.updateItemWithExamples).not.toHaveBeenCalled();
+  await page.get('.item-editor form').trigger('submit');
+  await flushPromises();
+  expect(api.updateItemWithExamples).toHaveBeenCalledWith('g1', { item: { text: '把 + N', meaning: 'Mô tả', category: 'grammar', folder_id: 'f1' }, examples: [{ text: '把门关上。', meaning: 'Đóng cửa.' }] });
+  page.unmount();
+});
+
+test('learner drafts existing cross-folder Example Sentence while editing Word or Phrase', async () => {
+  storedFolders = [{ id: 'f1', name: 'Words', parent_id: null }, { id: 'f2', name: 'Sentences', parent_id: null }];
+  storedItems = [
+    { id: 'w1', folder_id: 'f1', category: 'word', text: '学习', meaning: 'học', pinyin: '', created_at: 1, linked_item_ids: [] },
+    { id: 's1', folder_id: 'f2', category: 'sentence', text: '我学习。', meaning: 'Tôi học.', pinyin: '', created_at: 2, linked_item_ids: [] },
+  ];
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+  await page.get('button[aria-label="Sửa 学习"]').trigger('click');
+  await page.get('#edit-example-existing').setValue('s1');
+  await page.get('button[aria-label="Thêm câu đã lưu vào bản nháp"]').trigger('click');
+  expect(api.addItemLink).not.toHaveBeenCalled();
+  await page.get('.item-editor form').trigger('submit');
+  await flushPromises();
+  expect(api.updateItemWithExamples).toHaveBeenCalledWith('w1', { item: { text: '学习', meaning: 'học', category: 'word', folder_id: 'f1' }, examples: [{ item_id: 's1' }] });
   page.unmount();
 });
 
@@ -300,7 +617,7 @@ test('creates, browses, renames and moves a nested folder through the website', 
   await page.get('nav[aria-label="Cây thư mục"]').findAll('.tree-button')[1]!.trigger('contextmenu', { clientX: 100, clientY: 120 });
   await flushPromises();
   expect(page.get('[role="menu"]').findAll('[role="menuitem"]').map((item) => item.text())).toEqual([
-    'Tạo thư mục con', 'Đổi tên', 'Chuyển thư mục', 'Xóa thư mục',
+    'Tạo thư mục con', 'Đổi tên', 'Chuyển thư mục', 'Thêm', 'Xóa thư mục',
   ]);
   document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
   await page.vm.$nextTick();
@@ -318,7 +635,7 @@ test('creates, browses, renames and moves a nested folder through the website', 
 
   await page.get('.breadcrumb').findAll('button')[1]!.trigger('click');
   expect(breadcrumb.findAll('button')[1]!.attributes('aria-current')).toBe('page');
-  await page.get('select[aria-label="Chọn thư mục con"]').setValue('folder-2');
+  await page.get('button[aria-label="Mở thư mục Bài 01"]').trigger('click');
   await page.get('button[aria-label="Tùy chọn Bài 01"]').trigger('click');
   await page.get('[role="menu"] button:nth-of-type(2)').trigger('click');
   await page.get('#folder-name').setValue('Bài 02');
@@ -364,7 +681,7 @@ test('asks for sign in and approves an extension link for the signed in account'
   page.unmount();
 });
 
-test('folder location and child dropdown count only items at selected level', async () => {
+test('folder location and child grid count only items at selected level', async () => {
   storedFolders = [
     { id: 'f1', name: 'HSK 1', parent_id: null },
     { id: 'f2', name: 'HSK 2', parent_id: null },
@@ -383,8 +700,8 @@ test('folder location and child dropdown count only items at selected level', as
   expect(page.get('[aria-label="Thống kê vị trí hiện tại"]').text()).toMatch(/3\s*từ.*2\s*câu/s);
   await page.get('nav[aria-label="Cây thư mục"]').findAll('.tree-button')[1]!.trigger('click');
   expect(page.get('[aria-label="Thống kê vị trí hiện tại"]').text()).toMatch(/2\s*từ.*1\s*câu/s);
-  expect(page.get('select[aria-label="Chọn thư mục con"]').text()).toMatch(/Bài 1 · 1 từ · 0 câu/);
-  await page.get('select[aria-label="Chọn thư mục con"]').setValue('f3');
+  expect(page.get('.child-folder-grid').text()).toContain('Bài 1');
+  await page.get('button[aria-label="Mở thư mục Bài 1"]').trigger('click');
   expect(page.find('.empty-state').exists()).toBe(false);
   expect(page.get('[aria-label="Thống kê vị trí hiện tại"]').text()).toMatch(/1\s*từ.*0\s*câu/s);
   page.unmount();
@@ -404,9 +721,9 @@ test('breadcrumb carries current folder counts and child navigation without extr
   await page.get('nav[aria-label="Cây thư mục"]').findAll('.tree-button')[1]!.trigger('click');
   expect(page.find('.library-main:not(.trash-main) .library-header').exists()).toBe(false);
   expect(page.get('nav[aria-label="Đường dẫn thư mục"] [aria-label="Thống kê vị trí hiện tại"]').text()).toBe('(1 từ · 0 câu)');
-  await page.get('nav[aria-label="Đường dẫn thư mục"] select[aria-label="Chọn thư mục con"]').setValue('f2');
+  await page.get('button[aria-label="Mở thư mục Bài 1"]').trigger('click');
   expect(page.get('nav[aria-label="Đường dẫn thư mục"] [aria-label="Thống kê vị trí hiện tại"]').text()).toBe('(0 từ · 1 câu)');
-  expect(page.find('nav[aria-label="Đường dẫn thư mục"] select').exists()).toBe(false);
+  expect(page.find('.child-folder-grid').exists()).toBe(false);
   page.unmount();
 });
 

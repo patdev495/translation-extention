@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { ArrowRight, BookOpen, Check, ChevronRight, Ellipsis, Folder, FolderPlus, Home, Link2, LogOut, MoveRight, Pencil, RotateCcw, Sparkles, Trash2 } from '@lucide/vue';
-import { ApiError, learningApi, type Account, type LearningFolder, type SavedLearningItem, type TrashEntry } from './api';
+import { ApiError, learningApi, type Account, type ExampleSentenceDraft, type LearningFolder, type SavedLearningItem, type TrashEntry } from './api';
 
 type EditorMode = 'create' | 'rename' | 'move';
 
@@ -63,12 +63,60 @@ const linkedSourceId = ref<string | null>(null);
 const editingItem = ref<SavedLearningItem | null>(null);
 const editText = ref('');
 const editMeaning = ref('');
-const editCategory = ref<'word' | 'sentence'>('word');
+const editCategory = ref<SavedLearningItem['category']>('word');
 const editFolderId = ref('');
+const editLinkTarget = ref('');
+const editExampleText = ref('');
+const editExampleMeaning = ref('');
+const editExampleExisting = ref('');
+const editExampleDrafts = ref<ExampleSentenceDraft[]>([]);
+const editExampleCandidates = computed(() => items.value.filter(entry => entry.category === 'sentence' && !editingItem.value?.linked_item_ids.includes(entry.id) && !editExampleDrafts.value.some(draft => 'item_id' in draft && draft.item_id === entry.id)));
+function addEditExample(): void {
+  if (!editExampleText.value.trim() || !editExampleMeaning.value.trim()) return;
+  editExampleDrafts.value.push({ text: editExampleText.value.trim(), meaning: editExampleMeaning.value.trim() });
+  editExampleText.value = '';
+  editExampleMeaning.value = '';
+}
+function addEditExistingExample(): void {
+  if (!editExampleExisting.value) return;
+  editExampleDrafts.value.push({ item_id: editExampleExisting.value });
+  editExampleExisting.value = '';
+}
 const itemBusy = ref(false);
+const newItemEditor = ref<HTMLDialogElement | null>(null);
+const newItemCategory = ref<SavedLearningItem['category']>('word');
+const newItemFolderId = ref('');
+const newItemText = ref('');
+const newItemMeaning = ref('');
+const newItemMeaningUserEdited = ref(false);
+const newItemSuggestionBusy = ref(false);
+const newItemSuggestionError = ref('');
+let suggestionVersion = 0;
+const newItemBusy = ref(false);
+const newItemError = ref('');
+const exampleText = ref('');
+const exampleMeaning = ref('');
+const exampleExisting = ref('');
+const exampleDrafts = ref<ExampleSentenceDraft[]>([]);
+const exampleCandidates = computed(() => items.value.filter(entry => entry.category === 'sentence' && !exampleDrafts.value.some(draft => 'item_id' in draft && draft.item_id === entry.id)));
+function addNewExample(): void {
+  if (!exampleText.value.trim() || !exampleMeaning.value.trim()) return;
+  exampleDrafts.value.push({ text: exampleText.value.trim(), meaning: exampleMeaning.value.trim() });
+  exampleText.value = '';
+  exampleMeaning.value = '';
+}
+function addExistingExample(): void {
+  if (!exampleExisting.value) return;
+  exampleDrafts.value.push({ item_id: exampleExisting.value });
+  exampleExisting.value = '';
+}
+function exampleLabel(draft: ExampleSentenceDraft): string {
+  return 'item_id' in draft ? itemById.value.get(draft.item_id)?.text ?? '' : draft.text;
+}
 const focusedItemId = ref<string | null>(null);
 const selectedId = ref<string | null>(null);
-const categoryFilter = ref<'all' | 'word' | 'sentence'>('all');
+const expandedFolderIds = ref<Set<string>>(new Set());
+const categoryFilter = ref<'all' | SavedLearningItem['category']>('all');
 const cardFields = ref<CardFields>(savedCardFields());
 const displayOptions = ref<HTMLDetailsElement | null>(null);
 watch(cardFields, (fields) => {
@@ -78,6 +126,7 @@ const sortOrder = ref<'newest' | 'oldest'>('newest');
 const page = ref(1);
 const PAGE_SIZE = 20;
 const folderContextMenu = ref<FolderContextMenu | null>(null);
+const showAddChoices = ref(false);
 const folderContextMenuElement = ref<HTMLElement | null>(null);
 const editor = ref<HTMLDialogElement | null>(null);
 const editorMode = ref<EditorMode>('create');
@@ -102,6 +151,7 @@ function errorMessage(error: unknown): string {
     'Folder not found': 'Không tìm thấy thư mục.',
     'Cannot move folder into itself or a descendant': 'Không thể chuyển thư mục vào chính nó hoặc thư mục con.',
     'Link request expired or unavailable': 'Yêu cầu liên kết đã hết hạn. Hãy bắt đầu lại từ extension.',
+    'Duplicate Learning Item': 'Mục này đã có trong thư mục. Hãy sửa mục đã lưu hoặc chọn thư mục khác.',
   };
   return messages[error.message] ?? error.message;
 }
@@ -135,6 +185,24 @@ async function openTrash(): Promise<void> {
 function openLibrary(folderId: string | null): void {
   showTrash.value = false;
   selectedId.value = folderId;
+  if (folderId) {
+    const expanded = new Set(expandedFolderIds.value);
+    let current: string | null = folderId;
+    while (current) {
+      expanded.add(current);
+      current = folders.value.find(folder => folder.id === current)?.parent_id ?? null;
+    }
+    expandedFolderIds.value = expanded;
+  }
+}
+
+function openSidebarFolder(folderId: string): void {
+  showTrash.value = false;
+  selectedId.value = folderId;
+  const expanded = new Set(expandedFolderIds.value);
+  if (expanded.has(folderId)) expanded.delete(folderId);
+  else expanded.add(folderId);
+  expandedFolderIds.value = expanded;
 }
 
 function askToDelete(label: string, action: () => Promise<void>, success: string): void {
@@ -192,6 +260,7 @@ onMounted(async () => {
 
 function closeFolderContextMenu(): void {
   folderContextMenu.value = null;
+  showAddChoices.value = false;
 }
 
 function dismissFolderContextMenu(event: PointerEvent): void {
@@ -281,6 +350,10 @@ const linkedSource = computed(() => linkedSourceId.value ? itemById.value.get(li
 const linkedEntries = computed(() => (linkedSource.value?.linked_item_ids ?? [])
   .map(id => itemById.value.get(id))
   .filter((entry): entry is SavedLearningItem => Boolean(entry)));
+function linkedKind(entry: SavedLearningItem): string {
+  if (entry.category !== 'sentence') return 'câu';
+  return entry.linked_item_ids.some(id => itemById.value.get(id)?.category === 'grammar') ? 'mục' : 'từ';
+}
 const filteredItems = computed(() => categoryFilter.value === 'all'
   ? visibleItems.value
   : visibleItems.value.filter(item => item.category === categoryFilter.value));
@@ -302,7 +375,7 @@ const folderStats = computed(() => {
     const count = counts.get(entry.folder_id);
     if (count) {
       if (entry.category === 'word') count.words += 1;
-      else count.sentences += 1;
+      else if (entry.category === 'sentence') count.sentences += 1;
     }
   }
   return counts;
@@ -323,10 +396,32 @@ async function openItemEditor(item: SavedLearningItem): Promise<void> {
   editMeaning.value = item.meaning;
   editCategory.value = item.category;
   editFolderId.value = item.folder_id;
+  editLinkTarget.value = '';
+  editExampleText.value = '';
+  editExampleMeaning.value = '';
+  editExampleExisting.value = '';
+  editExampleDrafts.value = [];
   itemError.value = '';
   itemEditor.value?.showModal();
   await nextTick();
   itemEditor.value?.querySelector('input')?.focus();
+}
+
+const editLinkedItems = computed(() => editingItem.value?.linked_item_ids.map(id => itemById.value.get(id)).filter((entry): entry is SavedLearningItem => !!entry) ?? []);
+const editLinkCandidates = computed(() => items.value.filter(entry => editingItem.value && entry.id !== editingItem.value.id
+  && !editingItem.value.linked_item_ids.includes(entry.id)
+  && (editingItem.value.category === 'sentence' ? entry.category === 'word' || entry.category === 'grammar' : entry.category === 'sentence')));
+async function changeItemLink(targetId: string, remove = false): Promise<void> {
+  if (!editingItem.value || !targetId) return;
+  itemError.value = '';
+  try {
+    if (remove) await learningApi.removeItemLink(editingItem.value.id, targetId);
+    else await learningApi.addItemLink(editingItem.value.id, targetId);
+    items.value = await learningApi.items();
+    const refreshed = items.value.find(entry => entry.id === editingItem.value?.id);
+    editingItem.value = refreshed ? { ...refreshed, linked_item_ids: [...refreshed.linked_item_ids] } : null;
+    editLinkTarget.value = '';
+  } catch (error) { itemError.value = errorMessage(error); }
 }
 
 async function saveItem(): Promise<void> {
@@ -334,9 +429,11 @@ async function saveItem(): Promise<void> {
   itemBusy.value = true;
   itemError.value = '';
   try {
-    await learningApi.updateItem(editingItem.value.id, {
+    const item = {
       text: editText.value.trim(), meaning: editMeaning.value.trim(), category: editCategory.value, folder_id: editFolderId.value,
-    });
+    };
+    if (editExampleDrafts.value.length) await learningApi.updateItemWithExamples(editingItem.value.id, { item, examples: editExampleDrafts.value });
+    else await learningApi.updateItem(editingItem.value.id, item);
     items.value = await learningApi.items();
     itemEditor.value?.close();
   } catch (error) {
@@ -378,11 +475,6 @@ const currentChildren = computed(() => folders.value
   .filter((folder) => folder.parent_id === selectedId.value)
   .sort((a, b) => a.name.localeCompare(b.name, 'vi')));
 
-function chooseChildFolder(event: Event): void {
-  const folderId = (event.target as HTMLSelectElement).value;
-  if (folderId) openLibrary(folderId);
-}
-
 const treeRows = computed<TreeRow[]>(() => {
   const result: TreeRow[] = [];
   const visit = (parentId: string | null, depth: number): void => {
@@ -391,7 +483,7 @@ const treeRows = computed<TreeRow[]>(() => {
       .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
       .forEach((folder) => {
         result.push({ folder, depth });
-        visit(folder.id, depth + 1);
+        if (expandedFolderIds.value.has(folder.id)) visit(folder.id, depth + 1);
       });
   };
   visit(null, 0);
@@ -428,6 +520,7 @@ const moveDestinations = computed(() => {
 
 async function showFolderContextMenu(folderId: string | null, x: number, y: number): Promise<void> {
   folderContextMenu.value = { folderId, left: x, top: y };
+  showAddChoices.value = false;
   await nextTick();
   const menu = folderContextMenuElement.value;
   if (!menu) return;
@@ -456,6 +549,67 @@ function chooseFolderContextAction(mode: EditorMode): void {
   const folderId = folderContextMenu.value?.folderId ?? null;
   closeFolderContextMenu();
   void openEditor(mode, folderId);
+}
+
+function startNewItem(category: SavedLearningItem['category']): void {
+  const folderId = folderContextMenu.value?.folderId;
+  if (!folderId) return;
+  closeFolderContextMenu();
+  newItemCategory.value = category;
+  newItemFolderId.value = folderId;
+  newItemText.value = '';
+  newItemMeaning.value = '';
+  newItemMeaningUserEdited.value = false;
+  newItemSuggestionBusy.value = false;
+  newItemSuggestionError.value = '';
+  suggestionVersion += 1;
+  newItemError.value = '';
+  exampleDrafts.value = [];
+  exampleText.value = '';
+  exampleMeaning.value = '';
+  exampleExisting.value = '';
+  newItemEditor.value?.showModal();
+}
+
+async function requestMeaningSuggestion(): Promise<void> {
+  const text = newItemText.value.trim();
+  const version = ++suggestionVersion;
+  if (newItemCategory.value !== 'word' || !text || newItemMeaningUserEdited.value) return;
+  newItemSuggestionBusy.value = true;
+  newItemSuggestionError.value = '';
+  try {
+    const result = await learningApi.suggestMeaning(text);
+    if (version === suggestionVersion && !newItemMeaningUserEdited.value && newItemText.value.trim() === text) {
+      newItemMeaning.value = result.meaning;
+    }
+  } catch {
+    if (version === suggestionVersion) newItemSuggestionError.value = 'Chưa lấy được nghĩa gợi ý. Bạn có thể tự nhập.';
+  } finally {
+    if (version === suggestionVersion) newItemSuggestionBusy.value = false;
+  }
+}
+
+async function submitNewItem(): Promise<void> {
+  if (newItemBusy.value) return;
+  newItemBusy.value = true;
+  newItemError.value = '';
+  try {
+    const item = {
+      folder_id: newItemFolderId.value,
+      category: newItemCategory.value,
+      text: newItemText.value.trim(),
+      meaning: newItemMeaning.value.trim(),
+    };
+    if (exampleDrafts.value.length) await learningApi.createItemWithExamples({ item, examples: exampleDrafts.value });
+    else await learningApi.createItem(item);
+    await loadFolders();
+    openLibrary(newItemFolderId.value);
+    newItemEditor.value?.close();
+  } catch (error) {
+    newItemError.value = errorMessage(error);
+  } finally {
+    newItemBusy.value = false;
+  }
 }
 
 function requestTrashFolder(): void {
@@ -487,15 +641,18 @@ async function submitEditor(): Promise<void> {
   editorBusy.value = true;
   editorError.value = '';
   try {
+    let createdFolderId: string | null = null;
     if (editorMode.value === 'create') {
       const folder = await learningApi.createFolder(editorName.value.trim(), editorParentId.value);
-      selectedId.value = folder.id;
+      createdFolderId = folder.id;
     } else if (editorMode.value === 'rename') {
       await learningApi.updateFolder(editorTarget.value!, { name: editorName.value.trim() });
     } else {
       await learningApi.updateFolder(editorTarget.value!, { parent_id: editorParentId.value });
     }
     await loadFolders();
+    if (createdFolderId) openLibrary(createdFolderId);
+    else if (editorMode.value === 'move' && selectedId.value) openLibrary(selectedId.value);
     closeEditor();
   } catch (error) {
     editorError.value = errorMessage(error);
@@ -553,7 +710,7 @@ async function submitEditor(): Promise<void> {
         <div class="sidebar-heading"><span>THƯ VIỆN</span></div>
         <nav aria-label="Cây thư mục">
           <div class="tree-row" :class="{ active: selectedId === null && !showTrash }"><button class="tree-button" :class="{ active: selectedId === null && !showTrash }" type="button" :aria-current="selectedId === null && !showTrash ? 'page' : undefined" @click="openLibrary(null)" @contextmenu.prevent="showFolderContextMenu(null, $event.clientX, $event.clientY)" @keydown="handleFolderContextKey($event, null)"><Home :size="17" aria-hidden="true" /> Tất cả thư mục</button><button class="tree-menu-button" type="button" aria-label="Tùy chọn Thư viện" title="Tùy chọn Thư viện" @click="openFolderMenuFromButton(null, $event)"><Ellipsis :size="17" aria-hidden="true" /></button></div>
-          <div v-for="row in treeRows" :key="row.folder.id" class="tree-row" :class="{ active: selectedId === row.folder.id && !showTrash }"><button class="tree-button" :class="{ active: selectedId === row.folder.id && !showTrash }" :style="{ paddingLeft: `${14 + row.depth * 18}px` }" type="button" :aria-current="selectedId === row.folder.id && !showTrash ? 'page' : undefined" @click="openLibrary(row.folder.id)" @contextmenu.prevent="showFolderContextMenu(row.folder.id, $event.clientX, $event.clientY)" @keydown="handleFolderContextKey($event, row.folder.id)"><Folder :size="17" aria-hidden="true" /> <span class="truncate">{{ row.folder.name }}</span></button><button class="tree-menu-button" type="button" :aria-label="`Tùy chọn ${row.folder.name}`" :title="`Tùy chọn ${row.folder.name}`" @click="openFolderMenuFromButton(row.folder.id, $event)"><Ellipsis :size="17" aria-hidden="true" /></button></div>
+          <div v-for="row in treeRows" :key="row.folder.id" class="tree-row" :class="{ active: selectedId === row.folder.id && !showTrash }"><button class="tree-button" :class="{ active: selectedId === row.folder.id && !showTrash }" :style="{ paddingLeft: `${14 + row.depth * 18}px` }" type="button" :aria-current="selectedId === row.folder.id && !showTrash ? 'page' : undefined" :aria-expanded="folders.some(folder => folder.parent_id === row.folder.id) ? expandedFolderIds.has(row.folder.id) : undefined" @click="openSidebarFolder(row.folder.id)" @contextmenu.prevent="showFolderContextMenu(row.folder.id, $event.clientX, $event.clientY)" @keydown="handleFolderContextKey($event, row.folder.id)"><ChevronRight v-if="folders.some(folder => folder.parent_id === row.folder.id)" :size="14" class="tree-chevron" :class="{ expanded: expandedFolderIds.has(row.folder.id) }" aria-hidden="true" /><Folder :size="17" aria-hidden="true" /> <span class="truncate">{{ row.folder.name }}</span></button><button class="tree-menu-button" type="button" :aria-label="`Tùy chọn ${row.folder.name}`" :title="`Tùy chọn ${row.folder.name}`" @click="openFolderMenuFromButton(row.folder.id, $event)"><Ellipsis :size="17" aria-hidden="true" /></button></div>
         </nav>
         <button class="tree-button trash-nav" :class="{ active: showTrash }" type="button" aria-label="Mở thùng rác" :aria-current="showTrash ? 'page' : undefined" @click="openTrash"><Trash2 :size="17" aria-hidden="true" /> Thùng rác</button>
       </aside>
@@ -564,6 +721,8 @@ async function submitEditor(): Promise<void> {
         <template v-if="folderContextMenu.folderId">
           <button type="button" role="menuitem" @click="chooseFolderContextAction('rename')"><Pencil :size="16" aria-hidden="true" /> Đổi tên</button>
           <button type="button" role="menuitem" @click="chooseFolderContextAction('move')"><MoveRight :size="17" aria-hidden="true" /> Chuyển thư mục</button>
+          <button type="button" role="menuitem" :aria-expanded="showAddChoices" @click="showAddChoices = !showAddChoices"><BookOpen :size="17" aria-hidden="true" /> Thêm</button>
+          <template v-if="showAddChoices"><button type="button" role="menuitem" @click="startNewItem('word')">Từ / cụm từ</button><button type="button" role="menuitem" @click="startNewItem('sentence')">Câu</button><button type="button" role="menuitem" @click="startNewItem('grammar')">Ngữ pháp</button><button type="button" role="menuitem" @click="startNewItem('note')">Ghi chú</button></template>
           <button type="button" role="menuitem" @click="requestTrashFolder"><Trash2 :size="17" aria-hidden="true" /> Xóa thư mục</button>
         </template>
       </div>
@@ -574,7 +733,7 @@ async function submitEditor(): Promise<void> {
         <p v-if="!trash.length" class="saved-items-empty">Thùng rác trống.</p>
         <div v-else class="trash-grid">
           <article v-for="entry in trash" :key="entry.id" class="trash-card">
-            <span class="saved-item-category">{{ entry.kind === 'folder' ? 'Thư mục' : entry.category === 'word' ? 'Từ / cụm từ' : 'Câu' }}</span>
+            <span class="saved-item-category">{{ entry.kind === 'folder' ? 'Thư mục' : entry.category === 'word' ? 'Từ / cụm từ' : entry.category === 'sentence' ? 'Câu' : entry.category === 'grammar' ? 'Ngữ pháp' : 'Ghi chú' }}</span>
             <h2>{{ entry.name }}</h2>
             <p>{{ entry.kind === 'folder' ? 'Gồm thư mục con và mục học tập bên trong.' : 'Mục học tập đã xóa.' }}</p>
             <div class="trash-actions"><button type="button" :aria-label="`Khôi phục ${entry.name}`" :disabled="trashBusy" @click="restoreEntry(entry)"><RotateCcw :size="16" aria-hidden="true" /> Khôi phục</button><button type="button" class="danger-button" :aria-label="`Xóa vĩnh viễn ${entry.name}`" :disabled="trashBusy" @click="askToDelete(`Xóa vĩnh viễn “${entry.name}”? Thao tác này không thể hoàn tác.`, () => entry.kind === 'folder' ? learningApi.permanentlyDeleteFolder(entry.id) : learningApi.permanentlyDeleteItem(entry.id), `Đã xóa vĩnh viễn “${entry.name}”.`)"><Trash2 :size="16" aria-hidden="true" /> Xóa vĩnh viễn</button></div>
@@ -590,21 +749,24 @@ async function submitEditor(): Promise<void> {
           <Check v-else :size="20" aria-hidden="true" />
         </div>
         <nav class="breadcrumb" aria-label="Đường dẫn thư mục">
-          <div class="breadcrumb-trail"><button type="button" :aria-current="selectedId === null ? 'page' : undefined" @click="selectedId = null">Thư viện</button><template v-for="(crumb, index) in breadcrumbs" :key="crumb.id"><ChevronRight :size="15" aria-hidden="true" /><button type="button" :aria-current="index === breadcrumbs.length - 1 ? 'page' : undefined" @click="selectedId = crumb.id">{{ crumb.name }}</button></template><span class="breadcrumb-count" aria-label="Thống kê vị trí hiện tại">({{ currentStats.words }} từ · {{ currentStats.sentences }} câu)</span></div>
-          <select v-if="currentChildren.length" class="child-folder-select" aria-label="Chọn thư mục con" :value="''" @change="chooseChildFolder"><option value="" disabled>Thư mục con ({{ currentChildren.length }})</option><option v-for="folder in currentChildren" :key="folder.id" :value="folder.id">{{ folder.name }} · {{ folderStats.get(folder.id)?.words ?? 0 }} từ · {{ folderStats.get(folder.id)?.sentences ?? 0 }} câu</option></select>
+          <div class="breadcrumb-trail"><button type="button" :aria-current="selectedId === null ? 'page' : undefined" @click="openLibrary(null)">Thư viện</button><template v-for="(crumb, index) in breadcrumbs" :key="crumb.id"><ChevronRight :size="15" aria-hidden="true" /><button type="button" :aria-current="index === breadcrumbs.length - 1 ? 'page' : undefined" @click="openLibrary(crumb.id)">{{ crumb.name }}</button></template><span class="breadcrumb-count" aria-label="Thống kê vị trí hiện tại">({{ currentStats.words }} từ · {{ currentStats.sentences }} câu)</span></div>
         </nav>
 
         <p v-if="folderError" class="form-error library-error" role="alert">{{ folderError }}</p>
         <div v-if="foldersLoading" class="content-state" role="status">Đang tải thư mục…</div>
+        <section v-if="currentChildren.length" class="child-folders" aria-label="Thư mục con">
+          <h2>{{ selectedId ? 'Thư mục con' : 'Thư mục gốc' }}</h2>
+          <div class="child-folder-grid"><div v-for="folder in currentChildren" :key="folder.id" class="child-folder-card" @contextmenu.prevent="showFolderContextMenu(folder.id, $event.clientX, $event.clientY)"><button type="button" class="child-folder-open" :aria-label="`Mở thư mục ${folder.name}`" @click="openLibrary(folder.id)" @keydown="handleFolderContextKey($event, folder.id)"><Folder :size="20" aria-hidden="true" /><span>{{ folder.name }}</span><ChevronRight :size="16" aria-hidden="true" /></button><button type="button" class="child-folder-menu" :aria-label="`Tùy chọn ${folder.name} trong lưới`" @click="openFolderMenuFromButton(folder.id, $event)"><Ellipsis :size="17" aria-hidden="true" /></button></div></div>
+        </section>
         <section class="saved-items" aria-labelledby="saved-items-title">
-          <div class="saved-items-heading"><h2 id="saved-items-title">Mục học tập <small>({{ filteredItems.length }})</small></h2><div class="saved-items-filters"><label class="sort-control">Loại <select v-model="categoryFilter" aria-label="Lọc mục học tập"><option value="all">Tất cả</option><option value="word">Từ / cụm từ</option><option value="sentence">Câu</option></select></label><details ref="displayOptions" class="display-options"><summary>Hiển thị <ChevronRight :size="14" aria-hidden="true" /></summary><div class="display-options-panel" role="group" aria-label="Trường hiển thị trên thẻ"><label><input v-model="cardFields.vietnamese" type="checkbox" aria-label="Hiển thị tiếng Việt" /> Tiếng Việt</label><label><input v-model="cardFields.chinese" type="checkbox" aria-label="Hiển thị tiếng Trung" /> Tiếng Trung</label><label><input v-model="cardFields.pinyin" type="checkbox" aria-label="Hiển thị Pinyin" /> Pinyin</label></div></details><label class="sort-control">Sắp xếp <select v-model="sortOrder" aria-label="Sắp xếp mục học tập"><option value="newest">Mới thêm</option><option value="oldest">Cũ trước</option></select></label></div></div>
-          <p v-if="visibleItems.length === 0" class="saved-items-empty">Chưa có mục học tập trong vị trí này. Lưu chữ Trung từ Translation Tooltip.</p>
-          <p v-else-if="filteredItems.length === 0" class="saved-items-empty">Không có {{ categoryFilter === 'word' ? 'từ / cụm từ' : 'câu' }} trong thư mục này.</p>
+          <div class="saved-items-heading"><h2 id="saved-items-title">Mục học tập <small>({{ filteredItems.length }})</small></h2><div class="saved-items-filters"><label class="sort-control">Loại <select v-model="categoryFilter" aria-label="Lọc mục học tập"><option value="all">Tất cả</option><option value="word">Từ / cụm từ</option><option value="sentence">Câu</option><option value="grammar">Ngữ pháp</option><option value="note">Ghi chú</option></select></label><details ref="displayOptions" class="display-options"><summary>Hiển thị <ChevronRight :size="14" aria-hidden="true" /></summary><div class="display-options-panel" role="group" aria-label="Trường hiển thị trên thẻ"><label><input v-model="cardFields.vietnamese" type="checkbox" aria-label="Hiển thị tiếng Việt" /> Tiếng Việt</label><label><input v-model="cardFields.chinese" type="checkbox" aria-label="Hiển thị tiếng Trung" /> Tiếng Trung</label><label><input v-model="cardFields.pinyin" type="checkbox" aria-label="Hiển thị Pinyin" /> Pinyin</label></div></details><label class="sort-control">Sắp xếp <select v-model="sortOrder" aria-label="Sắp xếp mục học tập"><option value="newest">Mới thêm</option><option value="oldest">Cũ trước</option></select></label></div></div>
+          <p v-if="visibleItems.length === 0" class="saved-items-empty">Chưa có mục học tập trong vị trí này. Chọn Thêm trong menu thư mục hoặc lưu chữ Trung từ Translation Tooltip.</p>
+          <p v-else-if="filteredItems.length === 0" class="saved-items-empty">Không có mục thuộc loại này trong thư mục.</p>
           <div v-else class="saved-items-list">
             <article v-for="(item, index) in pagedItems" :id="`learning-item-${item.id}`" :key="item.id" class="saved-item-row" :class="{ focused: focusedItemId === item.id }" :aria-label="`Mục học tập số ${(currentPage - 1) * PAGE_SIZE + index + 1}`" tabindex="-1">
               <span class="saved-item-number">{{ (currentPage - 1) * PAGE_SIZE + index + 1 }}</span>
-              <div class="saved-item-body"><div class="saved-item-title"><h3 v-if="cardFields.chinese" lang="zh">{{ item.text }}</h3><span class="saved-item-category">{{ item.category === 'word' ? 'Từ / cụm từ' : 'Câu' }}</span></div><p v-if="cardFields.pinyin" class="saved-item-pinyin">{{ item.pinyin }}</p><p v-if="cardFields.vietnamese" class="saved-item-meaning">{{ item.meaning }}</p></div>
-              <div class="saved-item-meta"><time :datetime="new Date(item.created_at < 100_000_000_000 ? item.created_at * 1000 : item.created_at).toISOString()">{{ formatAddedAt(item.created_at) }}</time><div class="saved-item-controls"><button v-if="item.linked_item_ids.length" type="button" class="linked-open-button" :aria-label="`Xem ${item.linked_item_ids.length} ${item.category === 'word' ? 'câu' : 'từ'} liên kết của ${item.text}`" :title="`Xem ${item.linked_item_ids.length} mục liên kết`" @click="openLinkedItems(item)"><Link2 :size="16" aria-hidden="true" /><span>{{ item.linked_item_ids.length }}</span></button><button type="button" :aria-label="`Sửa ${item.text}`" @click="openItemEditor(item)"><Pencil :size="16" aria-hidden="true" /></button><button type="button" :aria-label="`Xóa ${item.text}`" @click="askToDelete(`Chuyển “${item.text}” vào thùng rác?`, () => learningApi.trashItem(item.id), 'Đã chuyển mục học tập vào thùng rác.')"><Trash2 :size="16" aria-hidden="true" /></button></div></div>
+              <div class="saved-item-body"><div class="saved-item-title"><h3 v-if="cardFields.chinese || item.category === 'note'" :lang="item.category === 'note' ? undefined : 'zh'">{{ item.text }}</h3><span class="saved-item-category">{{ item.category === 'word' ? 'Từ / cụm từ' : item.category === 'sentence' ? 'Câu' : item.category === 'grammar' ? 'Ngữ pháp' : 'Ghi chú' }}</span></div><p v-if="cardFields.pinyin && item.pinyin && (item.category === 'word' || item.category === 'sentence')" class="saved-item-pinyin">{{ item.pinyin }}</p><p v-if="cardFields.vietnamese || item.category === 'note'" class="saved-item-meaning" :class="{ 'note-body': item.category === 'note' }">{{ item.meaning }}</p></div>
+              <div class="saved-item-meta"><time :datetime="new Date(item.created_at < 100_000_000_000 ? item.created_at * 1000 : item.created_at).toISOString()">{{ formatAddedAt(item.created_at) }}</time><div class="saved-item-controls"><button v-if="item.linked_item_ids.length" type="button" class="linked-open-button" :aria-label="`Xem ${item.linked_item_ids.length} ${linkedKind(item)} liên kết của ${item.text}`" :title="`Xem ${item.linked_item_ids.length} mục liên kết`" @click="openLinkedItems(item)"><Link2 :size="16" aria-hidden="true" /><span>{{ item.linked_item_ids.length }}</span></button><button type="button" :aria-label="`Sửa ${item.text}`" @click="openItemEditor(item)"><Pencil :size="16" aria-hidden="true" /></button><button type="button" :aria-label="`Xóa ${item.text}`" @click="askToDelete(`Chuyển “${item.text}” vào thùng rác?`, () => learningApi.trashItem(item.id), 'Đã chuyển mục học tập vào thùng rác.')"><Trash2 :size="16" aria-hidden="true" /></button></div></div>
             </article>
           </div>
           <nav v-if="filteredItems.length" class="pagination" aria-label="Phân trang mục học tập"><button type="button" aria-label="Trang trước" :disabled="currentPage === 1" @click="page = currentPage - 1">Trước</button><span>Trang {{ currentPage }} / {{ pageCount }}</span><button type="button" aria-label="Trang sau" :disabled="currentPage === pageCount" @click="page = currentPage + 1">Sau</button></nav>
@@ -624,17 +786,30 @@ async function submitEditor(): Promise<void> {
       </form>
     </dialog>
     <dialog ref="itemEditor" class="editor-dialog item-editor" @click.self="itemEditor?.close()">
-      <form @submit.prevent="saveItem"><h2>Sửa mục học tập</h2><p>Chỉnh chữ, nghĩa, loại hoặc thư mục. Pinyin sẽ cập nhật theo chữ mới.</p>
-        <label for="item-text">Chữ Trung</label><input id="item-text" v-model="editText" required lang="zh" />
-        <label for="item-meaning">Nghĩa</label><input id="item-meaning" v-model="editMeaning" required />
-        <label for="item-category">Loại</label><select id="item-category" v-model="editCategory"><option value="word">Từ / cụm từ</option><option value="sentence">Câu</option></select>
+      <form @submit.prevent="saveItem"><h2>Sửa mục học tập</h2><p>Chỉnh nội dung hoặc thư mục.</p>
+        <label for="item-text">{{ editCategory === 'note' ? 'Tiêu đề' : editCategory === 'grammar' ? 'Cấu trúc' : 'Chữ Trung' }}</label><input id="item-text" v-model="editText" required :lang="editCategory === 'note' ? undefined : 'zh'" />
+        <label for="item-meaning">{{ editCategory === 'note' ? 'Nội dung' : editCategory === 'grammar' ? 'Mô tả' : 'Nghĩa' }}</label><textarea v-if="editCategory === 'note'" id="item-meaning" v-model="editMeaning" required rows="5"></textarea><input v-else id="item-meaning" v-model="editMeaning" required />
+        <label for="item-category">Loại</label><select id="item-category" v-model="editCategory" :disabled="!!editingItem?.linked_item_ids.length || editingItem?.category === 'note'"><option value="word">Từ / cụm từ</option><option value="sentence">Câu</option><option value="grammar">Ngữ pháp</option><option v-if="editingItem?.category === 'note'" value="note">Ghi chú</option></select>
         <label for="item-folder">Thư mục</label><select id="item-folder" v-model="editFolderId"><option v-for="folder in folders" :key="folder.id" :value="folder.id">{{ folder.name }}</option></select>
+        <template v-if="editingItem?.category !== 'note'"><label for="item-link-target">Liên kết</label><div v-for="entry in editLinkedItems" :key="entry.id" class="linked-entry"><span>{{ entry.text }} · {{ folderById.get(entry.folder_id)?.name }}</span><button type="button" :aria-label="`Gỡ liên kết ${entry.text}`" @click="changeItemLink(entry.id, true)">Gỡ</button></div><div class="link-picker"><select id="item-link-target" v-model="editLinkTarget"><option value="">Chọn mục đã lưu</option><option v-for="entry in editLinkCandidates" :key="entry.id" :value="entry.id">{{ entry.text }} · {{ folderById.get(entry.folder_id)?.name }}</option></select><button type="button" aria-label="Thêm liên kết" :disabled="!editLinkTarget" @click="changeItemLink(editLinkTarget)">Thêm</button></div></template>
+        <div v-if="editingItem?.category === 'word' || editingItem?.category === 'grammar'" class="example-editor"><h3>Câu ví dụ mới</h3><div v-for="(draft, index) in editExampleDrafts" :key="index" class="linked-entry"><span>{{ exampleLabel(draft) }}</span><button type="button" @click="editExampleDrafts.splice(index, 1)">Bỏ</button></div><label for="edit-example-text">Câu mới</label><textarea id="edit-example-text" v-model="editExampleText" rows="2"></textarea><label for="edit-example-meaning">Nghĩa câu mới</label><input id="edit-example-meaning" v-model="editExampleMeaning" /><button type="button" aria-label="Thêm câu ví dụ vào bản nháp" :disabled="!editExampleText.trim() || !editExampleMeaning.trim()" @click="addEditExample">Thêm câu mới</button><label for="edit-example-existing">Câu đã lưu</label><select id="edit-example-existing" v-model="editExampleExisting"><option value="">Chọn câu</option><option v-for="entry in editExampleCandidates" :key="entry.id" :value="entry.id">{{ entry.text }} · {{ folderById.get(entry.folder_id)?.name }}</option></select><button type="button" aria-label="Thêm câu đã lưu vào bản nháp" :disabled="!editExampleExisting" @click="addEditExistingExample">Thêm câu đã lưu</button></div>
         <p v-if="itemError" class="form-error" role="alert">{{ itemError }}</p>
         <div class="dialog-actions"><button type="button" class="plain-button" @click="itemEditor?.close()">Hủy</button><button type="submit" class="primary-button" :disabled="itemBusy">{{ itemBusy ? 'Đang lưu…' : 'Lưu thay đổi' }}</button></div>
       </form>
     </dialog>
+    <dialog ref="newItemEditor" class="editor-dialog new-item-editor" @click.self="newItemEditor?.close()">
+      <form @submit.prevent="submitNewItem"><h2>{{ newItemCategory === 'word' ? 'Thêm từ / cụm từ' : newItemCategory === 'sentence' ? 'Thêm câu' : newItemCategory === 'grammar' ? 'Thêm ngữ pháp' : 'Thêm ghi chú' }}</h2><p>Thêm vào thư mục “{{ folderById.get(newItemFolderId)?.name }}”.</p>
+        <label for="new-item-text">{{ newItemCategory === 'word' ? 'Từ / cụm từ' : newItemCategory === 'sentence' ? 'Câu' : newItemCategory === 'grammar' ? 'Cấu trúc' : 'Tiêu đề' }}</label><input v-if="newItemCategory !== 'sentence'" id="new-item-text" v-model="newItemText" required :lang="newItemCategory === 'note' ? undefined : 'zh'" @change="requestMeaningSuggestion" /><textarea v-else id="new-item-text" v-model="newItemText" required lang="zh" rows="4"></textarea>
+        <label for="new-item-meaning">{{ newItemCategory === 'word' ? 'Nghĩa gợi ý' : newItemCategory === 'grammar' ? 'Mô tả' : newItemCategory === 'note' ? 'Nội dung' : 'Nghĩa' }}</label><textarea v-if="newItemCategory === 'note'" id="new-item-meaning" v-model="newItemMeaning" required rows="5"></textarea><input v-else id="new-item-meaning" v-model="newItemMeaning" required @input="newItemMeaningUserEdited = true" />
+        <p v-if="newItemCategory === 'word' && newItemSuggestionBusy" class="form-hint" role="status">Đang gợi ý nghĩa…</p>
+        <p v-if="newItemSuggestionError" class="form-hint" role="status">{{ newItemSuggestionError }}</p>
+        <div v-if="newItemCategory === 'word' || newItemCategory === 'grammar'" class="example-editor"><h3>Câu ví dụ</h3><div v-for="(draft, index) in exampleDrafts" :key="index" class="linked-entry"><span>{{ exampleLabel(draft) }}</span><button type="button" :aria-label="`Bỏ câu ví dụ ${exampleLabel(draft)}`" @click="exampleDrafts.splice(index, 1)">Bỏ</button></div><label for="example-text">Câu mới</label><textarea id="example-text" v-model="exampleText" rows="2"></textarea><label for="example-meaning">Nghĩa câu mới</label><input id="example-meaning" v-model="exampleMeaning" /><button type="button" aria-label="Thêm câu mới" :disabled="!exampleText.trim() || !exampleMeaning.trim()" @click="addNewExample">Thêm câu mới</button><label for="example-existing">Câu đã lưu</label><select id="example-existing" v-model="exampleExisting"><option value="">Chọn câu</option><option v-for="entry in exampleCandidates" :key="entry.id" :value="entry.id">{{ entry.text }} · {{ folderById.get(entry.folder_id)?.name }}</option></select><button type="button" aria-label="Chọn câu đã lưu" :disabled="!exampleExisting" @click="addExistingExample">Chọn câu đã lưu</button></div>
+        <p v-if="newItemError" class="form-error" role="alert">{{ newItemError }}</p>
+        <div class="dialog-actions"><button type="button" class="plain-button" @click="newItemEditor?.close()">Hủy</button><button type="submit" class="primary-button" :disabled="newItemBusy">{{ newItemBusy ? 'Đang lưu…' : 'Lưu' }}</button></div>
+      </form>
+    </dialog>
     <dialog ref="linkedItemsDialog" class="editor-dialog linked-items-dialog" aria-labelledby="linked-items-title" @click.self="closeLinkedItems" @close="linkedSourceId = null">
-      <div class="linked-dialog-header"><div><h2 id="linked-items-title">{{ linkedSource?.category === 'word' ? 'Câu liên kết' : 'Từ liên kết' }}</h2><p>Liên kết với “{{ linkedSource?.text }}”</p></div><button type="button" class="plain-button" aria-label="Đóng mục liên kết" @click="closeLinkedItems">Đóng</button></div>
+      <div class="linked-dialog-header"><div><h2 id="linked-items-title">{{ linkedSource?.category === 'sentence' ? (linkedSource.linked_item_ids.some(id => itemById.get(id)?.category === 'grammar') ? 'Mục liên kết' : 'Từ liên kết') : 'Câu liên kết' }}</h2><p>Liên kết với “{{ linkedSource?.text }}”</p></div><button type="button" class="plain-button" aria-label="Đóng mục liên kết" @click="closeLinkedItems">Đóng</button></div>
       <div class="linked-items-list"><article v-for="entry in linkedEntries" :key="entry.id" class="linked-entry"><h3 lang="zh">{{ entry.text }}</h3><p class="linked-entry-pinyin">{{ entry.pinyin }}</p><p class="linked-entry-meaning">{{ entry.meaning }}</p><span class="linked-entry-folder">{{ folderById.get(entry.folder_id)?.name ?? 'Thư viện' }}</span><div class="linked-entry-actions"><button type="button" :aria-label="`Mở ${entry.text}`" @click="followLinkedItem(entry.id)"><ArrowRight :size="16" aria-hidden="true" /> Mở</button><button type="button" :aria-label="`Sửa ${entry.text} trong liên kết`" @click="editLinkedItem(entry)"><Pencil :size="16" aria-hidden="true" /> Sửa</button></div></article></div>
       <p v-if="!linkedEntries.length" class="saved-items-empty">Không còn mục liên kết nào.</p>
     </dialog>

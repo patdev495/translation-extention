@@ -12,7 +12,7 @@ export interface LearningFolder {
 export interface SavedLearningItem {
   id: string;
   folder_id: string;
-  category: 'word' | 'sentence';
+  category: 'word' | 'sentence' | 'grammar' | 'note';
   text: string;
   meaning: string;
   pinyin: string;
@@ -20,11 +20,13 @@ export interface SavedLearningItem {
   linked_item_ids: string[];
 }
 
+export type ExampleSentenceDraft = { item_id: string } | { text: string; meaning: string };
+
 export interface TrashEntry {
   id: string;
   kind: 'item' | 'folder';
   name: string;
-  category: 'word' | 'sentence' | null;
+  category: 'word' | 'sentence' | 'grammar' | 'note' | null;
   folder_id: string | null;
 }
 
@@ -34,6 +36,7 @@ interface ApiErrorBody {
 
 function errorDetail(body: ApiErrorBody, status: number): string {
   if (typeof body.detail === 'string') return body.detail;
+  if (body.detail && typeof body.detail === 'object' && !Array.isArray(body.detail) && 'message' in body.detail && typeof body.detail.message === 'string') return body.detail.message;
   if (Array.isArray(body.detail)) {
     const fields = new Set(body.detail.flatMap((issue: unknown) => {
       if (!issue || typeof issue !== 'object' || !('loc' in issue) || !Array.isArray(issue.loc)) return [];
@@ -98,8 +101,20 @@ export const learningApi = {
   updateFolder: (id: string, change: { name?: string; parent_id?: string | null }): Promise<LearningFolder> =>
     api(`/folders/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(change) }),
   items: (): Promise<SavedLearningItem[]> => api('/items'),
+  createItem: (item: Pick<SavedLearningItem, 'folder_id' | 'category' | 'text' | 'meaning'>): Promise<SavedLearningItem> =>
+    api('/items', { method: 'POST', body: JSON.stringify(item) }),
+  createItemWithExamples: (body: { item: Pick<SavedLearningItem, 'folder_id' | 'category' | 'text' | 'meaning'>; examples: ExampleSentenceDraft[] }): Promise<SavedLearningItem> =>
+    api('/items/with-examples', { method: 'POST', body: JSON.stringify(body) }),
+  updateItemWithExamples: (id: string, body: { item: Pick<SavedLearningItem, 'folder_id' | 'category' | 'text' | 'meaning'>; examples: ExampleSentenceDraft[] }): Promise<SavedLearningItem> =>
+    api(`/items/${encodeURIComponent(id)}/with-examples`, { method: 'PATCH', body: JSON.stringify(body) }),
+  suggestMeaning: (text: string): Promise<{ meaning: string }> =>
+    api('/items/meaning-suggestion', { method: 'POST', body: JSON.stringify({ text }) }),
   updateItem: (id: string, change: Pick<SavedLearningItem, 'folder_id' | 'category' | 'text' | 'meaning'>): Promise<SavedLearningItem> =>
     api(`/items/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(change) }),
+  addItemLink: (id: string, itemId: string): Promise<void> =>
+    api(`/items/${encodeURIComponent(id)}/links`, { method: 'POST', body: JSON.stringify({ item_id: itemId }) }),
+  removeItemLink: (id: string, itemId: string): Promise<void> =>
+    api(`/items/${encodeURIComponent(id)}/links/${encodeURIComponent(itemId)}`, { method: 'DELETE' }),
   trash: (): Promise<TrashEntry[]> => api('/trash'),
   trashItem: (id: string): Promise<void> => api(`/items/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   trashFolder: (id: string): Promise<void> => api(`/folders/${encodeURIComponent(id)}`, { method: 'DELETE' }),

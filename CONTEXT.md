@@ -229,7 +229,7 @@ The learner's personal collection of saved Chinese learning content on the compa
 _Avoid_: General-purpose cloud drive
 
 **Learning Folder**:
-A learner-named location in the Learning Library that can contain saved content and other Learning Folders. Learners create folders on the companion website, not in the extension.
+A learner-named location in the Learning Library that directly contains saved learning items and may contain child Learning Folders. Each item has one direct folder and is also within the tree of that folder's ancestors. Learners create folders on the companion website, not in the extension.
 
 **Default Learning Folder**:
 The last Learning Folder chosen when saving from the Translation Tooltip, reused for later saves until the learner changes it. The learner chooses an existing folder on their first save; if none exists, the extension directs them to the website to create one.
@@ -238,7 +238,7 @@ The last Learning Folder chosen when saving from the Translation Tooltip, reused
 The recoverable location for individually deleted Saved Learning Items and for deleted Learning Folders together with their nested folders and items. Its contents remain until the learner explicitly deletes them permanently or empties the trash.
 
 **Saved Learning Item**:
-A Chinese text entry created from the Translation Tooltip in a Learning Folder, regardless of where the text came from, and classified as either Word or Phrase or Sentence. Its Chinese text and meaning can be corrected on the website; it shows Pinyin for its current text and does not record a source page or PDF address.
+A learner-owned entry in one Learning Folder, classified as Word or Phrase, Sentence, Grammar, or Note. It does not record a source page or PDF address.
 
 **Chinese Save Selection**:
 The part of the Chinese text row that the learner highlights inside the Translation Tooltip before saving. It determines the selected item's text and identifies the containing sentence when both are saved.
@@ -248,17 +248,29 @@ _Avoid_: Source Text selection, Pinyin selection
 The menu opened by the Chinese row's save button or by pressing `s` while the Translation Tooltip is open. It offers `1` Word or Phrase and `2` Sentence for any save, and `3` Both when a Chinese Save Selection exists; number keys activate the corresponding choices only while the learner is not typing in an editable field.
 
 **Learning Category**:
-The classification selected in the extension when creating a Saved Learning Item: either Word or Phrase or Sentence. It is independent of the Learning Folder containing the item, does not represent a physical folder on the website, and can be corrected later on the website.
+The classification of a Saved Learning Item as Word or Phrase, Sentence, Grammar, or Note. It is independent of the Learning Folder containing the item and does not represent a physical folder.
 
 **Word or Phrase**:
-The Learning Category for Chinese text the learner treats as a word or phrase. The learner chooses this category whether the saved text is a Chinese Save Selection or the entire Chinese row.
+The Learning Category for Chinese text the learner treats as a word or phrase, with a meaning confirmed by the learner even when a suggestion is offered. The learner chooses this category whether the saved text is a Chinese Save Selection or the entire Chinese row.
 _Avoid_: Word Item
 
+**Grammar**:
+The Learning Category for a Chinese language pattern recorded with a required learner-written structure and description. The structure is free-form text that may mix Chinese and Vietnamese and has no Pinyin. Example Sentences are optional and may be added later in any number.
+
+**Note**:
+The Learning Category for a learner-written title and note body kept in a Learning Folder. Notes have no Learning Links, and identical titles or bodies may be saved separately.
+
 **Sentence**:
-The Learning Category for Chinese text the learner treats as a sentence or longer passage. The learner chooses this category even when no Chinese Save Selection exists; without a selection, the item's text is the entire Chinese row, including multiple sentences when present.
+The Learning Category for Chinese text the learner treats as a sentence or longer passage, with a meaning confirmed by the learner. It may stand alone or be linked to multiple Words or Phrases and Grammar entries.
+
+**Example Sentence**:
+A Sentence linked to a Word or Phrase or Grammar entry as an example of its use. It remains a Sentence in its own right and may be an example for multiple entries; each entry may have multiple Example Sentences.
+
+**Learning Link**:
+An association between a Sentence and a Word or Phrase or Grammar entry. Links may cross Learning Folders without changing either item's direct folder, and each entry may have multiple links.
 
 **Linked Word and Sentence**:
-Two separate Saved Learning Items created by the "both" save choice: a Word or Phrase from the Chinese Save Selection and the Sentence containing it. The items remain linked so the learner can navigate between them.
+Two separate learning entries, a Word or Phrase and a Sentence containing it, connected by a Learning Link.
 
 **Sentence Save Preview**:
 The learner's chance to review and edit the sentence inferred to contain their Chinese Save Selection before it is saved, especially when the text lacks clear sentence punctuation.
@@ -273,6 +285,6 @@ A Saved Learning Item accepted by the extension for a linked Learning Account wh
 A save request made before an Account Link exists. The extension asks the learner to link an account through settings and does not create a Saved Learning Item.
 
 **Duplicate Learning Item**:
-A save attempt with the same Chinese text and Learning Category as an existing item in the chosen Learning Folder. In a paired save, an existing Sentence is reused and linked to the new Word or Phrase; its meaning stays as saved unless the learner edits it. Matching items in different folders remain separate.
+An attempt to save a new Word or Phrase, Sentence, or Grammar entry with the same complete text and Learning Category as an active item in the same Learning Folder. For Grammar, the compared text is its learner-written structure; matching items in different folders remain distinct. Notes are exempt.
 
 

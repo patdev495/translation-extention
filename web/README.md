@@ -39,4 +39,4 @@ Sau khi đồng bộ source vào `/opt/polytranslate-learning`, tạo `/var/lib/
 
 Trước mỗi lần cập nhật backend, tạo backup và kiểm tra `GET /api/health`. Nếu cần quay về bản cũ, triển khai lại source/ảnh Docker trước đó nhưng giữ nguyên volume; nếu schema đã đổi, khôi phục bản SQLite tương ứng từ bản sao đã kiểm tra.
 
-Phạm vi hiện tại: tài khoản, liên kết extension, cây thư mục. Lưu từ/câu từ tooltip thuộc các issue tiếp theo.
+Phạm vi hiện tại: tài khoản, liên kết extension, cây thư mục có thể xổ từng cấp, lưu từ/câu từ tooltip, thêm Từ / cụm từ hoặc Câu trên web, liên kết câu ví dụ, Ngữ pháp và Ghi chú.

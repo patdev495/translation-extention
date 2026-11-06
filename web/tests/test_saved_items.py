@@ -1,4 +1,5 @@
 from pathlib import Path
+from io import BytesIO
 
 from fastapi.testclient import TestClient
 
@@ -37,6 +38,85 @@ def test_extension_save_is_account_owned_and_duplicate_is_visible(tmp_path: Path
         assert duplicate.status_code == 409
         assert duplicate.json()["detail"]["existing_item"]["id"] == saved.json()["id"]
         assert extension.post("/api/extension/items", json=payload).status_code == 401
+
+
+def test_learner_creates_word_on_website_and_reads_it_back(tmp_path: Path) -> None:
+    app = create_app(tmp_path / "web-word.sqlite3")
+    with TestClient(app) as browser:
+        register(browser, "learner")
+        folder = browser.post("/api/folders", json={"name": "HSK"}, headers=ORIGIN).json()["id"]
+        created = browser.post("/api/items", json={
+            "folder_id": folder, "category": "word", "text": "学习", "meaning": "học",
+        }, headers=ORIGIN)
+        assert created.status_code == 201, created.text
+        assert created.json()["pinyin"] == "xué xí"
+        assert any(item["id"] == created.json()["id"] for item in browser.get("/api/items").json())
+
+
+def test_web_word_creation_enforces_folder_ownership_and_duplicate_scope(tmp_path: Path) -> None:
+    app = create_app(tmp_path / "web-word-rules.sqlite3")
+    with TestClient(app) as alice, TestClient(app) as bob:
+        register(alice, "alice")
+        register(bob, "bob")
+        one = alice.post("/api/folders", json={"name": "One"}, headers=ORIGIN).json()["id"]
+        two = alice.post("/api/folders", json={"name": "Two"}, headers=ORIGIN).json()["id"]
+        payload = {"folder_id": one, "category": "word", "text": "你好", "meaning": "xin chào"}
+        first = alice.post("/api/items", json=payload, headers=ORIGIN)
+        assert first.status_code == 201
+        assert alice.post("/api/items", json=payload, headers=ORIGIN).status_code == 409
+        assert alice.post("/api/items", json={**payload, "folder_id": two}, headers=ORIGIN).status_code == 201
+        assert bob.post("/api/items", json=payload, headers=ORIGIN).status_code == 404
+        assert alice.post("/api/items", json={**payload, "meaning": "  "}, headers=ORIGIN).status_code == 422
+        assert alice.post("/api/items", json=payload).status_code == 403
+
+
+def test_learner_gets_editable_meaning_suggestion_for_word(tmp_path: Path, monkeypatch) -> None:
+    def translated_response(_request, timeout: int):
+        assert timeout <= 10
+        return BytesIO(b'[[["hoc tap","\xe5\xad\xa6\xe4\xb9\xa0",null,null,1]],null,"zh"]')
+
+    monkeypatch.setattr("urllib.request.urlopen", translated_response)
+    app = create_app(tmp_path / "suggestion.sqlite3")
+    with TestClient(app) as browser:
+        register(browser, "learner")
+        suggested = browser.post("/api/items/meaning-suggestion", json={"text": "学习"}, headers=ORIGIN)
+        assert suggested.status_code == 200, suggested.text
+        assert suggested.json() == {"meaning": "hoc tap"}
+
+
+def test_learner_can_enter_word_meaning_when_suggestion_unavailable(tmp_path: Path, monkeypatch) -> None:
+    def unavailable(_request, timeout: int):
+        raise OSError("translation service unavailable")
+
+    monkeypatch.setattr("urllib.request.urlopen", unavailable)
+    app = create_app(tmp_path / "suggestion-unavailable.sqlite3")
+    with TestClient(app) as browser:
+        register(browser, "learner")
+        folder = browser.post("/api/folders", json={"name": "HSK"}, headers=ORIGIN).json()["id"]
+        assert browser.post("/api/items/meaning-suggestion", json={"text": "学习"}, headers=ORIGIN).status_code == 503
+        saved = browser.post("/api/items", json={
+            "folder_id": folder, "category": "word", "text": "学习", "meaning": "học",
+        }, headers=ORIGIN)
+        assert saved.status_code == 201, saved.text
+
+
+def test_learner_creates_standalone_sentence_on_website(tmp_path: Path) -> None:
+    app = create_app(tmp_path / "web-sentence.sqlite3")
+    with TestClient(app) as alice, TestClient(app) as bob:
+        register(alice, "alice")
+        register(bob, "bob")
+        one = alice.post("/api/folders", json={"name": "One"}, headers=ORIGIN).json()["id"]
+        two = alice.post("/api/folders", json={"name": "Two"}, headers=ORIGIN).json()["id"]
+        payload = {"folder_id": one, "category": "sentence", "text": "我喜欢学习中文。", "meaning": "Tôi thích học tiếng Trung."}
+        saved = alice.post("/api/items", json=payload, headers=ORIGIN)
+        assert saved.status_code == 201, saved.text
+        assert saved.json()["linked_item_ids"] == []
+        assert saved.json()["pinyin"].startswith("wǒ xǐ huān")
+        assert alice.post("/api/items", json=payload, headers=ORIGIN).status_code == 409
+        assert alice.post("/api/items", json={**payload, "folder_id": two}, headers=ORIGIN).status_code == 201
+        assert bob.post("/api/items", json=payload, headers=ORIGIN).status_code == 404
+        assert alice.post("/api/items", json={**payload, "meaning": " "}, headers=ORIGIN).status_code == 422
+        assert any(item["id"] == saved.json()["id"] for item in alice.get("/api/items").json())
 
 
 def test_both_links_existing_word_and_edit_rechecks_collisions(tmp_path: Path) -> None:

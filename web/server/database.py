@@ -25,6 +25,28 @@ def connect(path: Path) -> Iterator[sqlite3.Connection]:
 
 def initialize(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        with sqlite3.connect(path) as migration:
+            schema = migration.execute("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'learning_items'").fetchone()
+            if schema and "category IN ('word', 'sentence')" in schema[0]:
+                migration.execute("PRAGMA foreign_keys = OFF")
+                columns = {row[1] for row in migration.execute("PRAGMA table_info(learning_items)")}
+                migration.execute("BEGIN IMMEDIATE")
+                migration.execute("""CREATE TABLE learning_items_new (
+                    id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    folder_id TEXT NOT NULL REFERENCES folders(id),
+                    category TEXT NOT NULL CHECK (category IN ('word', 'sentence', 'grammar', 'note')),
+                    text TEXT NOT NULL, meaning TEXT NOT NULL, pinyin TEXT NOT NULL, created_at INTEGER NOT NULL,
+                    deleted_at INTEGER, trash_root_id TEXT
+                )""")
+                deleted = "deleted_at" if "deleted_at" in columns else "NULL"
+                trash_root = "trash_root_id" if "trash_root_id" in columns else "NULL"
+                migration.execute(f"""INSERT INTO learning_items_new
+                    SELECT id, user_id, folder_id, category, text, meaning, pinyin, created_at, {deleted}, {trash_root}
+                    FROM learning_items""")
+                migration.execute("DROP TABLE learning_items")
+                migration.execute("ALTER TABLE learning_items_new RENAME TO learning_items")
+                migration.commit()
     with connect(path) as connection:
         connection.executescript(
             """
@@ -67,7 +89,7 @@ def initialize(path: Path) -> None:
                 id TEXT PRIMARY KEY,
                 user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 folder_id TEXT NOT NULL REFERENCES folders(id),
-                category TEXT NOT NULL CHECK (category IN ('word', 'sentence')),
+                category TEXT NOT NULL CHECK (category IN ('word', 'sentence', 'grammar', 'note')),
                 text TEXT NOT NULL,
                 meaning TEXT NOT NULL,
                 pinyin TEXT NOT NULL,
@@ -105,6 +127,6 @@ def initialize(path: Path) -> None:
                 ON folders(user_id, COALESCE(parent_id, ''), name_key) WHERE deleted_at IS NULL;
             DROP INDEX IF EXISTS learning_item_identity;
             CREATE UNIQUE INDEX learning_item_identity
-                ON learning_items(user_id, folder_id, category, text) WHERE deleted_at IS NULL;
+                ON learning_items(user_id, folder_id, category, text) WHERE deleted_at IS NULL AND category != 'note';
             """
         )

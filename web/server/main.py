@@ -8,10 +8,11 @@ import os
 import secrets
 import sqlite3
 import time
+import urllib.request
 import uuid
 from pathlib import Path
 from typing import Literal
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -93,7 +94,7 @@ class Folder(BaseModel):
 
 class ItemInput(BaseModel):
     folder_id: str
-    category: Literal["word", "sentence"]
+    category: Literal["word", "sentence", "grammar", "note"]
     text: str = Field(min_length=1)
     meaning: str = Field(min_length=1)
 
@@ -105,11 +106,42 @@ class ItemInput(BaseModel):
         return value
 
 
+class MeaningSuggestionInput(BaseModel):
+    text: str = Field(min_length=1, max_length=1000)
+
+    @field_validator("text")
+    @classmethod
+    def nonblank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Value is required")
+        return value
+
+
 class ItemUpdate(BaseModel):
     folder_id: str | None = None
-    category: Literal["word", "sentence"] | None = None
+    category: Literal["word", "sentence", "grammar", "note"] | None = None
     text: str | None = None
     meaning: str | None = None
+
+
+class ItemLinkInput(BaseModel):
+    item_id: str
+
+
+class ExampleInput(BaseModel):
+    item_id: str | None = None
+    text: str | None = None
+    meaning: str | None = None
+
+
+class ItemWithExamplesInput(BaseModel):
+    item: ItemInput
+    examples: list[ExampleInput]
+
+
+class ItemUpdateWithExamplesInput(BaseModel):
+    item: ItemUpdate
+    examples: list[ExampleInput]
 
 
 class BothInput(BaseModel):
@@ -137,7 +169,7 @@ class SyncInput(BaseModel):
 class Item(BaseModel):
     id: str
     folder_id: str
-    category: Literal["word", "sentence"]
+    category: Literal["word", "sentence", "grammar", "note"]
     text: str
     meaning: str
     pinyin: str
@@ -149,7 +181,7 @@ class TrashEntry(BaseModel):
     id: str
     kind: Literal["item", "folder"]
     name: str
-    category: Literal["word", "sentence"] | None = None
+    category: Literal["word", "sentence", "grammar", "note"] | None = None
     folder_id: str | None = None
 
 
@@ -366,12 +398,12 @@ def create_app(database_path: Path | None = None) -> FastAPI:
             "SELECT * FROM learning_items WHERE user_id = ? AND folder_id = ? AND category = ? AND text = ? AND deleted_at IS NULL",
             (user_id, body.folder_id, body.category, body.text),
         ).fetchone()
-        if existing is not None:
+        if existing is not None and body.category != "note":
             if reuse:
                 return item(connection, existing)
             raise HTTPException(status_code=409, detail={"message": "Duplicate Learning Item", "existing_item": item(connection, existing).model_dump()})
         item_id = _new_id()
-        pinyin = " ".join(lazy_pinyin(body.text, style=Style.TONE, errors=lambda chars: list(chars)))
+        pinyin = " ".join(lazy_pinyin(body.text, style=Style.TONE, errors=lambda chars: list(chars))) if body.category in ("word", "sentence") else ""
         try:
             connection.execute(
                 "INSERT INTO learning_items (id, user_id, folder_id, category, text, meaning, pinyin, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -422,6 +454,8 @@ def create_app(database_path: Path | None = None) -> FastAPI:
 
     @app.post("/api/extension/items", response_model=Item, status_code=201)
     def extension_save_item(body: ItemInput, account: Account = Depends(extension_account)) -> Item:
+        if body.category not in ("word", "sentence"):
+            raise HTTPException(status_code=422, detail="Extension saves only Word or Phrase and Sentence")
         with connect(db_path) as connection:
             connection.execute("BEGIN IMMEDIATE")
             return create_item(connection, account.id, body)
@@ -436,7 +470,7 @@ def create_app(database_path: Path | None = None) -> FastAPI:
     def sync_save(body: SyncInput, account: Account = Depends(extension_account)) -> dict[str, object]:
         if body.choice == "both" and not isinstance(body.item, BothInput):
             raise HTTPException(status_code=422, detail="Paired save requires word and sentence")
-        if body.choice != "both" and (not isinstance(body.item, ItemInput) or body.item.category != body.choice):
+        if body.choice != "both" and (not isinstance(body.item, ItemInput) or body.item.category != body.choice or body.item.category not in ("word", "sentence")):
             raise HTTPException(status_code=422, detail="Save category mismatch")
         payload = body.model_dump(mode="json")
         payload_hash = _digest(json.dumps({"choice": payload["choice"], "item": payload["item"]}, sort_keys=True, ensure_ascii=False))
@@ -461,34 +495,140 @@ def create_app(database_path: Path | None = None) -> FastAPI:
             )
             return result
 
+    @app.post("/api/items/meaning-suggestion", dependencies=[Depends(require_browser_origin)])
+    def web_meaning_suggestion(body: MeaningSuggestionInput, _account: Account = Depends(web_account)) -> dict[str, str]:
+        query = urlencode({"client": "gtx", "sl": "auto", "tl": "vi", "dt": "t", "q": body.text.strip()})
+        request = urllib.request.Request(
+            f"https://translate.googleapis.com/translate_a/single?{query}",
+            headers={"User-Agent": "PolyTranslate-Learning/1.0"},
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=6) as response:
+                segments = json.loads(response.read().decode("utf-8"))[0]
+            meaning = "".join(segment[0] for segment in segments if isinstance(segment, list) and isinstance(segment[0], str)).strip()
+        except (OSError, ValueError, IndexError, KeyError, TypeError) as error:
+            raise HTTPException(status_code=503, detail="Meaning suggestion unavailable") from error
+        if not meaning:
+            raise HTTPException(status_code=503, detail="Meaning suggestion unavailable")
+        return {"meaning": meaning}
+
     @app.get("/api/items", response_model=list[Item])
     def list_items(account: Account = Depends(web_account)) -> list[Item]:
         with connect(db_path) as connection:
             rows = connection.execute("SELECT * FROM learning_items WHERE user_id = ? AND deleted_at IS NULL ORDER BY created_at DESC, id", (account.id,)).fetchall()
             return [item(connection, row) for row in rows]
 
-    @app.patch("/api/items/{item_id}", response_model=Item, dependencies=[Depends(require_browser_origin)])
-    def update_item(item_id: str, body: ItemUpdate, account: Account = Depends(web_account)) -> Item:
+    @app.post("/api/items", response_model=Item, status_code=201, dependencies=[Depends(require_browser_origin)])
+    def create_web_item(body: ItemInput, account: Account = Depends(web_account)) -> Item:
+        with connect(db_path) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            return create_item(connection, account.id, body)
+
+    def attach_examples(connection: sqlite3.Connection, user_id: str, owner: Item, examples: list[ExampleInput]) -> Item:
+        if owner.category not in ("word", "grammar"):
+            raise HTTPException(status_code=422, detail="Examples require Word or Phrase or Grammar")
+        for example in examples:
+            if example.item_id:
+                row = connection.execute(
+                    "SELECT * FROM learning_items WHERE id = ? AND user_id = ? AND category = 'sentence' AND deleted_at IS NULL",
+                    (example.item_id, user_id),
+                ).fetchone()
+                if row is None:
+                    raise HTTPException(status_code=404, detail="Sentence not found")
+                sentence_id = row["id"]
+            else:
+                if not example.text or not example.text.strip() or not example.meaning or not example.meaning.strip():
+                    raise HTTPException(status_code=422, detail="Sentence text and meaning are required")
+                sentence_id = create_item(connection, user_id, ItemInput(
+                    folder_id=owner.folder_id, category="sentence", text=example.text, meaning=example.meaning,
+                ), reuse=True).id
+            connection.execute("INSERT OR IGNORE INTO learning_item_links (word_id, sentence_id) VALUES (?, ?)", (owner.id, sentence_id))
+        row = connection.execute("SELECT * FROM learning_items WHERE id = ?", (owner.id,)).fetchone()
+        return item(connection, row)
+
+    @app.post("/api/items/with-examples", response_model=Item, status_code=201, dependencies=[Depends(require_browser_origin)])
+    def create_web_item_with_examples(body: ItemWithExamplesInput, account: Account = Depends(web_account)) -> Item:
+        with connect(db_path) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            owner = create_item(connection, account.id, body.item)
+            return attach_examples(connection, account.id, owner, body.examples)
+
+    @app.post("/api/items/{item_id}/examples", response_model=Item, dependencies=[Depends(require_browser_origin)])
+    def add_item_examples(item_id: str, examples: list[ExampleInput], account: Account = Depends(web_account)) -> Item:
         with connect(db_path) as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute("SELECT * FROM learning_items WHERE id = ? AND user_id = ? AND deleted_at IS NULL", (item_id, account.id)).fetchone()
             if row is None:
                 raise HTTPException(status_code=404, detail="Saved Learning Item not found")
-            folder_id = body.folder_id if body.folder_id is not None else row["folder_id"]
-            category = body.category if body.category is not None else row["category"]
-            text = body.text if body.text is not None else row["text"]
-            meaning = body.meaning if body.meaning is not None else row["meaning"]
-            if not text.strip() or not meaning.strip():
-                raise HTTPException(status_code=422, detail="Text and meaning are required")
-            require_folder(connection, account.id, folder_id)
-            pinyin = " ".join(lazy_pinyin(text, style=Style.TONE, errors=lambda chars: list(chars)))
-            try:
-                connection.execute("UPDATE learning_items SET folder_id = ?, category = ?, text = ?, meaning = ?, pinyin = ? WHERE id = ?", (folder_id, category, text, meaning, pinyin, item_id))
-            except sqlite3.IntegrityError as error:
-                raise HTTPException(status_code=409, detail="Duplicate Learning Item") from error
-            updated = connection.execute("SELECT * FROM learning_items WHERE id = ?", (item_id,)).fetchone()
-            assert updated is not None
-            return item(connection, updated)
+            return attach_examples(connection, account.id, item(connection, row), examples)
+
+    def update_item_record(connection: sqlite3.Connection, user_id: str, item_id: str, body: ItemUpdate) -> Item:
+        row = connection.execute("SELECT * FROM learning_items WHERE id = ? AND user_id = ? AND deleted_at IS NULL", (item_id, user_id)).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Saved Learning Item not found")
+        folder_id = body.folder_id if body.folder_id is not None else row["folder_id"]
+        category = body.category if body.category is not None else row["category"]
+        if (category == "note") != (row["category"] == "note"):
+            raise HTTPException(status_code=422, detail="Note category cannot be converted")
+        if category != row["category"] and item(connection, row).linked_item_ids:
+            raise HTTPException(status_code=409, detail="Remove Learning Links before changing category")
+        text = body.text if body.text is not None else row["text"]
+        meaning = body.meaning if body.meaning is not None else row["meaning"]
+        if not text.strip() or not meaning.strip():
+            raise HTTPException(status_code=422, detail="Text and meaning are required")
+        require_folder(connection, user_id, folder_id)
+        pinyin = " ".join(lazy_pinyin(text, style=Style.TONE, errors=lambda chars: list(chars))) if category in ("word", "sentence") else ""
+        try:
+            connection.execute("UPDATE learning_items SET folder_id = ?, category = ?, text = ?, meaning = ?, pinyin = ? WHERE id = ?", (folder_id, category, text, meaning, pinyin, item_id))
+        except sqlite3.IntegrityError as error:
+            raise HTTPException(status_code=409, detail="Duplicate Learning Item") from error
+        updated = connection.execute("SELECT * FROM learning_items WHERE id = ?", (item_id,)).fetchone()
+        return item(connection, updated)
+
+    @app.patch("/api/items/{item_id}/with-examples", response_model=Item, dependencies=[Depends(require_browser_origin)])
+    def update_item_with_examples(item_id: str, body: ItemUpdateWithExamplesInput, account: Account = Depends(web_account)) -> Item:
+        with connect(db_path) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            updated = update_item_record(connection, account.id, item_id, body.item)
+            return attach_examples(connection, account.id, updated, body.examples)
+
+    @app.patch("/api/items/{item_id}", response_model=Item, dependencies=[Depends(require_browser_origin)])
+    def update_item(item_id: str, body: ItemUpdate, account: Account = Depends(web_account)) -> Item:
+        with connect(db_path) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            return update_item_record(connection, account.id, item_id, body)
+
+    @app.post("/api/items/{item_id}/links", status_code=201, dependencies=[Depends(require_browser_origin)])
+    def add_item_link(item_id: str, body: ItemLinkInput, account: Account = Depends(web_account)) -> dict[str, str]:
+        with connect(db_path) as connection:
+            rows = connection.execute(
+                "SELECT id, category FROM learning_items WHERE id IN (?, ?) AND user_id = ? AND deleted_at IS NULL",
+                (item_id, body.item_id, account.id),
+            ).fetchall()
+            if len(rows) != 2:
+                raise HTTPException(status_code=404, detail="Saved Learning Item not found")
+            categories = {row["id"]: row["category"] for row in rows}
+            pair = {categories[item_id], categories[body.item_id]}
+            if pair not in ({"word", "sentence"}, {"grammar", "sentence"}):
+                raise HTTPException(status_code=422, detail="Learning Link requires Word or Phrase and Sentence")
+            word_id = item_id if categories[item_id] != "sentence" else body.item_id
+            sentence_id = item_id if categories[item_id] == "sentence" else body.item_id
+            connection.execute("INSERT OR IGNORE INTO learning_item_links (word_id, sentence_id) VALUES (?, ?)", (word_id, sentence_id))
+            return {"word_id": word_id, "sentence_id": sentence_id}
+
+    @app.delete("/api/items/{item_id}/links/{linked_id}", status_code=204, dependencies=[Depends(require_browser_origin)])
+    def remove_item_link(item_id: str, linked_id: str, account: Account = Depends(web_account)) -> None:
+        with connect(db_path) as connection:
+            owned = connection.execute(
+                "SELECT COUNT(*) AS count FROM learning_items WHERE id IN (?, ?) AND user_id = ? AND deleted_at IS NULL",
+                (item_id, linked_id, account.id),
+            ).fetchone()
+            if owned["count"] != 2:
+                raise HTTPException(status_code=404, detail="Saved Learning Item not found")
+            connection.execute(
+                "DELETE FROM learning_item_links WHERE (word_id = ? AND sentence_id = ?) OR (word_id = ? AND sentence_id = ?)",
+                (item_id, linked_id, linked_id, item_id),
+            )
 
     @app.delete("/api/items/{item_id}", status_code=204, dependencies=[Depends(require_browser_origin)])
     def trash_item(item_id: str, account: Account = Depends(web_account)) -> None:
@@ -553,7 +693,7 @@ def create_app(database_path: Path | None = None) -> FastAPI:
                 "SELECT 1 FROM folders WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
                 (row["folder_id"], account.id),
             ).fetchone()
-            collision = connection.execute(
+            collision = None if row["category"] == "note" else connection.execute(
                 "SELECT 1 FROM learning_items WHERE user_id = ? AND folder_id = ? AND category = ? AND text = ? AND deleted_at IS NULL",
                 (account.id, row["folder_id"], row["category"], row["text"]),
             ).fetchone()

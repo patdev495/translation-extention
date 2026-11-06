@@ -85,6 +85,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .tree-row.active .tree-menu-button { color: #4b43cd; }
 .trash-nav { margin-top: 16px; border-top: 1px solid #e9ebf5; border-radius: 0 0 9px 9px; }
 .tree-button svg { flex: none; }
+.tree-chevron { margin-left: -8px; margin-right: -6px; transition: transform .17s ease; }
+.tree-chevron.expanded { transform: rotate(90deg); }
 .folder-context-menu { position: fixed; z-index: 100; width: 225px; max-width: calc(100vw - 16px); padding: 6px; border: 1px solid #dfe2f2; border-radius: 12px; background: #fff; box-shadow: 0 14px 36px #25295829; }
 .folder-context-title { margin: 0 4px 5px; padding: 7px 8px 9px; border-bottom: 1px solid #eceef7; color: #727c99; overflow-wrap: anywhere; font-size: 12px; font-weight: 700; }
 .folder-context-menu button { @apply flex items-center gap-3; width: 100%; min-height: 38px; padding: 8px 10px; border: 0; border-radius: 7px; background: transparent; color: #333b65; text-align: left; font-size: 13px; font-weight: 650; }
@@ -106,7 +108,15 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .library-header { @apply flex items-center justify-between gap-4; margin: 12px 0 10px; }
 .library-header .overline { margin: 0 0 8px; }
 .library-header h1 { margin: 0; font-size: clamp(23px, 2.5vw, 28px); line-height: 1.2; letter-spacing: -.04em; }
-.child-folder-select { min-width: 180px; max-width: min(320px, 100%); min-height: 32px; padding: 0 9px; border: 1px solid #d9deef; border-radius: 8px; background: #fff; color: #343e67; font-size: 12px; }
+.child-folders { margin: 18px 0 22px; }
+.child-folders h2 { margin: 0 0 10px; font-size: 16px; }
+.child-folder-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr)); gap: 10px; }
+.child-folder-card { display: flex; align-items: center; min-height: 62px; border: 1px solid #e2e5f1; border-radius: 11px; background: #fff; color: #454f72; font-weight: 700; }
+.child-folder-card:hover, .child-folder-card:focus-within { border-color: #aaa9e8; background: #f5f4ff; color: var(--indigo); }
+.child-folder-open { display: flex; align-items: center; flex: 1; gap: 10px; min-width: 0; min-height: 60px; padding: 12px; border: 0; background: transparent; color: inherit; text-align: left; font-weight: inherit; }
+.child-folder-open span { flex: 1; overflow-wrap: anywhere; }
+.child-folder-menu { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 32px; height: 32px; margin-right: 8px; border: 0; border-radius: 7px; background: transparent; color: inherit; }
+.child-folder-menu:hover, .child-folder-menu:focus-visible { background: #e8e6ff; }
 .library-subtitle { margin: 9px 0 0; color: var(--muted); font-size: 14px; }
 .create-button { white-space: nowrap; }
 .content-state { padding: 90px 0; text-align: center; color: var(--muted); }
@@ -182,6 +192,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .item-editor form { display: flex; flex-direction: column; }
 .item-editor form > label { margin-top: 12px; }
 .item-editor input, .item-editor select { width: 100%; }
+.new-item-editor textarea { width: 100%; min-height: 104px; padding: 12px 14px; border: 1px solid #d9deef; border-radius: 10px; color: #252b47; background: #fcfcff; resize: vertical; }
+.form-hint { margin: 7px 0 0; color: var(--muted); font-size: 12px; }
 .item-editor .dialog-actions { align-self: flex-end; }
 
 .editor-dialog { position: fixed; inset: 0; width: min(460px, calc(100vw - 32px)); margin: auto; padding: 26px; border: 1px solid #dfe2f2; border-radius: 20px; box-shadow: 0 35px 80px #24224c40; }
@@ -232,7 +244,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .library-header { align-items: flex-start; flex-direction: column; margin-top: 10px; }
   .library-header h1 { font-size: 25px; }
   .create-button { width: 100%; }
-  .breadcrumb .child-folder-select { flex: 1; min-width: 0; }
   .saved-items-heading { align-items: flex-start; }
   .link-banner { align-items: flex-start; flex-wrap: wrap; }
   .link-button { margin-left: 57px; }
@@ -240,3 +251,4 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
+.note-body { white-space: pre-wrap; }
