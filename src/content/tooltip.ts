@@ -91,6 +91,7 @@ export class TranslationTooltip {
 
     this.tooltipEl = document.createElement('div');
     this.tooltipEl.id = 'tooltip';
+    this.tooltipEl.tabIndex = -1;
     this.shadow.appendChild(this.tooltipEl);
 
     this.triggerEl = document.createElement('button');
@@ -362,7 +363,7 @@ export class TranslationTooltip {
         (activeElement as HTMLInputElement).blur();
       }
     }, true);
-    document.addEventListener('keydown', (event) => {
+    window.addEventListener('keydown', (event) => {
       if (!this.tooltipEl?.isConnected || this.tooltipEl.style.display === 'none' || !this.tooltipEl.classList.contains('visible')) return;
       const activeElement = this.shadow?.activeElement ?? document.activeElement;
       const eventElements = event.composedPath().filter((node): node is Element => node instanceof Element);
@@ -372,6 +373,7 @@ export class TranslationTooltip {
       if (event.ctrlKey || event.altKey || event.metaKey) return;
       if (event.key.toLowerCase() === 'x' && !event.repeat && this.tooltipEl.querySelector('.tt-save-panel')) {
         event.preventDefault();
+        event.stopImmediatePropagation();
         this.closeSavePanel();
         return;
       }
@@ -381,16 +383,17 @@ export class TranslationTooltip {
         const form = this.tooltipEl.querySelector<HTMLFormElement>('.tt-save-form');
         if (form) {
           event.preventDefault();
+          event.stopImmediatePropagation();
           if (!form.querySelector<HTMLButtonElement>('.tt-save-submit')?.disabled) form.requestSubmit();
           return;
         }
         const section = this.saveSection ?? this.tooltipEl.querySelector('.tt-save-button')?.closest('.tt-section');
-        if (section) { event.preventDefault(); this.openSaveChoices(section); }
+        if (section) { event.preventDefault(); event.stopImmediatePropagation(); this.openSaveChoices(section); }
       } else {
         const numberKey = /^[1-3]$/.test(event.key) ? event.key : event.code?.match(/^(?:Digit|Numpad)([1-3])$/)?.[1];
         if (!numberKey) return;
         const choice = this.tooltipEl.querySelector<HTMLButtonElement>(`.tt-save-choice[data-key="${numberKey}"]`);
-        if (choice) { event.preventDefault(); choice.click(); }
+        if (choice) { event.preventDefault(); event.stopImmediatePropagation(); choice.click(); }
       }
     }, true);
   }
@@ -428,7 +431,7 @@ export class TranslationTooltip {
       }
       panel.classList.add('tt-save-unlinked');
       panel.setAttribute('role', 'alert');
-      panel.innerHTML = '<strong>Chưa liên kết tài khoản web</strong><p>Liên kết tài khoản để lưu mục học tập vào thư viện.</p><button type="button" class="tt-save-link-account">Liên kết tài khoản</button><button type="button" class="tt-save-close" aria-label="Đóng thông báo lưu">×</button><p class="tt-save-link-status" role="status"></p>';
+      panel.innerHTML = '<strong>Chưa liên kết tài khoản web</strong><p>Liên kết tài khoản để lưu mục học tập vào thư viện.</p><button type="button" class="tt-save-link-account">Liên kết tài khoản</button><button type="button" class="tt-save-close" aria-label="Đóng thông báo lưu" title="Đóng · phím X">×</button><p class="tt-save-link-status" role="status"></p>';
     };
     try { chrome.runtime.sendMessage({ type: 'GET_ACCOUNT_LINK_STATUS' }, checked); }
     catch { checked(null); }
@@ -455,11 +458,11 @@ export class TranslationTooltip {
     panel.className = 'tt-save-panel';
     panel.setAttribute('role', 'group');
     panel.setAttribute('aria-label', 'Save Choice Menu');
-    panel.innerHTML = `<div class="tt-save-heading"><strong class="tt-save-title"></strong><button type="button" class="tt-save-close" aria-label="Đóng menu lưu">×</button></div>
+    panel.innerHTML = `<div class="tt-save-heading"><strong class="tt-save-title"></strong><button type="button" class="tt-save-close" aria-label="Đóng menu lưu" title="Đóng · phím X">×</button></div>
       <small class="tt-save-shortcut">${this.saveSelection ? 'Nhấn 1, 2 hoặc 3 để chọn' : 'Nhấn 1 hoặc 2 để chọn'} · X để thoát</small>
-      <button type="button" class="tt-save-choice" data-choice="word" data-key="1">1 · Từ / cụm từ</button>
-      <button type="button" class="tt-save-choice" data-choice="sentence" data-key="2">2 · Câu</button>
-      ${this.saveSelection ? '<button type="button" class="tt-save-choice" data-choice="both" data-key="3">3 · Cả hai</button>' : ''}`;
+      <button type="button" class="tt-save-choice" data-choice="word" data-key="1" title="Chọn từ / cụm từ · phím 1">1 · Từ / cụm từ</button>
+      <button type="button" class="tt-save-choice" data-choice="sentence" data-key="2" title="Chọn câu · phím 2">2 · Câu</button>
+      ${this.saveSelection ? '<button type="button" class="tt-save-choice" data-choice="both" data-key="3" title="Chọn cả hai · phím 3">3 · Cả hai</button>' : ''}`;
     panel.querySelector('.tt-save-title')!.textContent = `Lưu “${this.saveSelection || source}” vào thư viện`;
     section.append(panel);
   }
@@ -470,13 +473,13 @@ export class TranslationTooltip {
     const row = this.saveSection.querySelector('.tt-source-text, .tt-translation-text')!;
     const text = choice === 'sentence' && this.saveSelection ? this.saveSentence : this.saveSelection || row.textContent || '';
     const panel = this.saveSection.querySelector('.tt-save-panel')!;
-    panel.innerHTML = `<div class="tt-save-heading"><strong class="tt-save-title"></strong><button type="button" class="tt-save-close" aria-label="Đóng menu lưu">×</button></div>
+    panel.innerHTML = `<div class="tt-save-heading"><strong class="tt-save-title"></strong><button type="button" class="tt-save-close" aria-label="Đóng menu lưu" title="Đóng · phím X">×</button></div>
       <form class="tt-save-form"><label>Thư mục học tập<select class="tt-save-folder" required><option value="">Đang tải…</option></select></label>
       <label>${choice === 'sentence' && this.saveSelection ? 'Câu chứa chữ đã chọn · kiểm tra trước khi lưu' : 'Chữ Trung'}<input class="tt-save-text" required /></label>
       <label>Nghĩa gợi ý<input class="tt-save-meaning" required placeholder="Sửa nghĩa trước khi lưu" /></label>
       ${choice === 'both' ? '<label>Câu chứa từ · kiểm tra trước khi lưu<textarea class="tt-save-sentence" required></textarea></label><label>Nghĩa câu<input class="tt-save-sentence-meaning" required /></label><small class="tt-save-existing-sentence" role="status"></small>' : ''}
       <small class="tt-save-shortcut">Nhấn S để lưu · X để thoát khi không nhập liệu</small>
-      <p class="tt-save-status" role="status"></p><button type="submit" class="tt-save-submit">Lưu</button></form>`;
+      <p class="tt-save-status" role="status"></p><button type="submit" class="tt-save-submit" title="Lưu · phím S">Lưu</button></form>`;
     panel.querySelector('.tt-save-title')!.textContent = `Lưu “${text}” vào thư viện`;
     panel.querySelector<HTMLInputElement>('.tt-save-text')!.value = text;
     const sentence = panel.querySelector<HTMLTextAreaElement>('.tt-save-sentence');
@@ -725,7 +728,7 @@ export class TranslationTooltip {
       `;
     };
     const renderSaveButton = (text: string) => /\p{Script=Han}/u.test(text)
-      ? '<button type="button" class="tt-btn tt-save-button" aria-label="Lưu chữ Trung" title="Lưu chữ Trung"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2.8 2.8 5.8 6.4.9-4.6 4.5 1.1 6.3-5.7-3-5.7 3 1.1-6.3-4.6-4.5 6.4-.9z"/></svg></button>' : '';
+      ? '<button type="button" class="tt-btn tt-save-button" aria-label="Lưu chữ Trung" title="Lưu chữ Trung · phím S"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2.8 2.8 5.8 6.4.9-4.6 4.5 1.1 6.3-5.7-3-5.7 3 1.1-6.3-4.6-4.5 6.4-.9z"/></svg></button>' : '';
 
     const isOcrTooltip = typeof ocrWidth === 'number' && ocrWidth > 0;
     const viewportMargin = 16;
@@ -857,6 +860,10 @@ export class TranslationTooltip {
     // Reset state, then trigger appear animation
     this.tooltipEl.classList.remove('hidden', 'visible');
     this.tooltipEl.style.display = 'block';
+    const focused = document.activeElement;
+    if (focused instanceof HTMLElement && (focused.matches('input, textarea, [contenteditable="true"]') || focused.isContentEditable)) {
+      this.tooltipEl.focus({ preventScroll: true });
+    }
     const initialWidth = this.tooltipEl.getBoundingClientRect().width;
     if (initialWidth > 0) {
       this.tooltipEl.style.width = `${initialWidth}px`;

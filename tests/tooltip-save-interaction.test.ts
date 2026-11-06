@@ -84,6 +84,25 @@ test('number keys choose visible category despite bubbling being stopped inside 
   expect(root.querySelector('.tt-save-sentence')).not.toBeNull();
 });
 
+test('opening tooltip from a focused page editor moves shortcut focus into tooltip and advertises keys on hover', () => {
+  const editor = document.createElement('div');
+  editor.setAttribute('contenteditable', 'true');
+  editor.tabIndex = 0;
+  document.body.append(editor);
+  editor.focus();
+  expect(document.activeElement).toBe(editor);
+  const { root } = setup('你好');
+  const tooltip = root.querySelector<HTMLElement>('#tooltip')!;
+  expect(root.activeElement).toBe(tooltip);
+  const save = root.querySelector<HTMLButtonElement>('.tt-save-button')!;
+  expect(save.title).toContain('S');
+  tooltip.dispatchEvent(new KeyboardEvent('keydown', { key: 's', bubbles: true, composed: true }));
+  const word = root.querySelector<HTMLButtonElement>('.tt-save-choice[data-key="1"]')!;
+  expect(word.title).toContain('1');
+  tooltip.dispatchEvent(new KeyboardEvent('keydown', { key: '1', bubbles: true, composed: true }));
+  expect(root.querySelector('.tt-save-form')).not.toBeNull();
+});
+
 test('x closes Save Choice Menu and save form back to original Translation Tooltip', async () => {
   const { root, sendMessage } = setup('你好');
   root.querySelector<HTMLButtonElement>('.tt-save-button')!.click();
