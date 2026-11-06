@@ -85,6 +85,7 @@ function addEditExistingExample(): void {
 const itemBusy = ref(false);
 const newItemEditor = ref<HTMLDialogElement | null>(null);
 const newItemCategory = ref<SavedLearningItem['category']>('word');
+const newItemTab = ref<'main' | 'examples'>('main');
 const newItemFolderId = ref('');
 const newItemText = ref('');
 const newItemMeaning = ref('');
@@ -584,6 +585,7 @@ function startNewItem(category: SavedLearningItem['category']): void {
   if (!folderId) return;
   closeFolderContextMenu();
   newItemCategory.value = category;
+  newItemTab.value = 'main';
   newItemFolderId.value = folderId;
   newItemText.value = '';
   newItemMeaning.value = '';
@@ -619,8 +621,17 @@ async function requestMeaningSuggestion(): Promise<void> {
 
 async function submitNewItem(): Promise<void> {
   if (newItemBusy.value) return;
-  newItemBusy.value = true;
   newItemError.value = '';
+  if (!newItemText.value.trim() || !newItemMeaning.value.trim()) {
+    newItemTab.value = 'main';
+    newItemError.value = 'Nhập nội dung chính trước khi lưu.';
+    await nextTick();
+    newItemEditor.value?.querySelector<HTMLInputElement | HTMLTextAreaElement>(
+      !newItemText.value.trim() ? '#new-item-text' : '#new-item-meaning',
+    )?.focus();
+    return;
+  }
+  newItemBusy.value = true;
   try {
     const item = {
       folder_id: newItemFolderId.value,
@@ -638,6 +649,13 @@ async function submitNewItem(): Promise<void> {
   } finally {
     newItemBusy.value = false;
   }
+}
+
+function handleNewItemTabKey(event: KeyboardEvent): void {
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+  event.preventDefault();
+  newItemTab.value = newItemTab.value === 'main' ? 'examples' : 'main';
+  void nextTick(() => newItemEditor.value?.querySelector<HTMLButtonElement>(`#new-item-tab-${newItemTab.value}`)?.focus());
 }
 
 function requestTrashFolder(): void {
@@ -828,14 +846,34 @@ async function submitEditor(): Promise<void> {
       </form>
     </dialog>
     <dialog ref="newItemEditor" class="editor-dialog new-item-editor" @click.self="newItemEditor?.close()">
-      <form @submit.prevent="submitNewItem"><h2>{{ newItemCategory === 'word' ? 'Thêm từ / cụm từ' : newItemCategory === 'sentence' ? 'Thêm câu' : newItemCategory === 'grammar' ? 'Thêm ngữ pháp' : 'Thêm ghi chú' }}</h2><p>Thêm vào thư mục “{{ folderById.get(newItemFolderId)?.name }}”.</p>
-        <label for="new-item-text">{{ newItemCategory === 'word' ? 'Từ / cụm từ' : newItemCategory === 'sentence' ? 'Câu' : newItemCategory === 'grammar' ? 'Cấu trúc' : 'Tiêu đề' }}</label><textarea v-if="newItemCategory === 'sentence' || newItemCategory === 'grammar'" id="new-item-text" v-model="newItemText" required lang="zh" rows="4"></textarea><input v-else id="new-item-text" v-model="newItemText" required :lang="newItemCategory === 'note' ? undefined : 'zh'" @change="requestMeaningSuggestion" />
-        <label for="new-item-meaning">{{ newItemCategory === 'word' ? 'Nghĩa gợi ý' : newItemCategory === 'grammar' ? 'Mô tả' : newItemCategory === 'note' ? 'Nội dung' : 'Nghĩa' }}</label><textarea v-if="newItemCategory === 'note' || newItemCategory === 'grammar'" id="new-item-meaning" v-model="newItemMeaning" required rows="5"></textarea><input v-else id="new-item-meaning" v-model="newItemMeaning" required @input="newItemMeaningUserEdited = true" />
-        <p v-if="newItemCategory === 'word' && newItemSuggestionBusy" class="form-hint" role="status">Đang gợi ý nghĩa…</p>
-        <p v-if="newItemSuggestionError" class="form-hint" role="status">{{ newItemSuggestionError }}</p>
-        <div v-if="newItemCategory === 'word' || newItemCategory === 'grammar'" class="example-editor"><h3>Câu ví dụ</h3><div v-for="(draft, index) in exampleDrafts" :key="index" class="linked-entry"><span>{{ exampleLabel(draft) }}</span><button type="button" :aria-label="`Bỏ câu ví dụ ${exampleLabel(draft)}`" @click="exampleDrafts.splice(index, 1)">Bỏ</button></div><label for="example-text">Câu mới</label><textarea id="example-text" v-model="exampleText" rows="2"></textarea><label for="example-meaning">Nghĩa câu mới</label><input id="example-meaning" v-model="exampleMeaning" /><button type="button" aria-label="Thêm câu mới" :disabled="!exampleText.trim() || !exampleMeaning.trim()" @click="addNewExample">Thêm câu mới</button><label for="example-existing">Câu đã lưu</label><select id="example-existing" v-model="exampleExisting"><option value="">Chọn câu</option><option v-for="entry in exampleCandidates" :key="entry.id" :value="entry.id">{{ entry.text }} · {{ folderById.get(entry.folder_id)?.name }}</option></select><button type="button" aria-label="Chọn câu đã lưu" :disabled="!exampleExisting" @click="addExistingExample">Chọn câu đã lưu</button></div>
+      <form @submit.prevent="submitNewItem">
+        <div class="new-item-header">
+          <span class="new-item-eyebrow">MỤC HỌC TẬP MỚI</span>
+          <h2>{{ newItemCategory === 'word' ? 'Thêm từ / cụm từ' : newItemCategory === 'sentence' ? 'Thêm câu' : newItemCategory === 'grammar' ? 'Thêm ngữ pháp' : 'Thêm ghi chú' }}</h2>
+          <p>Lưu vào <strong>{{ folderById.get(newItemFolderId)?.name }}</strong></p>
+        </div>
+        <div v-if="newItemCategory === 'word' || newItemCategory === 'grammar'" class="new-item-tabs" role="tablist" aria-label="Phần của mục học tập" @keydown="handleNewItemTabKey">
+          <button id="new-item-tab-main" type="button" role="tab" aria-label="Nội dung chính" aria-controls="new-item-panel-main" :aria-selected="newItemTab === 'main'" :tabindex="newItemTab === 'main' ? 0 : -1" @click="newItemTab = 'main'"><Pencil :size="16" aria-hidden="true" /><span class="new-item-tab-desktop">Nội dung chính</span><span class="new-item-tab-mobile">Nội dung</span></button>
+          <button id="new-item-tab-examples" type="button" role="tab" aria-controls="new-item-panel-examples" :aria-selected="newItemTab === 'examples'" :tabindex="newItemTab === 'examples' ? 0 : -1" @click="newItemTab = 'examples'"><BookOpen :size="16" aria-hidden="true" /><span>Câu ví dụ</span><span v-if="exampleDrafts.length" class="new-item-tab-count">{{ exampleDrafts.length }}</span></button>
+        </div>
+        <section v-if="newItemTab === 'main' || (newItemCategory !== 'word' && newItemCategory !== 'grammar')" id="new-item-panel-main" class="new-item-panel" :role="newItemCategory === 'word' || newItemCategory === 'grammar' ? 'tabpanel' : undefined" :aria-labelledby="newItemCategory === 'word' || newItemCategory === 'grammar' ? 'new-item-tab-main' : undefined">
+          <div v-if="newItemCategory === 'word' || newItemCategory === 'grammar'" class="new-item-panel-intro"><strong>{{ newItemCategory === 'word' ? 'Từ bạn muốn ghi nhớ' : 'Mẫu ngữ pháp cần lưu' }}</strong><span>{{ newItemCategory === 'word' ? 'Nhập từ và nghĩa để tra lại dễ dàng.' : 'Ghi cấu trúc và cách dùng bằng ngôn ngữ của bạn.' }}</span></div>
+          <label for="new-item-text">{{ newItemCategory === 'word' ? 'Từ / cụm từ' : newItemCategory === 'sentence' ? 'Câu' : newItemCategory === 'grammar' ? 'Cấu trúc' : 'Tiêu đề' }}</label>
+          <textarea v-if="newItemCategory === 'sentence' || newItemCategory === 'grammar'" id="new-item-text" v-model="newItemText" required lang="zh" rows="4"></textarea><input v-else id="new-item-text" v-model="newItemText" required :lang="newItemCategory === 'note' ? undefined : 'zh'" @change="requestMeaningSuggestion" />
+          <label for="new-item-meaning">{{ newItemCategory === 'word' ? 'Nghĩa gợi ý' : newItemCategory === 'grammar' ? 'Mô tả' : newItemCategory === 'note' ? 'Nội dung' : 'Nghĩa' }}</label>
+          <textarea v-if="newItemCategory === 'note' || newItemCategory === 'grammar'" id="new-item-meaning" v-model="newItemMeaning" required rows="5"></textarea><input v-else id="new-item-meaning" v-model="newItemMeaning" required @input="newItemMeaningUserEdited = true" />
+          <p v-if="newItemCategory === 'word' && newItemSuggestionBusy" class="form-hint" role="status">Đang gợi ý nghĩa…</p>
+          <p v-if="newItemSuggestionError" class="form-hint" role="status">{{ newItemSuggestionError }}</p>
+        </section>
+        <section v-if="(newItemCategory === 'word' || newItemCategory === 'grammar') && newItemTab === 'examples'" id="new-item-panel-examples" class="new-item-panel new-item-examples" role="tabpanel" aria-labelledby="new-item-tab-examples">
+          <div class="new-item-panel-intro"><strong>Học qua câu ví dụ</strong><span>Thêm câu mới hoặc chọn câu đã lưu. Bạn cũng có thể lưu mục này mà chưa thêm ví dụ.</span></div>
+          <div v-if="exampleDrafts.length" class="new-item-draft-list" aria-label="Câu ví dụ đã chọn"><div v-for="(draft, index) in exampleDrafts" :key="index" class="new-item-draft"><span class="new-item-draft-number">{{ index + 1 }}</span><span class="new-item-draft-text">{{ exampleLabel(draft) }}</span><button type="button" :aria-label="`Bỏ câu ví dụ ${exampleLabel(draft)}`" @click="exampleDrafts.splice(index, 1)">Bỏ</button></div></div>
+          <div v-else class="new-item-empty-examples">Chưa có câu ví dụ nào.</div>
+          <div class="new-item-example-block"><h3>Tạo câu mới</h3><label for="example-text">Câu tiếng Trung</label><textarea id="example-text" v-model="exampleText" rows="2"></textarea><label for="example-meaning">Nghĩa tiếng Việt</label><input id="example-meaning" v-model="exampleMeaning" /><button type="button" class="new-item-add-example" aria-label="Thêm câu mới" :disabled="!exampleText.trim() || !exampleMeaning.trim()" @click="addNewExample"><FolderPlus :size="16" aria-hidden="true" /> Thêm câu mới</button></div>
+          <div class="new-item-example-block"><h3>Dùng câu đã lưu</h3><label for="example-existing">Chọn câu trong thư viện</label><div class="new-item-existing-row"><select id="example-existing" v-model="exampleExisting"><option value="">Chọn câu đã lưu</option><option v-for="entry in exampleCandidates" :key="entry.id" :value="entry.id">{{ entry.text }} · {{ folderById.get(entry.folder_id)?.name }}</option></select><button type="button" aria-label="Chọn câu đã lưu" :disabled="!exampleExisting" @click="addExistingExample">Thêm</button></div></div>
+        </section>
         <p v-if="newItemError" class="form-error" role="alert">{{ newItemError }}</p>
-        <div class="dialog-actions"><button type="button" class="plain-button" @click="newItemEditor?.close()">Hủy</button><button type="submit" class="primary-button" :disabled="newItemBusy">{{ newItemBusy ? 'Đang lưu…' : 'Lưu' }}</button></div>
+        <div class="dialog-actions new-item-actions"><button type="button" class="plain-button" @click="newItemEditor?.close()">Hủy</button><button type="submit" class="primary-button" :disabled="newItemBusy">{{ newItemBusy ? 'Đang lưu…' : 'Lưu mục học tập' }}</button></div>
       </form>
     </dialog>
     <dialog ref="linkedItemsDialog" class="editor-dialog linked-items-dialog" aria-labelledby="linked-items-title" @click.self="closeLinkedItems" @close="linkedSourceId = null">

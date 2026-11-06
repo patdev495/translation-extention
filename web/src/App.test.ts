@@ -531,15 +531,39 @@ test('word form drafts multiple new and existing Example Sentences until save', 
   await page.findAll('[role="menuitem"]').find(button => button.text() === 'Từ / cụm từ')!.trigger('click');
   await page.get('#new-item-text').setValue('你');
   await page.get('#new-item-meaning').setValue('bạn');
+  await page.get('#new-item-tab-examples').trigger('click');
+  expect(page.get('#new-item-tab-examples').attributes('aria-selected')).toBe('true');
   await page.get('#example-text').setValue('你好吗？');
   await page.get('#example-meaning').setValue('Bạn khỏe không?');
   await page.get('button[aria-label="Thêm câu mới"]').trigger('click');
   await page.get('#example-existing').setValue('s1');
   await page.get('button[aria-label="Chọn câu đã lưu"]').trigger('click');
+  expect(page.get('.new-item-tab-count').text()).toBe('2');
+  await page.get('#new-item-tab-main').trigger('click');
+  expect((page.get('#new-item-text').element as HTMLInputElement).value).toBe('你');
+  await page.get('#new-item-tab-examples').trigger('click');
   expect(api.createItemWithExamples).not.toHaveBeenCalled();
   await page.get('.new-item-editor form').trigger('submit');
   await flushPromises();
   expect(api.createItemWithExamples).toHaveBeenCalledWith({ item: { folder_id: 'f1', category: 'word', text: '你', meaning: 'bạn' }, examples: [{ text: '你好吗？', meaning: 'Bạn khỏe không?' }, { item_id: 's1' }] });
+  page.unmount();
+});
+
+test('the two-tab form returns to missing main content before saving', async () => {
+  storedFolders = [{ id: 'f1', name: 'Words', parent_id: null }];
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+  await page.get('button[aria-label="Tùy chọn Words"]').trigger('click');
+  await page.findAll('[role="menuitem"]').find(button => button.text() === 'Thêm')!.trigger('click');
+  await page.findAll('[role="menuitem"]').find(button => button.text() === 'Từ / cụm từ')!.trigger('click');
+  expect(page.get('#new-item-tab-main').attributes('aria-selected')).toBe('true');
+  await page.get('#new-item-tab-main').trigger('keydown', { key: 'ArrowRight' });
+  expect(page.get('#new-item-tab-examples').attributes('aria-selected')).toBe('true');
+  await page.get('.new-item-editor form').trigger('submit');
+  await flushPromises();
+  expect(api.createItem).not.toHaveBeenCalled();
+  expect(page.get('#new-item-tab-main').attributes('aria-selected')).toBe('true');
+  expect(page.get('.new-item-editor [role="alert"]').text()).toContain('Nhập nội dung chính');
   page.unmount();
 });
 
@@ -555,6 +579,7 @@ test('learner creates Grammar without Pinyin and filters it in folder', async ()
   await page.get('button[aria-label="Tùy chọn HSK"]').trigger('click');
   await page.findAll('[role="menuitem"]').find(button => button.text() === 'Thêm')!.trigger('click');
   await page.findAll('[role="menuitem"]').find(button => button.text() === 'Ngữ pháp')!.trigger('click');
+  expect(page.get('.new-item-tabs').findAll('[role="tab"]')).toHaveLength(2);
   expect(page.get('#new-item-text').element.tagName).toBe('TEXTAREA');
   expect(page.get('#new-item-meaning').element.tagName).toBe('TEXTAREA');
   await page.get('#new-item-text').setValue('把 + đồ vật\n+ động từ');
