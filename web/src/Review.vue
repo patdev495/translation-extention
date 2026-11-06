@@ -1,10 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { learningApi, type LearningFolder, type RecallResult, type ReviewOverview, type ReviewSession } from './api';
+import ReviewFolderNode from './ReviewFolderNode.vue';
 
-defineProps<{ folders: LearningFolder[] }>();
+const props = defineProps<{ folders: LearningFolder[] }>();
 const emit = defineEmits<{ openItem: [id: string] }>();
 const scope = ref<string | null>(null);
+const scopePicker = ref<HTMLDetailsElement | null>(null);
+const rootFolders = computed(() => props.folders.filter(folder => !folder.parent_id || !props.folders.some(parent => parent.id === folder.parent_id)));
+const scopeName = computed(() => props.folders.find(folder => folder.id === scope.value)?.name ?? 'Toàn bộ thư viện');
+function selectScope(id: string | null): void {
+  scope.value = id;
+  if (scopePicker.value) scopePicker.value.open = false;
+}
 const kind = ref<'vocabulary' | 'grammar'>('vocabulary');
 const mode = ref<'meaning' | 'chinese' | 'pinyin'>('meaning');
 const overview = ref<ReviewOverview>({ entries: [], totals: { remembered: 0, not_yet: 0 } });
@@ -88,7 +96,7 @@ function previous(): void {
 function onKeydown(event: KeyboardEvent): void {
   if (event.code !== 'Space' || event.repeat || event.altKey || event.ctrlKey || event.metaKey || !session.value || !current.value) return;
   const target = event.target as HTMLElement | null;
-  if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+  if (target?.closest('input, textarea, select, .review-card, [contenteditable="true"]')) return;
   event.preventDefault();
   void next();
 }
@@ -102,22 +110,22 @@ const front = computed(() => {
   <section class="review-page" aria-label="Ôn tập">
     <header><h1>Ôn tập</h1><p>Ôn lại nội dung trong thư viện học tập.</p></header>
     <div class="review-controls">
-      <label>Phạm vi ôn tập <select v-model="scope" aria-label="Phạm vi ôn tập"><option :value="null">Toàn bộ thư viện</option><option v-for="folder in folders" :key="folder.id" :value="folder.id">{{ folder.name }}</option></select></label>
+      <div class="review-scope-control"><span>Phạm vi ôn tập</span><details ref="scopePicker" class="review-scope-picker"><summary aria-label="Phạm vi ôn tập">{{ scopeName }}</summary><div class="review-scope-menu"><button type="button" class="review-all-folders" :aria-current="scope === null ? 'true' : undefined" @click="selectScope(null)">Toàn bộ thư viện</button><ul class="review-scope-tree"><ReviewFolderNode v-for="folder in rootFolders" :key="folder.id" :folder="folder" :folders="folders" :selected="scope" @select="selectScope" /></ul></div></details></div>
       <label>Hoạt động <select v-model="kind" aria-label="Hoạt động ôn tập"><option value="vocabulary">Ôn từ vựng</option><option value="grammar">Ôn ngữ pháp</option></select></label>
       <label v-if="kind === 'vocabulary'">Mặt trước <select v-model="mode" aria-label="Mặt trước flashcard"><option value="meaning">Nghĩa tiếng Việt</option><option value="chinese">Chữ Trung</option><option value="pinyin">Pinyin</option></select></label>
       <button type="button" aria-label="Bắt đầu ôn tập" :disabled="busy" @click="start">{{ session ? 'Ôn lại' : 'Bắt đầu ôn tập' }}</button>
     </div>
     <p v-if="error" role="alert">{{ error }}</p>
-    <section class="review-statistics" aria-label="Thống kê ghi nhớ"><h2>Thống kê ghi nhớ</h2><p>Đã nhớ: {{ overview.totals.remembered }} · Chưa nhớ: {{ overview.totals.not_yet }}</p><ul><li v-for="entry in overview.entries" :key="entry.id">{{ entry.text }} — Đã nhớ: {{ entry.remembered }} · Chưa nhớ: {{ entry.not_yet }}</li></ul></section>
     <div v-if="kind === 'grammar' && session?.ineligible_count" class="review-missing"><p>{{ session.ineligible_count }} mục Ngữ pháp chưa có Câu ví dụ.</p><button v-for="id in session.ineligible_item_ids" :key="id" type="button" @click="emit('openItem', id)">Thêm Câu ví dụ cho {{ overview.entries.find(entry => entry.id === id)?.text ?? 'Ngữ pháp' }}</button></div>
     <section v-if="session && !session.questions.length" class="review-empty"><h2>Chưa có mục để ôn</h2><p>Chọn phạm vi khác hoặc thêm mục học tập.</p></section>
     <section v-else-if="session && complete" class="review-summary"><h2>Tóm tắt ôn tập</h2><p>Đã nhớ: {{ summary.remembered }} · Chưa nhớ: {{ summary.not_yet }}</p><button type="button" aria-label="Lùi" @click="previous">Lùi</button><button type="button" @click="start">Ôn lại</button></section>
     <section v-else-if="current" class="review-question">
       <p>{{ position + 1 }} / {{ session?.questions.length }}</p>
-      <template v-if="kind === 'vocabulary'"><div class="review-front">{{ front }}</div><button type="button" aria-label="Lật thẻ" @click="revealed = !revealed">{{ revealed ? 'Ẩn đáp án' : 'Lật thẻ' }}</button><div v-if="revealed" class="review-answer"><p v-if="mode !== 'meaning'">{{ current.items[0]?.meaning }}</p><p v-if="mode !== 'chinese'" lang="zh">{{ current.items[0]?.text }}</p><p v-if="mode !== 'pinyin'">{{ current.items[0]?.pinyin }}</p></div></template>
+      <template v-if="kind === 'vocabulary'"><div class="review-card-scene"><button type="button" class="review-card" :class="{ 'is-flipped': revealed }" aria-label="Lật thẻ" :aria-pressed="revealed" @click="revealed = !revealed"><span class="review-card-face review-card-face-front" :aria-hidden="revealed"><span class="review-card-eyebrow">MẶT TRƯỚC · CHẠM ĐỂ LẬT</span><span class="review-front">{{ front }}</span><span class="review-card-hint">↻ Lật thẻ xem đáp án</span></span><span class="review-card-face review-card-face-back" :aria-hidden="!revealed"><span class="review-card-eyebrow">MẶT SAU · CHẠM ĐỂ LẬT LẠI</span><span class="review-back"><span v-if="mode !== 'meaning'">{{ current.items[0]?.meaning }}</span><span v-if="mode !== 'chinese'" lang="zh">{{ current.items[0]?.text }}</span><span v-if="mode !== 'pinyin'">{{ current.items[0]?.pinyin }}</span></span><span class="review-card-hint">↻ Lật lại mặt trước</span></span></button></div></template>
       <template v-else><div class="review-front" lang="zh">{{ current.sentence?.text }}</div><button type="button" aria-label="Hiện Pinyin" @click="pinyinVisible = !pinyinVisible">{{ pinyinVisible ? 'Ẩn Pinyin' : 'Hiện Pinyin' }}</button><p v-if="pinyinVisible">{{ current.sentence?.pinyin }}</p><button type="button" aria-label="Xem đáp án" @click="revealed = true">Xem đáp án</button><div v-if="revealed" class="review-answer"><p>{{ current.sentence?.meaning }}</p><div v-for="entry in current.items" :key="entry.id"><strong>{{ entry.text }}</strong><p>{{ entry.meaning }}</p><p v-if="results[entry.id]" role="status">{{ results[entry.id] === 'remembered' ? 'Đã nhớ' : 'Chưa nhớ' }}</p><button type="button" :aria-label="`Chưa nhớ ${entry.text}`" :disabled="busy" @click="notYet(entry.id)">Chưa nhớ</button><button type="button" :aria-label="`Đã nhớ ${entry.text}`" :disabled="busy" @click="assess(entry.id, 'remembered')">Đã nhớ</button></div></div></template>
       <label>Ô nháp ôn tập <textarea v-model="scratchpads[position]" aria-label="Ô nháp ôn tập"></textarea></label>
       <div class="review-navigation"><button type="button" aria-label="Lùi" :disabled="position === 0 || busy" @click="previous">Lùi</button><button v-if="kind === 'vocabulary'" type="button" aria-label="Chưa nhớ" :disabled="busy" @click="notYet(current.item_ids[0]!)">Chưa nhớ</button><button type="button" aria-label="Tiếp" :disabled="busy" @click="next">Tiếp</button></div>
     </section>
+    <details class="review-statistics" aria-label="Thống kê ghi nhớ"><summary>Thống kê ghi nhớ <span>Đã nhớ {{ overview.totals.remembered }} · Chưa nhớ {{ overview.totals.not_yet }}</span></summary><ul><li v-for="entry in overview.entries" :key="entry.id">{{ entry.text }} — Đã nhớ: {{ entry.remembered }} · Chưa nhớ: {{ entry.not_yet }}</li></ul></details>
   </section>
 </template>

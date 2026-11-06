@@ -18,7 +18,7 @@ test('learner reviews vocabulary with flip, scratchpad, correction and summary',
   await page.get('button[aria-label="Bắt đầu ôn tập"]').trigger('click');
   await flushPromises();
   expect(page.text()).toContain('xin chào');
-  expect(page.text()).not.toContain('nǐ hǎo');
+  expect(page.get('.review-card-face-back').attributes('aria-hidden')).toBe('true');
   await page.get('textarea[aria-label="Ô nháp ôn tập"]').setValue('my answer');
   await page.get('button[aria-label="Lật thẻ"]').trigger('click');
   expect(page.text()).toContain('nǐ hǎo');
@@ -87,6 +87,8 @@ test('Space advances outside editable fields but types inside scratchpad', async
   expect(api.recordRecall).not.toHaveBeenCalled();
   (scratchpad.element as HTMLTextAreaElement).blur();
   page.get('button[aria-label="Lật thẻ"]').element.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', bubbles: true, cancelable: true }));
+  expect(api.recordRecall).not.toHaveBeenCalled();
+  document.body.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', bubbles: true, cancelable: true }));
   await flushPromises();
   expect(api.recordRecall).toHaveBeenCalledWith('space-session', 'one', 'remembered');
   page.unmount();
@@ -98,9 +100,12 @@ test('review scope and three flashcard prompt modes change visible front', async
   api.startReview.mockResolvedValue({ id: 'modes', kind: 'vocabulary', ineligible_count: 0, questions: [
     { sentence: null, item_ids: ['one'], items: [{ id: 'one', folder_id: 'child', category: 'word', text: '你好', meaning: 'xin chào', pinyin: 'nǐ hǎo', created_at: 1, linked_item_ids: [] }] },
   ] });
-  const page = mount(Review, { props: { folders: [{ id: 'root', name: 'HSK', parent_id: null }] }, attachTo: document.body });
+  const page = mount(Review, { props: { folders: [{ id: 'root', name: 'HSK', parent_id: null }, { id: 'child', name: 'HSK 1', parent_id: 'root' }] }, attachTo: document.body });
   await flushPromises();
-  await page.get('select[aria-label="Phạm vi ôn tập"]').setValue('root');
+  expect(page.get('.review-scope-tree').find('[data-folder-id="child"]').exists()).toBe(false);
+  await page.get('button[aria-label="Mở thư mục HSK"]').trigger('click');
+  expect(page.get('.review-scope-tree').find('[data-folder-id="child"]').exists()).toBe(true);
+  await page.get('[data-folder-id="root"]').trigger('click');
   await flushPromises();
   expect(api.reviewOverview).toHaveBeenCalledWith('root');
   await page.get('button[aria-label="Bắt đầu ôn tập"]').trigger('click');
@@ -111,5 +116,30 @@ test('review scope and three flashcard prompt modes change visible front', async
   expect(page.get('.review-front').text()).toBe('你好');
   await page.get('select[aria-label="Mặt trước flashcard"]').setValue('pinyin');
   expect(page.get('.review-front').text()).toBe('nǐ hǎo');
+  page.unmount();
+});
+
+test('flashcard is first in play area and flips in both directions by clicking the card', async () => {
+  const api = vi.mocked(learningApi);
+  api.reviewOverview.mockResolvedValue({ entries: [], totals: { remembered: 0, not_yet: 0 } });
+  api.startReview.mockResolvedValue({ id: 'flip', kind: 'vocabulary', ineligible_count: 0, questions: [
+    { sentence: null, item_ids: ['one'], items: [{ id: 'one', folder_id: 'f', category: 'word', text: '你好', meaning: 'xin chào', pinyin: 'nǐ hǎo', created_at: 1, linked_item_ids: [] }] },
+  ] });
+  const page = mount(Review, { props: { folders: [] }, attachTo: document.body });
+  await flushPromises();
+  await page.get('button[aria-label="Bắt đầu ôn tập"]').trigger('click');
+  await flushPromises();
+  expect(page.get('.review-question').element.compareDocumentPosition(page.get('.review-statistics').element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  const card = page.get('button[aria-label="Lật thẻ"]');
+  expect(card.attributes('aria-pressed')).toBe('false');
+  expect(page.get('.review-card-face-back').attributes('aria-hidden')).toBe('true');
+  await card.trigger('click');
+  expect(card.classes()).toContain('is-flipped');
+  expect(card.attributes('aria-pressed')).toBe('true');
+  expect(page.get('.review-card-face-back').attributes('aria-hidden')).toBe('false');
+  expect(page.get('.review-back').text()).toContain('你好');
+  await card.trigger('click');
+  expect(card.classes()).not.toContain('is-flipped');
+  expect(card.attributes('aria-pressed')).toBe('false');
   page.unmount();
 });
