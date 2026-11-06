@@ -93,6 +93,16 @@ function previous(): void {
   revealed.value = false;
   pinyinVisible.value = false;
 }
+function flipCard(): void {
+  if (window.getSelection()?.toString().trim()) return;
+  revealed.value = !revealed.value;
+}
+function onCardKeydown(event: KeyboardEvent): void {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  event.preventDefault();
+  event.stopPropagation();
+  revealed.value = !revealed.value;
+}
 function onKeydown(event: KeyboardEvent): void {
   if (event.code !== 'Space' || event.repeat || event.altKey || event.ctrlKey || event.metaKey || !session.value || !current.value) return;
   const target = event.target as HTMLElement | null;
@@ -121,7 +131,7 @@ const front = computed(() => {
     <section v-else-if="session && complete" class="review-summary"><h2>Tóm tắt ôn tập</h2><p>Đã nhớ: {{ summary.remembered }} · Chưa nhớ: {{ summary.not_yet }}</p><button type="button" aria-label="Lùi" @click="previous">Lùi</button><button type="button" @click="start">Ôn lại</button></section>
     <section v-else-if="current" class="review-question">
       <p>{{ position + 1 }} / {{ session?.questions.length }}</p>
-      <template v-if="kind === 'vocabulary'"><div class="review-card-scene"><button type="button" class="review-card" :class="{ 'is-flipped': revealed }" aria-label="Lật thẻ" :aria-pressed="revealed" @click="revealed = !revealed"><span class="review-card-face review-card-face-front" :aria-hidden="revealed"><span class="review-card-eyebrow">MẶT TRƯỚC · CHẠM ĐỂ LẬT</span><span class="review-front">{{ front }}</span><span class="review-card-hint">↻ Lật thẻ xem đáp án</span></span><span class="review-card-face review-card-face-back" :aria-hidden="!revealed"><span class="review-card-eyebrow">MẶT SAU · CHẠM ĐỂ LẬT LẠI</span><span class="review-back"><span v-if="mode !== 'meaning'">{{ current.items[0]?.meaning }}</span><span v-if="mode !== 'chinese'" lang="zh">{{ current.items[0]?.text }}</span><span v-if="mode !== 'pinyin'">{{ current.items[0]?.pinyin }}</span></span><span class="review-card-hint">↻ Lật lại mặt trước</span></span></button></div></template>
+      <template v-if="kind === 'vocabulary'"><div class="review-card-scene"><div class="review-card" :class="{ 'is-flipped': revealed }" role="button" tabindex="0" aria-label="Lật thẻ" :aria-pressed="revealed" @click="flipCard" @keydown="onCardKeydown"><span class="review-card-face review-card-face-front" :aria-hidden="revealed"><span class="review-card-eyebrow">MẶT TRƯỚC · CHẠM ĐỂ LẬT</span><span class="review-front">{{ front }}</span><span class="review-card-hint">↻ Lật thẻ xem đáp án</span></span><span class="review-card-face review-card-face-back" :aria-hidden="!revealed"><span class="review-card-eyebrow">MẶT SAU · CHẠM ĐỂ LẬT LẠI</span><span class="review-back"><span v-if="mode !== 'meaning'">{{ current.items[0]?.meaning }}</span><span v-if="mode !== 'chinese'" lang="zh">{{ current.items[0]?.text }}</span><span v-if="mode !== 'pinyin'">{{ current.items[0]?.pinyin }}</span></span><span class="review-card-hint">↻ Lật lại mặt trước</span></span></div></div></template>
       <template v-else><div class="review-front" lang="zh">{{ current.sentence?.text }}</div><button type="button" aria-label="Hiện Pinyin" @click="pinyinVisible = !pinyinVisible">{{ pinyinVisible ? 'Ẩn Pinyin' : 'Hiện Pinyin' }}</button><p v-if="pinyinVisible">{{ current.sentence?.pinyin }}</p><button type="button" aria-label="Xem đáp án" @click="revealed = true">Xem đáp án</button><div v-if="revealed" class="review-answer"><p>{{ current.sentence?.meaning }}</p><div v-for="entry in current.items" :key="entry.id"><strong>{{ entry.text }}</strong><p>{{ entry.meaning }}</p><p v-if="results[entry.id]" role="status">{{ results[entry.id] === 'remembered' ? 'Đã nhớ' : 'Chưa nhớ' }}</p><button type="button" :aria-label="`Chưa nhớ ${entry.text}`" :disabled="busy" @click="notYet(entry.id)">Chưa nhớ</button><button type="button" :aria-label="`Đã nhớ ${entry.text}`" :disabled="busy" @click="assess(entry.id, 'remembered')">Đã nhớ</button></div></div></template>
       <label>Ô nháp ôn tập <textarea v-model="scratchpads[position]" aria-label="Ô nháp ôn tập"></textarea></label>
       <div class="review-navigation"><button type="button" aria-label="Lùi" :disabled="position === 0 || busy" @click="previous">Lùi</button><button v-if="kind === 'vocabulary'" type="button" aria-label="Chưa nhớ" :disabled="busy" @click="notYet(current.item_ids[0]!)">Chưa nhớ</button><button type="button" aria-label="Tiếp" :disabled="busy" @click="next">Tiếp</button></div>
