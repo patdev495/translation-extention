@@ -118,6 +118,7 @@ function exampleLabel(draft: ExampleSentenceDraft): string {
 }
 const focusedItemId = ref<string | null>(null);
 const selectedId = ref<string | null>(null);
+const selectedItemIds = ref<Set<string>>(new Set());
 const expandedFolderIds = ref<Set<string>>(new Set());
 const categoryFilter = ref<'all' | SavedLearningItem['category']>('all');
 const cardFields = ref<CardFields>(savedCardFields());
@@ -167,6 +168,7 @@ async function loadFolders(): Promise<void> {
   try {
     folders.value = await learningApi.folders();
     items.value = await learningApi.items();
+    selectedItemIds.value = new Set([...selectedItemIds.value].filter(id => items.value.some(item => item.id === id && item.folder_id === selectedId.value)));
     if (selectedId.value && !folders.value.some((folder) => folder.id === selectedId.value)) {
       selectedId.value = null;
     }
@@ -380,6 +382,38 @@ function linkedKind(entry: SavedLearningItem): string {
 const filteredItems = computed(() => categoryFilter.value === 'all'
   ? visibleItems.value
   : visibleItems.value.filter(item => item.category === categoryFilter.value));
+const allFilteredSelected = computed(() => filteredItems.value.length > 0 && filteredItems.value.every(item => selectedItemIds.value.has(item.id)));
+function toggleItemSelection(itemId: string): void {
+  const next = new Set(selectedItemIds.value);
+  if (next.has(itemId)) next.delete(itemId);
+  else next.add(itemId);
+  selectedItemIds.value = next;
+}
+function toggleFilteredSelection(): void {
+  const next = new Set(selectedItemIds.value);
+  for (const item of filteredItems.value) {
+    if (allFilteredSelected.value) next.delete(item.id);
+    else next.add(item.id);
+  }
+  selectedItemIds.value = next;
+}
+function trashSelectedItems(): void {
+  const folderId = selectedId.value;
+  const itemIds = [...selectedItemIds.value];
+  if (!folderId || !itemIds.length) return;
+  askToDelete(`Chuyển ${itemIds.length} mục đã chọn trong thư mục này vào thùng rác?`, async () => {
+    await learningApi.trashFolderItems(folderId, itemIds);
+    selectedItemIds.value = new Set();
+  }, 'Đã chuyển các mục đã chọn vào thùng rác.');
+}
+function trashAllFolderItems(): void {
+  const folderId = selectedId.value;
+  if (!folderId || !visibleItems.value.length) return;
+  askToDelete(`Chuyển toàn bộ ${visibleItems.value.length} mục trực tiếp trong thư mục này vào thùng rác? Thư mục con được giữ nguyên.`, async () => {
+    await learningApi.trashFolderItems(folderId);
+    selectedItemIds.value = new Set();
+  }, 'Đã dọn sạch mục học tập trong thư mục.');
+}
 const sortedItems = computed(() => [...filteredItems.value].sort((a, b) => {
   const difference = sortOrder.value === 'newest' ? b.created_at - a.created_at : a.created_at - b.created_at;
   return difference || a.id.localeCompare(b.id);
@@ -387,7 +421,7 @@ const sortedItems = computed(() => [...filteredItems.value].sort((a, b) => {
 const pageCount = computed(() => Math.max(1, Math.ceil(sortedItems.value.length / PAGE_SIZE)));
 const currentPage = computed(() => Math.min(page.value, pageCount.value));
 const pagedItems = computed(() => sortedItems.value.slice((currentPage.value - 1) * PAGE_SIZE, currentPage.value * PAGE_SIZE));
-watch(selectedId, () => { page.value = 1; categoryFilter.value = 'all'; }, { flush: 'sync' });
+watch(selectedId, () => { page.value = 1; categoryFilter.value = 'all'; selectedItemIds.value = new Set(); }, { flush: 'sync' });
 watch([sortOrder, categoryFilter], () => { page.value = 1; }, { flush: 'sync' });
 
 interface FolderStats { words: number; sentences: number }
@@ -815,11 +849,12 @@ async function submitEditor(): Promise<void> {
         </section>
         <section class="saved-items" aria-labelledby="saved-items-title">
           <div class="saved-items-heading"><h2 id="saved-items-title">Mục học tập <small>({{ filteredItems.length }})</small></h2><div class="saved-items-filters"><label class="sort-control">Loại <select v-model="categoryFilter" aria-label="Lọc mục học tập"><option value="all">Tất cả</option><option value="word">Từ / cụm từ</option><option value="sentence">Câu</option><option value="grammar">Ngữ pháp</option><option value="note">Ghi chú</option></select></label><details ref="displayOptions" class="display-options"><summary>Hiển thị <ChevronRight :size="14" aria-hidden="true" /></summary><div class="display-options-panel" role="group" aria-label="Trường hiển thị trên thẻ"><label><input v-model="cardFields.vietnamese" type="checkbox" aria-label="Hiển thị tiếng Việt" /> Tiếng Việt</label><label><input v-model="cardFields.chinese" type="checkbox" aria-label="Hiển thị tiếng Trung" /> Tiếng Trung</label><label><input v-model="cardFields.pinyin" type="checkbox" aria-label="Hiển thị Pinyin" /> Pinyin</label></div></details><label class="sort-control">Sắp xếp <select v-model="sortOrder" aria-label="Sắp xếp mục học tập"><option value="newest">Mới thêm</option><option value="oldest">Cũ trước</option></select></label></div></div>
+          <div v-if="selectedId && visibleItems.length" class="saved-items-bulk"><label><input type="checkbox" aria-label="Chọn tất cả mục đang lọc" :checked="allFilteredSelected" :disabled="!filteredItems.length" @change="toggleFilteredSelection" /> Chọn tất cả đang lọc</label><span>{{ selectedItemIds.size }} đã chọn</span><button type="button" class="danger-button" aria-label="Xóa mục đã chọn" :disabled="!selectedItemIds.size || trashBusy" @click="trashSelectedItems">Xóa mục đã chọn</button><button type="button" class="danger-button" aria-label="Dọn sạch thư mục" :disabled="trashBusy" @click="trashAllFolderItems">Dọn sạch thư mục</button></div>
           <p v-if="visibleItems.length === 0" class="saved-items-empty">Chưa có mục học tập trong vị trí này. Chọn Thêm trong menu thư mục hoặc lưu chữ Trung từ Translation Tooltip.</p>
           <p v-else-if="filteredItems.length === 0" class="saved-items-empty">Không có mục thuộc loại này trong thư mục.</p>
           <div v-else class="saved-items-list">
-            <article v-for="(item, index) in pagedItems" :id="`learning-item-${item.id}`" :key="item.id" class="saved-item-row" :class="{ focused: focusedItemId === item.id }" :aria-label="`Mục học tập số ${(currentPage - 1) * PAGE_SIZE + index + 1}`" tabindex="-1">
-              <span class="saved-item-number">{{ (currentPage - 1) * PAGE_SIZE + index + 1 }}</span>
+            <article v-for="(item, index) in pagedItems" :id="`learning-item-${item.id}`" :key="item.id" class="saved-item-row" :class="{ focused: focusedItemId === item.id, selected: selectedItemIds.has(item.id) }" :aria-label="`Mục học tập số ${(currentPage - 1) * PAGE_SIZE + index + 1}`" tabindex="-1">
+              <input v-if="selectedId" type="checkbox" class="saved-item-select" :aria-label="`Chọn ${item.text}`" :checked="selectedItemIds.has(item.id)" @change="toggleItemSelection(item.id)" /><span v-else class="saved-item-number">{{ (currentPage - 1) * PAGE_SIZE + index + 1 }}</span>
               <div class="saved-item-body"><div class="saved-item-title"><h3 v-if="cardFields.chinese || item.category === 'note'" :lang="item.category === 'note' ? undefined : 'zh'" :class="{ 'multiline-content': item.category === 'grammar' }">{{ item.text }}</h3><span class="saved-item-category">{{ item.category === 'word' ? 'Từ / cụm từ' : item.category === 'sentence' ? 'Câu' : item.category === 'grammar' ? 'Ngữ pháp' : 'Ghi chú' }}</span></div><p v-if="cardFields.pinyin && item.pinyin && (item.category === 'word' || item.category === 'sentence')" class="saved-item-pinyin">{{ item.pinyin }}</p><p v-if="cardFields.vietnamese || item.category === 'note'" class="saved-item-meaning" :class="{ 'note-body': item.category === 'note', 'multiline-content': item.category === 'grammar' }">{{ item.meaning }}</p></div>
               <div class="saved-item-meta"><time :datetime="new Date(item.created_at < 100_000_000_000 ? item.created_at * 1000 : item.created_at).toISOString()">{{ formatAddedAt(item.created_at) }}</time><div class="saved-item-controls"><button v-if="item.linked_item_ids.length" type="button" class="linked-open-button" :aria-label="`Xem ${item.linked_item_ids.length} ${linkedKind(item)} liên kết của ${item.text}`" :title="`Xem ${item.linked_item_ids.length} mục liên kết`" @click="openLinkedItems(item)"><Link2 :size="16" aria-hidden="true" /><span>{{ item.linked_item_ids.length }}</span></button><button type="button" :aria-label="`Sửa ${item.text}`" @click="openItemEditor(item)"><Pencil :size="16" aria-hidden="true" /></button><button type="button" :aria-label="`Xóa ${item.text}`" @click="askToDelete(`Chuyển “${item.text}” vào thùng rác?`, () => learningApi.trashItem(item.id), 'Đã chuyển mục học tập vào thùng rác.')"><Trash2 :size="16" aria-hidden="true" /></button></div></div>
             </article>

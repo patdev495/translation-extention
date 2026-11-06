@@ -12,7 +12,7 @@ vi.mock('./api', async (importOriginal) => {
       me: vi.fn(), register: vi.fn(), login: vi.fn(), logout: vi.fn(),
       approveLink: vi.fn(), folders: vi.fn(), createFolder: vi.fn(), updateFolder: vi.fn(), items: vi.fn(), createItem: vi.fn(), suggestMeaning: vi.fn(), updateItem: vi.fn(),
       addItemLink: vi.fn(), removeItemLink: vi.fn(), createItemWithExamples: vi.fn(), updateItemWithExamples: vi.fn(),
-      trash: vi.fn(), trashItem: vi.fn(), trashFolder: vi.fn(), restoreItem: vi.fn(), restoreFolder: vi.fn(),
+      trash: vi.fn(), trashItem: vi.fn(), trashFolderItems: vi.fn(), trashFolder: vi.fn(), restoreItem: vi.fn(), restoreFolder: vi.fn(),
       permanentlyDeleteItem: vi.fn(), permanentlyDeleteFolder: vi.fn(), emptyTrash: vi.fn(),
     },
   };
@@ -80,6 +80,38 @@ test('learner deletes item, finds it in Trash, and restores it', async () => {
   await flushPromises();
   expect(api.restoreItem).toHaveBeenCalledWith('w1');
   expect(page.text()).toContain('Đã khôi phục');
+  page.unmount();
+});
+
+test('folder selection deletes checked items, then clears remaining direct items only', async () => {
+  storedFolders = [{ id: 'f1', name: 'HSK', parent_id: null }, { id: 'child', name: 'Bài 1', parent_id: 'f1' }];
+  storedItems = [
+    { id: 'w1', folder_id: 'f1', category: 'word', text: '学习', meaning: 'học', pinyin: '', created_at: 1700000000000, linked_item_ids: [] },
+    { id: 'w2', folder_id: 'f1', category: 'word', text: '你好', meaning: 'chào', pinyin: '', created_at: 1700000000001, linked_item_ids: [] },
+    { id: 'child-word', folder_id: 'child', category: 'word', text: '中文', meaning: 'Trung văn', pinyin: '', created_at: 1700000000002, linked_item_ids: [] },
+  ];
+  api.trashFolderItems.mockImplementation(async (folderId, itemIds) => {
+    const removed = storedItems.filter(item => item.folder_id === folderId && (!itemIds || itemIds.includes(item.id)));
+    storedItems = storedItems.filter(item => !removed.includes(item));
+    storedTrash.push(...removed.map(item => ({ id: item.id, kind: 'item' as const, name: item.text, category: item.category, folder_id: item.folder_id })));
+    return { count: removed.length };
+  });
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+  await page.get('nav[aria-label="Cây thư mục"] .tree-row:nth-child(2) .tree-button').trigger('click');
+  await page.get('input[aria-label="Chọn 学习"]').setValue(true);
+  await page.get('button[aria-label="Xóa mục đã chọn"]').trigger('click');
+  expect(api.trashFolderItems).not.toHaveBeenCalled();
+  await page.get('.confirm-dialog button[type="submit"]').trigger('click');
+  await flushPromises();
+  expect(api.trashFolderItems).toHaveBeenCalledWith('f1', ['w1']);
+  expect(page.find('input[aria-label="Chọn 你好"]').exists()).toBe(true);
+  await page.get('button[aria-label="Dọn sạch thư mục"]').trigger('click');
+  await page.get('.confirm-dialog button[type="submit"]').trigger('click');
+  await flushPromises();
+  expect(api.trashFolderItems).toHaveBeenLastCalledWith('f1');
+  expect(storedItems.map(item => item.id)).toEqual(['child-word']);
+  expect(storedFolders).toHaveLength(2);
   page.unmount();
 });
 

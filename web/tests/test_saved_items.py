@@ -53,6 +53,29 @@ def test_learner_creates_word_on_website_and_reads_it_back(tmp_path: Path) -> No
         assert any(item["id"] == created.json()["id"] for item in browser.get("/api/items").json())
 
 
+def test_bulk_trash_only_removes_chosen_items_or_all_direct_items_in_owned_folder(tmp_path: Path) -> None:
+    app = create_app(tmp_path / "bulk-trash.sqlite3")
+    with TestClient(app) as alice, TestClient(app) as bob:
+        register(alice, "alice")
+        register(bob, "bob")
+        folder = alice.post("/api/folders", json={"name": "HSK"}, headers=ORIGIN).json()["id"]
+        child = alice.post("/api/folders", json={"name": "Child", "parent_id": folder}, headers=ORIGIN).json()["id"]
+        def create(folder_id: str, text: str) -> str:
+            return alice.post("/api/items", json={"folder_id": folder_id, "category": "word", "text": text, "meaning": text}, headers=ORIGIN).json()["id"]
+        first, second, nested = create(folder, "学习"), create(folder, "朋友"), create(child, "你好")
+        endpoint = f"/api/folders/{folder}/trash-items"
+        assert bob.post(endpoint, json={"item_ids": [first]}, headers=ORIGIN).status_code == 404
+        assert alice.post(endpoint, json={"item_ids": [first, nested]}, headers=ORIGIN).status_code == 404
+        assert {item["id"] for item in alice.get("/api/items").json()} == {first, second, nested}
+        selected = alice.post(endpoint, json={"item_ids": [first]}, headers=ORIGIN)
+        assert selected.status_code == 200 and selected.json() == {"count": 1}
+        all_direct = alice.post(endpoint, json={}, headers=ORIGIN)
+        assert all_direct.status_code == 200 and all_direct.json() == {"count": 1}
+        assert {item["id"] for item in alice.get("/api/items").json()} == {nested}
+        assert {item["id"] for item in alice.get("/api/trash").json() if item["kind"] == "item"} == {first, second}
+        assert alice.post(endpoint, json={}).status_code == 403
+
+
 def test_web_word_creation_enforces_folder_ownership_and_duplicate_scope(tmp_path: Path) -> None:
     app = create_app(tmp_path / "web-word-rules.sqlite3")
     with TestClient(app) as alice, TestClient(app) as bob:

@@ -371,10 +371,11 @@ export class TranslationTooltip {
       if (eventElements.some(node => node.matches('input, textarea, [contenteditable="true"]')
         || node instanceof HTMLElement && node.isContentEditable)) return;
       if (event.ctrlKey || event.altKey || event.metaKey) return;
-      if (event.key.toLowerCase() === 'x' && !event.repeat && this.tooltipEl.querySelector('.tt-save-panel')) {
+      if (event.key.toLowerCase() === 'x' && !event.repeat) {
         event.preventDefault();
         event.stopImmediatePropagation();
-        this.closeSavePanel();
+        if (this.tooltipEl.querySelector('.tt-save-panel')) this.closeSavePanel();
+        else this.hide();
         return;
       }
       if (eventElements.some(node => node.matches('select'))

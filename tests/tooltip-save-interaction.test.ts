@@ -124,6 +124,8 @@ test('x closes Save Choice Menu and save form back to original Translation Toolt
   expect(root.querySelector('.tt-save-panel')).toBeNull();
   expect(root.querySelector('.tt-source-text')?.textContent).toBe('你好');
   expect(sendMessage.mock.calls.some(([message]) => message.type === 'LEARNING_SAVE')).toBe(false);
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'x', bubbles: true }));
+  expect((root.querySelector('#tooltip') as HTMLElement).style.display).toBe('none');
 });
 
 test('s submits ready save form and announces success without reopening choices', async () => {

@@ -220,6 +220,10 @@ class RecallInput(BaseModel):
     result: Literal["remembered", "not_yet"]
 
 
+class BulkTrashInput(BaseModel):
+    item_ids: list[str] | None = None
+
+
 def create_app(database_path: Path | None = None) -> FastAPI:
     db_path = database_path or Path(os.getenv("POLY_LEARNING_DB", "web/data/learning.sqlite3"))
     web_origin = os.getenv("POLY_WEB_ORIGIN", "http://127.0.0.1:5173").rstrip("/")
@@ -734,6 +738,30 @@ def create_app(database_path: Path | None = None) -> FastAPI:
             )
             if changed.rowcount != 1:
                 raise HTTPException(status_code=404, detail="Saved Learning Item not found")
+
+    @app.post("/api/folders/{folder_id}/trash-items", dependencies=[Depends(require_browser_origin)])
+    def trash_folder_items(folder_id: str, body: BulkTrashInput, account: Account = Depends(web_account)) -> dict[str, int]:
+        with connect(db_path) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            folder = connection.execute(
+                "SELECT id FROM folders WHERE id = ? AND user_id = ? AND deleted_at IS NULL", (folder_id, account.id),
+            ).fetchone()
+            if folder is None:
+                raise HTTPException(status_code=404, detail="Folder not found")
+            owned = connection.execute(
+                "SELECT id FROM learning_items WHERE folder_id = ? AND user_id = ? AND deleted_at IS NULL",
+                (folder_id, account.id),
+            ).fetchall()
+            owned_ids = {str(row["id"]) for row in owned}
+            selected_ids = owned_ids if body.item_ids is None else set(body.item_ids)
+            if not selected_ids.issubset(owned_ids):
+                raise HTTPException(status_code=404, detail="Saved Learning Item not found")
+            timestamp = _now()
+            connection.executemany(
+                "UPDATE learning_items SET deleted_at = ? WHERE id = ? AND user_id = ? AND folder_id = ? AND deleted_at IS NULL",
+                [(timestamp, item_id, account.id, folder_id) for item_id in selected_ids],
+            )
+            return {"count": len(selected_ids)}
 
     @app.get("/api/trash", response_model=list[TrashEntry])
     def list_trash(account: Account = Depends(web_account)) -> list[TrashEntry]:
