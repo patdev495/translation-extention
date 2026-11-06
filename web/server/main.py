@@ -668,7 +668,7 @@ def create_app(database_path: Path | None = None) -> FastAPI:
                 folder_id = _new_id()
                 connection.execute(
                     "INSERT INTO folders (id, user_id, parent_id, name, name_key, created_at) VALUES (?, ?, NULL, ?, ?, ?)",
-                    (folder_id, user_id, name, name.casefold(), _now()),
+                    (folder_id, user_id, name, name.casefold(), _now_ms()),
                 )
                 return folder_id
             collision = connection.execute(
@@ -761,7 +761,7 @@ def create_app(database_path: Path | None = None) -> FastAPI:
     def list_folders(account: Account = Depends(web_account)) -> list[Folder]:
         with connect(db_path) as connection:
             rows = connection.execute(
-                "SELECT id, name, parent_id FROM folders WHERE user_id = ? AND deleted_at IS NULL ORDER BY name_key, id",
+                "SELECT id, name, parent_id FROM folders WHERE user_id = ? AND deleted_at IS NULL ORDER BY created_at, rowid",
                 (account.id,),
             ).fetchall()
         return [_folder(row) for row in rows]
@@ -775,7 +775,7 @@ def create_app(database_path: Path | None = None) -> FastAPI:
                 connection.execute(
                     """INSERT INTO folders (id, user_id, parent_id, name, name_key, created_at)
                        VALUES (?, ?, ?, ?, ?, ?)""",
-                    (folder_id, account.id, body.parent_id, body.name, body.name.casefold(), _now()),
+                    (folder_id, account.id, body.parent_id, body.name, body.name.casefold(), _now_ms()),
                 )
             except sqlite3.IntegrityError as error:
                 raise HTTPException(status_code=409, detail="Folder name already used here") from error

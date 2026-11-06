@@ -93,7 +93,7 @@ test('one folder confirmation moves the selected folder to Trash', async () => {
   await flushPromises();
 
   await page.get('button[aria-label="Tùy chọn HSK 1"]').trigger('click');
-  await page.get('[role="menu"] button:last-child').trigger('click');
+  await page.get('.folder-context-menu > button:last-child').trigger('click');
   expect(api.trashFolder).not.toHaveBeenCalled();
   expect(page.find('[role="menu"]').exists()).toBe(false);
   expect(page.get('.confirm-dialog').text()).toContain('HSK 1');
@@ -278,6 +278,39 @@ test('folder arrow follows name so sibling folder icons start at same position',
   expect(parent.element.children[2]?.classList.contains('tree-chevron')).toBe(true);
   expect(leaf.element.children[0]?.classList.contains('lucide-folder')).toBe(true);
   expect(leaf.element.children[1]?.textContent).toBe('HSK-2');
+  page.unmount();
+});
+
+test('folder options open on ellipsis hover and Add reveals a separate submenu', async () => {
+  storedFolders = [{ id: 'f1', name: 'HSK', parent_id: null }];
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+  const options = page.get('button[aria-label="Tùy chọn HSK"]');
+  await options.trigger('mouseenter');
+  await flushPromises();
+  expect(page.get('.folder-context-menu').text()).toContain('Đổi tên');
+  const add = page.findAll('[role="menuitem"]').find(button => button.text() === 'Thêm')!;
+  expect(add.attributes('aria-haspopup')).toBe('menu');
+  expect(add.find('.folder-submenu-indicator').exists()).toBe(true);
+  await page.get('.folder-submenu-anchor').trigger('mouseenter');
+  expect(page.get('.folder-submenu').text()).toContain('Từ / cụm từ');
+  expect(page.get('.folder-context-menu > button:last-child').text()).toContain('Xóa thư mục');
+  page.unmount();
+});
+
+test('older folders remain above newly created siblings in both folder views', async () => {
+  storedFolders = [{ id: 'older', name: 'Zebra', parent_id: null }];
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+  await page.get('button[aria-label="Tùy chọn Thư viện"]').trigger('click');
+  await page.get('.folder-context-menu > button').trigger('click');
+  await page.get('#folder-name').setValue('Alpha');
+  await page.get('dialog form').trigger('submit');
+  await flushPromises();
+  expect(page.get('nav[aria-label="Cây thư mục"]').findAll('.tree-row').slice(1).map(row => row.text()))
+    .toEqual(['Zebra', 'Alpha']);
+  await page.get('nav[aria-label="Cây thư mục"] .tree-button').trigger('click');
+  expect(page.findAll('.child-folder-card').map(card => card.text())).toEqual(['Zebra', 'Alpha']);
   page.unmount();
 });
 
@@ -522,11 +555,18 @@ test('learner creates Grammar without Pinyin and filters it in folder', async ()
   await page.get('button[aria-label="Tùy chọn HSK"]').trigger('click');
   await page.findAll('[role="menuitem"]').find(button => button.text() === 'Thêm')!.trigger('click');
   await page.findAll('[role="menuitem"]').find(button => button.text() === 'Ngữ pháp')!.trigger('click');
-  await page.get('#new-item-text').setValue('把 + đồ vật');
-  await page.get('#new-item-meaning').setValue('Chuyển đồ vật');
+  expect(page.get('#new-item-text').element.tagName).toBe('TEXTAREA');
+  expect(page.get('#new-item-meaning').element.tagName).toBe('TEXTAREA');
+  await page.get('#new-item-text').setValue('把 + đồ vật\n+ động từ');
+  await page.get('#new-item-meaning').setValue('Chuyển đồ vật\nNhấn mạnh kết quả');
   await page.get('.new-item-editor form').trigger('submit');
   await flushPromises();
+  expect(api.createItem).toHaveBeenCalledWith({ folder_id: 'f1', category: 'grammar', text: '把 + đồ vật\n+ động từ', meaning: 'Chuyển đồ vật\nNhấn mạnh kết quả' });
   expect(page.get('#learning-item-g1').text()).toContain('把 + đồ vật');
+  expect(page.get('#learning-item-g1').get('.multiline-content').element.textContent).toContain('\n');
+  await page.findAll('button').find(button => button.attributes('aria-label') === 'Sửa 把 + đồ vật\n+ động từ')!.trigger('click');
+  expect(page.get('#item-text').element.tagName).toBe('TEXTAREA');
+  expect(page.get('#item-meaning').element.tagName).toBe('TEXTAREA');
   expect(page.get('#learning-item-g1').find('.saved-item-pinyin').exists()).toBe(false);
   expect(page.get('.breadcrumb-count').text()).toContain('0 từ · 0 câu');
   await page.get('select[aria-label="Lọc mục học tập"]').setValue('grammar');
