@@ -21,8 +21,8 @@ Mỗi lát cắt: viết một test hành vi, chạy đỏ, triển khai tối t
 - [x] Giao diện iPhone: vùng chạm rõ, thẻ cuộn được, bộ chọn bài thu gọn, nút nghe/thu/đánh giá dễ chạm, không tràn ngang.
 - [x] Kiểm chứng tích hợp trên trình duyệt, hồi quy API/web/extension, build.
 - [x] Review diff và đối chiếu toàn bộ tiêu chí PRD.
-- [ ] Commit chỉ thay đổi thuộc tính năng, push nhánh codex/mobile-flashcard-practice.
-- [ ] Backup production đã kiểm tra, deploy đúng commit, kiểm tra health và luồng thật, ghi bằng chứng phát hành.
+- [x] Commit chỉ thay đổi thuộc tính năng, push nhánh codex/mobile-flashcard-practice.
+- [x] Backup production đã kiểm tra, deploy đúng commit, kiểm tra health và luồng thật, ghi bằng chứng phát hành.
 
 ## Thiết kế triển khai
 
@@ -57,4 +57,7 @@ Mỗi lát cắt: viết một test hành vi, chạy đỏ, triển khai tối t
 - Browser: 6 tests qua trên WebKit ở kích thước iPhone và Chromium ở kích thước điện thoại, gồm nội dung dài, thu/nghe theo thẻ, chuyển nền, mở lại và kết thúc buổi. Thu/encode/playback native chạy trên Chromium; WebKit Windows dùng double tại ranh giới thiết bị.
 - Review bàn phím: test đỏ vì Space trên nút thu âm đồng thời chuyển thẻ; xử lý shortcut được giới hạn ngoài các điều khiển tương tác.
 - Kiểm chứng cuối sau sửa bàn phím: 53 web tests và 6 browser tests qua; web build kèm vue-tsc qua; TypeScript của extension qua. API 44 tests và extension 153 tests đã qua, không có thay đổi source API/extension sau các lượt đó.
+- Code commit 9e8a0180cfd121595d8c22507a93f34ef4bf5275 đã push và deploy lên learning.peebot.shop. Backup SQLite quick_check qua trước triển khai; giữ image/source trước phát hành để rollback.
+- Production smoke qua trên HTTPS với tài khoản kiểm thử riêng: Word or Phrase và Sentence, đánh giá, thu/encode/phát native bằng micro giả trình duyệt, resume sau tải lại, kết thúc buổi. Đã xóa đúng tài khoản kiểm thử cùng dữ liệu thuộc tài khoản đó.
+- Hash hai file backend trong container khớp commit; JS/CSS production khớp từng byte với bản build local đã chạy browser tests. Xem RELEASE.md.
 - Kiểm tra media native dùng Chromium với thiết bị micro giả của trình duyệt. WebKit Windows dùng double tại seam thiết bị do không có MediaRecorder/mediaDevices/AudioContext; không tuyên bố đã thử phần cứng iPhone thật.

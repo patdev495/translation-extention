@@ -47,6 +47,8 @@ npm run test:e2e
 
 Tests chạy bản build production, không dùng dữ liệu học thật. WebKit trên Windows không cung cấp các API media nên luồng media ở đó dùng test double tại ranh giới thiết bị; Chromium kiểm tra thu, encode và playback native với thiết bị micro giả của trình duyệt. Kiểm tra này không thay thế việc thử micro/loa trên iPhone thật.
 
+`e2e/production-smoke.mjs` là kiểm tra site thật chỉ chạy khi được yêu cầu rõ ràng, không được thu thập bởi các lệnh test trên. Script cần URL production và thư mục lưu kết quả, tạo tài khoản kiểm thử riêng và ghi ID tài khoản vào report; phải dọn đúng tài khoản kiểm thử này sau khi chạy. Script không ghi mật khẩu hoặc cookie vào report.
+
 ## Production trên VPS
 
 Stack ở `deploy/learning/compose.yml`: Vue được build thành static site trong Nginx, FastAPI chỉ nằm trong mạng Compose, và host chỉ bind frontend vào `127.0.0.1:8070`. Nginx của VPS dùng `deploy/learning/host-nginx.conf` để phục vụ `https://learning.peebot.shop`. File SQLite nằm ở `/var/lib/polytranslate-learning/learning.sqlite3`, tách khỏi container.
