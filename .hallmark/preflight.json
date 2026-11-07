@@ -1,0 +1,14 @@
+{
+  "scanned": "2026-10-27",
+  "findings": {
+    "fonts": "Inter in popup/index.html:9 and src/content/tooltip.ts:16; system font in PDF viewer",
+    "palette": "dark teal popup and tooltip; separate dark blue PDF viewer",
+    "motion": "CSS transitions, no motion library",
+    "spacing": "mixed compact values; 540px fixed popup",
+    "framework": "Vite, TypeScript, Tailwind v4",
+    "product": "Chrome translation extension, popup, PDF viewer, Shadow DOM tooltip and OCR panels"
+  },
+  "preserve": ["PolyTranslate", "all settings and values", "routes and handlers", "translation and OCR logic"],
+  "introduce": ["Coral light app theme", "shared tokens", "native accessible controls", "consistent reading surfaces"],
+  "authorization": "User requests replacement of all existing UI, compact, light and modern."
+}
