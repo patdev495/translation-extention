@@ -1,4 +1,5 @@
 import { SettingsManager } from '../src/services/settings';
+import { initializeSettingsTabs } from './tabs';
 import type { TargetLanguage } from '../src/services/translation-plan';
 import { shortcutConflictsWithOcr, shortcutFromKeyboardEvent } from '../src/content/input-replacement-shortcut';
 import {
@@ -16,6 +17,8 @@ const reverseLang = document.getElementById('reverse-lang') as HTMLSelectElement
 const inputReplacementEnabled = document.getElementById('input-replacement-enabled') as HTMLInputElement;
 const inputReplacementShortcut = document.getElementById('input-replacement-shortcut') as HTMLInputElement;
 const inputReplacementError = document.getElementById('input-replacement-error') as HTMLParagraphElement;
+const languagesError = document.getElementById('languages-error') as HTMLParagraphElement;
+const ocrShortcutError = document.getElementById('ocr-shortcut-error') as HTMLParagraphElement;
 const ocrShortcut = document.getElementById('ocr-shortcut') as HTMLSelectElement;
 const ocrModelTier = document.getElementById('ocr-model-tier') as HTMLSelectElement;
 const ocrLanguage = document.getElementById('ocr-language') as HTMLSelectElement;
@@ -157,6 +160,16 @@ function showInputShortcutError(message: string): void {
   inputReplacementShortcut.setAttribute('aria-invalid', String(Boolean(message)));
 }
 
+function showOcrShortcutError(message: string): void {
+  ocrShortcutError.textContent = message;
+  ocrShortcutError.classList.toggle('visible', Boolean(message));
+}
+
+function showLanguagesError(message: string): void {
+  languagesError.textContent = message;
+  languagesError.classList.toggle('visible', Boolean(message));
+}
+
 function showStatus() {
   if (statusMsg) {
     statusMsg.classList.remove('opacity-0');
@@ -285,11 +298,13 @@ async function saveSettings() {
       inputReplacementEnabled.checked = false;
       inputReplacementShortcut.disabled = true;
       showInputShortcutError('Chọn Primary Target trước khi bật dịch trong ô nhập.');
+      showLanguagesError('Dịch thay thế trong ô nhập đã tắt. Chọn Primary Target để bật lại trong Provider.');
     }
 
     if (inputReplacementEnabled.checked && shortcutConflictsWithOcr(lastValidInputShortcut, ocrShortcut.value)) {
       ocrShortcut.value = lastValidOcrShortcut;
       showInputShortcutError('Phím dịch trong ô nhập trùng phím OCR. Hãy chọn phím khác.');
+      showOcrShortcutError('Phím OCR trùng phím dịch trong Provider. Đã giữ lại phím OCR trước đó.');
       return;
     }
 
@@ -428,11 +443,16 @@ learningAccountUnlink.addEventListener('click', async () => {
 activeToggle.addEventListener('change', saveSettings);
 primaryLang.addEventListener('change', () => {
   showInputShortcutError('');
+  showLanguagesError('');
   saveSettings();
 });
 secondaryLang.addEventListener('change', saveSettings);
 reverseLang.addEventListener('change', saveSettings);
-ocrShortcut.addEventListener('change', saveSettings);
+ocrShortcut.addEventListener('change', () => {
+  showOcrShortcutError('');
+  showInputShortcutError('');
+  saveSettings();
+});
 ocrModelTier.addEventListener('change', saveSettings);
 ocrLanguage.addEventListener('change', saveSettings);
 ttsToggle.addEventListener('change', saveSettings);
@@ -447,10 +467,12 @@ phoneticsToggle.addEventListener('change', saveSettings);
 inputReplacementEnabled.addEventListener('change', () => {
   inputReplacementShortcut.disabled = !inputReplacementEnabled.checked;
   showInputShortcutError('');
+  showOcrShortcutError('');
   saveSettings();
 });
 
 inputReplacementShortcut.addEventListener('keydown', (event) => {
+  if (event.key === 'Tab') return;
   event.preventDefault();
   event.stopPropagation();
   const shortcut = shortcutFromKeyboardEvent(event);
@@ -463,6 +485,7 @@ inputReplacementShortcut.addEventListener('keydown', (event) => {
   lastValidInputShortcut = shortcut;
   inputReplacementShortcut.value = formatShortcut(shortcut);
   showInputShortcutError('');
+  showOcrShortcutError('');
   saveSettings();
 });
 
@@ -498,6 +521,7 @@ toggleDeeplKeyBtn.addEventListener('click', () => {
 });
 
 // Load on startup
+initializeSettingsTabs();
 document.addEventListener('DOMContentLoaded', loadSettings);
 loadSettings();
 void refreshLinkStatus();

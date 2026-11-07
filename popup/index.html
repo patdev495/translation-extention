@@ -35,15 +35,25 @@
       <p><a href="../privacy-policy.html" target="_blank" rel="noopener noreferrer">Đọc chính sách quyền riêng tư</a></p>
       <button id="privacy-consent-accept" type="button">Tôi đồng ý và bật dịch</button>
     </section>
-    <section class="language-section" aria-labelledby="languages-title">
-      <h2 id="languages-title">Languages</h2>
-      <div class="language-grid">
-        <div class="setting-row"><label class="setting-info" for="primary-lang" title="Main output language"><span class="setting-label">Primary Target</span><span class="setting-desc">Main output language</span></label><div class="select-wrap"><select id="primary-lang"><option value="vi" selected>Vietnamese</option><option value="none">Disabled</option><option value="en">English</option><option value="zh">Chinese</option></select></div></div>
-        <div class="setting-row"><label class="setting-info" for="secondary-lang" title="Fallback language"><span class="setting-label">Secondary Target</span><span class="setting-desc">Fallback language</span></label><div class="select-wrap"><select id="secondary-lang"><option value="vi">Vietnamese</option><option value="none">Disabled</option><option value="en" selected>English</option><option value="zh">Chinese</option></select></div></div>
-        <div class="setting-row"><label class="setting-info" for="reverse-lang" title="Smart swap fallback"><span class="setting-label">Reverse Target</span><span class="setting-desc">Smart swap fallback</span></label><div class="select-wrap"><select id="reverse-lang"><option value="vi">Vietnamese</option><option value="none">Disabled</option><option value="en">English</option><option value="zh" selected>Chinese</option></select></div></div>
-      </div>
-    </section>
-    <div class="settings-grid">
+    <div class="settings-tabs" role="tablist" aria-label="Settings categories">
+      <button id="tab-languages" type="button" role="tab" aria-controls="panel-languages" aria-selected="true" tabindex="0">Languages</button>
+      <button id="tab-provider" type="button" role="tab" aria-controls="panel-provider" aria-selected="false" tabindex="-1">Provider</button>
+      <button id="tab-display" type="button" role="tab" aria-controls="panel-display" aria-selected="false" tabindex="-1">Display</button>
+      <button id="tab-website" type="button" role="tab" aria-controls="panel-website" aria-selected="false" tabindex="-1">Website</button>
+      <button id="tab-ocr" type="button" role="tab" aria-controls="panel-ocr" aria-selected="false" tabindex="-1">OCR</button>
+    </div>
+    <div id="panel-languages" class="settings-panel" role="tabpanel" aria-labelledby="tab-languages" tabindex="0">
+      <section class="language-section" aria-labelledby="languages-title">
+        <h2 id="languages-title">Languages</h2>
+        <div class="language-grid">
+          <div class="setting-row"><label class="setting-info" for="primary-lang" title="Main output language"><span class="setting-label">Primary Target</span><span class="setting-desc">Main output language</span></label><div class="select-wrap"><select id="primary-lang"><option value="vi" selected>Vietnamese</option><option value="none">Disabled</option><option value="en">English</option><option value="zh">Chinese</option></select></div></div>
+          <div class="setting-row"><label class="setting-info" for="secondary-lang" title="Fallback language"><span class="setting-label">Secondary Target</span><span class="setting-desc">Fallback language</span></label><div class="select-wrap"><select id="secondary-lang"><option value="vi">Vietnamese</option><option value="none">Disabled</option><option value="en" selected>English</option><option value="zh">Chinese</option></select></div></div>
+          <div class="setting-row"><label class="setting-info" for="reverse-lang" title="Smart swap fallback"><span class="setting-label">Reverse Target</span><span class="setting-desc">Smart swap fallback</span></label><div class="select-wrap"><select id="reverse-lang"><option value="vi">Vietnamese</option><option value="none">Disabled</option><option value="en">English</option><option value="zh" selected>Chinese</option></select></div></div>
+        </div>
+        <p id="languages-error" class="shortcut-error" role="alert"></p>
+      </section>
+    </div>
+    <div id="panel-provider" class="settings-panel" role="tabpanel" aria-labelledby="tab-provider" tabindex="0" hidden>
       <section class="settings-section" aria-labelledby="translation-title">
         <h2 id="translation-title">Translation Engine</h2>
         <div class="setting-row"><label class="setting-info" for="provider"><span class="setting-label">Provider</span><span class="setting-desc">Active engine service</span></label><div class="select-wrap"><select id="provider"><option value="google" selected>Google</option><option value="deepl-free">DeepL Web (no key)</option><option value="deepl">DeepL API</option></select></div></div>
@@ -67,64 +77,74 @@
         </div>
         <p id="input-replacement-error" class="shortcut-error" role="alert"></p>
       </section>
+    </div>
+    <div id="panel-display" class="settings-panel" role="tabpanel" aria-labelledby="tab-display" tabindex="0" hidden>
       <section class="settings-section" aria-labelledby="display-title">
-        <h2 id="display-title">Tooltip &amp; Display</h2>
+        <h2 id="display-title">Tooltip</h2>
         <div class="setting-row"><label class="setting-info" for="tooltip-font-size"><span class="setting-label">Font Size</span><span class="setting-desc">Tooltip text size</span></label><div class="select-wrap"><select id="tooltip-font-size"><option value="12">12px (Small)</option><option value="14" selected>14px (Normal)</option><option value="16">16px (Large)</option><option value="18">18px (XL)</option><option value="20">20px (2XL)</option><option value="24">24px (3XL)</option><option value="28">28px</option><option value="32">32px</option><option value="36">36px</option><option value="40">40px</option><option value="48">48px</option><option value="56">56px</option><option value="64">64px</option><option value="72">72px</option><option value="80">80px</option></select></div></div>
         <div class="setting-row"><label class="setting-info" for="tts-toggle"><span class="setting-label">TTS Pronounce</span><span class="setting-desc">Speaker button</span></label><label class="toggle-wrap" title="TTS Pronounce"><input type="checkbox" id="tts-toggle" checked aria-label="TTS Pronounce"><span class="toggle-track" aria-hidden="true"></span></label></div>
         <div class="setting-row"><label class="setting-info" for="phonetics-toggle"><span class="setting-label">Phonetics</span><span class="setting-desc">IPA / Pinyin display</span></label><label class="toggle-wrap" title="Phonetics"><input type="checkbox" id="phonetics-toggle" checked aria-label="Phonetics"><span class="toggle-track" aria-hidden="true"></span></label></div>
+      </section>
+      <section class="settings-section panel-section" aria-labelledby="hanzi-title">
+        <h2 id="hanzi-title">Hanzi</h2>
         <div class="setting-row"><label class="setting-info" for="hanzi-stroke-speed"><span class="setting-label">Hanzi Stroke Speed</span><span class="setting-desc">Higher is faster</span></label><div class="select-wrap"><select id="hanzi-stroke-speed"><option value="0.5">0.5×</option><option value="1">1×</option><option value="1.5">1.5×</option><option value="2" selected>2× (Default)</option><option value="3">3×</option></select></div></div>
         <div class="setting-row"><label class="setting-info" for="hanzi-breakdown-enabled"><span class="setting-label">Hanzi Breakdown</span><span class="setting-desc">Show components while strokes loop</span></label><label class="toggle-wrap" title="Hanzi Breakdown"><input type="checkbox" id="hanzi-breakdown-enabled" aria-label="Hanzi Breakdown"><span class="toggle-track" aria-hidden="true"></span></label></div>
         <div class="setting-row"><label class="setting-info" for="hanzi-breakdown-language"><span class="setting-label">Breakdown Language</span><span class="setting-desc">Component explanations</span></label><div class="select-wrap"><select id="hanzi-breakdown-language"><option value="vi" selected>Vietnamese</option><option value="en">English</option></select></div></div>
       </section>
-    </div>
-    <section class="learning-account-section" aria-labelledby="learning-account-title">
-      <div class="learning-account-heading">
-        <h2 id="learning-account-title">Tài khoản học tập</h2>
-        <span class="learning-account-badge">WEB</span>
-      </div>
-      <p>Liên kết để quản lý thư mục học tiếng Trung trên web. Tên đăng nhập và tên thư mục lưu trên máy chủ web; ghi chú hiện có không tự tải lên.</p>
-      <p>Trang web liên kết: <a id="learning-account-web-url" href="https://learning.peebot.shop/" target="_blank" rel="noopener noreferrer">https://learning.peebot.shop/</a></p>
-      <p id="learning-account-status" class="learning-account-status" role="status" aria-live="polite">Đang kiểm tra liên kết…</p>
-      <div class="learning-account-actions">
-        <button id="learning-account-link" type="button">Liên kết tài khoản</button>
-        <button id="learning-account-unlink" type="button" hidden>Ngắt liên kết</button>
-      </div>
-      <div class="learning-sync-section" aria-labelledby="learning-sync-title">
-        <div class="learning-sync-heading"><h3 id="learning-sync-title">Đồng bộ mục học tập</h3><button id="learning-sync-retry" type="button">Thử lại</button></div>
-        <ul id="learning-sync-list" aria-live="polite"><li>Đang tải trạng thái…</li></ul>
-      </div>
-    </section>
-    <section class="hanzi-backup-section" aria-labelledby="hanzi-backup-title">
-      <h2 id="hanzi-backup-title">Hanzi learning backup</h2>
-      <p>Save your personal meanings and memory notes to a JSON file.</p>
-      <div class="hanzi-backup-actions">
-        <button id="hanzi-export-backup" type="button">Export JSON</button>
-        <button id="hanzi-import-backup" type="button">Import JSON</button>
-        <input id="hanzi-backup-file" type="file" accept="application/json,.json" hidden aria-label="Hanzi backup file">
-      </div>
-      <div id="hanzi-import-choice" hidden>
-        <p id="hanzi-import-summary"></p>
+      <section class="hanzi-backup-section" aria-labelledby="hanzi-backup-title">
+        <h2 id="hanzi-backup-title">Backup</h2>
+        <p>Save your personal meanings and memory notes to a JSON file.</p>
         <div class="hanzi-backup-actions">
-          <button id="hanzi-import-keep-current" type="button">Keep current</button>
-          <button id="hanzi-import-use-file" type="button">Use file</button>
+          <button id="hanzi-export-backup" type="button">Export JSON</button>
+          <button id="hanzi-import-backup" type="button">Import JSON</button>
+          <input id="hanzi-backup-file" type="file" accept="application/json,.json" hidden aria-label="Hanzi backup file">
         </div>
-      </div>
-      <p id="hanzi-backup-status" role="status" aria-live="polite"></p>
-    </section>
-    <section class="ocr-section" aria-labelledby="ocr-title">
-      <div class="ocr-heading">
-        <h2 id="ocr-title">Behavior &amp; OCR</h2>
-        <div class="ocr-actions">
-          <div class="setting-row"><label class="setting-info" for="ocr-pin-toggle" title="Float cropped region"><span class="setting-label">Pin OCR Image</span><span class="setting-desc">Float cropped region</span></label><label class="toggle-wrap" title="Pin OCR Image"><input type="checkbox" id="ocr-pin-toggle" aria-label="Pin OCR Image"><span class="toggle-track" aria-hidden="true"></span></label></div>
-          <div class="setting-row"><label class="setting-info" for="ocr-copy-toggle" title="Auto-copy to clipboard"><span class="setting-label">Copy OCR Image</span><span class="setting-desc">Auto-copy to clipboard</span></label><label class="toggle-wrap" title="Copy OCR Image"><input type="checkbox" id="ocr-copy-toggle" aria-label="Copy OCR Image"><span class="toggle-track" aria-hidden="true"></span></label></div>
+        <div id="hanzi-import-choice" hidden>
+          <p id="hanzi-import-summary"></p>
+          <div class="hanzi-backup-actions">
+            <button id="hanzi-import-keep-current" type="button">Keep current</button>
+            <button id="hanzi-import-use-file" type="button">Use file</button>
+          </div>
         </div>
-      </div>
-      <div class="ocr-fields">
-        <div class="setting-row"><label class="setting-info" for="ocr-shortcut" title="Toggle OCR mode"><span class="setting-label">OCR Shortcut</span><span class="setting-desc">Toggle OCR mode</span></label><div class="select-wrap"><select id="ocr-shortcut"><option value="ctrl-space" selected>Ctrl+Space</option><option value="alt-o">Alt+O</option><option value="ctrl-shift-o">Ctrl+Shift+O</option><option value="disabled">Disabled</option></select></div></div>
-        <div class="setting-row"><label class="setting-info" for="ocr-model-tier" title="PP-OCRv6 tier"><span class="setting-label">OCR Model</span><span class="setting-desc">PP-OCRv6 tier</span></label><div class="select-wrap"><select id="ocr-model-tier"><option value="tiny">Tiny (Fast)</option><option value="small" selected>Small (Balanced)</option><option value="medium">Medium (Accurate)</option></select></div></div>
-        <div class="setting-row"><label class="setting-info" for="ocr-language" title="Character set mode"><span class="setting-label">OCR Language</span><span class="setting-desc">Character set mode</span></label><div class="select-wrap"><select id="ocr-language"><option value="ch" selected>CJK / English</option><option value="latin">Latin / Multi</option></select></div></div>
-      </div>
-    </section>
+        <p id="hanzi-backup-status" role="status" aria-live="polite"></p>
+      </section>
+    </div>
+    <div id="panel-website" class="settings-panel" role="tabpanel" aria-labelledby="tab-website" tabindex="0" hidden>
+      <section class="learning-account-section" aria-labelledby="learning-account-title">
+        <div class="learning-account-heading">
+          <h2 id="learning-account-title">Tài khoản học tập</h2>
+          <span class="learning-account-badge">WEB</span>
+        </div>
+        <p>Liên kết để quản lý thư mục học tiếng Trung trên web. Tên đăng nhập và tên thư mục lưu trên máy chủ web; ghi chú hiện có không tự tải lên.</p>
+        <p>Trang web liên kết: <a id="learning-account-web-url" href="https://learning.peebot.shop/" target="_blank" rel="noopener noreferrer">https://learning.peebot.shop/</a></p>
+        <p id="learning-account-status" class="learning-account-status" role="status" aria-live="polite">Đang kiểm tra liên kết…</p>
+        <div class="learning-account-actions">
+          <button id="learning-account-link" type="button">Liên kết tài khoản</button>
+          <button id="learning-account-unlink" type="button" hidden>Ngắt liên kết</button>
+        </div>
+        <div class="learning-sync-section" aria-labelledby="learning-sync-title">
+          <div class="learning-sync-heading"><h3 id="learning-sync-title">Đồng bộ mục học tập</h3><button id="learning-sync-retry" type="button">Thử lại</button></div>
+          <ul id="learning-sync-list" aria-live="polite"><li>Đang tải trạng thái…</li></ul>
+        </div>
+      </section>
+    </div>
+    <div id="panel-ocr" class="settings-panel" role="tabpanel" aria-labelledby="tab-ocr" tabindex="0" hidden>
+      <section class="ocr-section" aria-labelledby="ocr-title">
+        <div class="ocr-heading">
+          <h2 id="ocr-title">OCR</h2>
+          <div class="ocr-actions">
+            <div class="setting-row"><label class="setting-info" for="ocr-pin-toggle" title="Float cropped region"><span class="setting-label">Pin OCR Image</span><span class="setting-desc">Float cropped region</span></label><label class="toggle-wrap" title="Pin OCR Image"><input type="checkbox" id="ocr-pin-toggle" aria-label="Pin OCR Image"><span class="toggle-track" aria-hidden="true"></span></label></div>
+            <div class="setting-row"><label class="setting-info" for="ocr-copy-toggle" title="Auto-copy to clipboard"><span class="setting-label">Copy OCR Image</span><span class="setting-desc">Auto-copy to clipboard</span></label><label class="toggle-wrap" title="Copy OCR Image"><input type="checkbox" id="ocr-copy-toggle" aria-label="Copy OCR Image"><span class="toggle-track" aria-hidden="true"></span></label></div>
+          </div>
+        </div>
+        <div class="ocr-fields">
+          <div class="setting-row"><label class="setting-info" for="ocr-shortcut" title="Toggle OCR mode"><span class="setting-label">OCR Shortcut</span><span class="setting-desc">Toggle OCR mode</span></label><div class="select-wrap"><select id="ocr-shortcut" aria-describedby="ocr-shortcut-error"><option value="ctrl-space" selected>Ctrl+Space</option><option value="alt-o">Alt+O</option><option value="ctrl-shift-o">Ctrl+Shift+O</option><option value="disabled">Disabled</option></select></div></div>
+          <div class="setting-row"><label class="setting-info" for="ocr-model-tier" title="PP-OCRv6 tier"><span class="setting-label">OCR Model</span><span class="setting-desc">PP-OCRv6 tier</span></label><div class="select-wrap"><select id="ocr-model-tier"><option value="tiny">Tiny (Fast)</option><option value="small" selected>Small (Balanced)</option><option value="medium">Medium (Accurate)</option></select></div></div>
+          <div class="setting-row"><label class="setting-info" for="ocr-language" title="Character set mode"><span class="setting-label">OCR Language</span><span class="setting-desc">Character set mode</span></label><div class="select-wrap"><select id="ocr-language"><option value="ch" selected>CJK / English</option><option value="latin">Latin / Multi</option></select></div></div>
+        </div>
+        <p id="ocr-shortcut-error" class="shortcut-error" role="alert"></p>
+      </section>
+    </div>
   </main>
   <div class="status-footer">
     <div id="status-msg" class="status-toast" role="status" aria-live="polite">
