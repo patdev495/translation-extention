@@ -30,6 +30,25 @@ export interface TrashEntry {
   folder_id: string | null;
 }
 
+export type RecallResult = 'remembered' | 'not_yet';
+export interface ReviewSettings {
+  folder_id: string | null;
+  category: 'word' | 'sentence' | 'all';
+  practice: 'classic' | 'listen' | 'speak';
+  prompt_mode: 'meaning' | 'chinese' | 'pinyin';
+  autoplay: boolean;
+}
+export interface ReviewQuestion { sentence: SavedLearningItem | null; item_ids: string[]; items: SavedLearningItem[] }
+export interface ReviewSession {
+  id: string; kind: 'vocabulary' | 'grammar'; questions: ReviewQuestion[];
+  ineligible_count: number; ineligible_item_ids?: string[];
+  position?: number; settings?: ReviewSettings; results?: Record<string, RecallResult>; completed?: boolean;
+}
+export interface ReviewOverview {
+  entries: { id: string; category: 'word' | 'sentence' | 'grammar'; text: string; remembered: number; not_yet: number }[];
+  totals: { remembered: number; not_yet: number };
+}
+
 interface ApiErrorBody {
   detail?: unknown;
 }
@@ -87,6 +106,15 @@ async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export const learningApi = {
+  reviewOverview: (folderId: string | null): Promise<ReviewOverview> => api(`/review/overview${folderId ? `?folder_id=${encodeURIComponent(folderId)}` : ''}`),
+  startReview: (kind: ReviewSession['kind'], folderId: string | null, options: Partial<Omit<ReviewSettings, 'folder_id'>> = {}): Promise<ReviewSession> =>
+    api('/review/sessions', { method: 'POST', body: JSON.stringify({ kind, folder_id: folderId, ...options }) }),
+  currentReview: (): Promise<ReviewSession | null> => api('/review/sessions/current'),
+  getReview: (id: string): Promise<ReviewSession> => api(`/review/sessions/${encodeURIComponent(id)}`),
+  progressReview: (id: string, position: number, settings: Partial<Omit<ReviewSettings, 'folder_id' | 'category'>> = {}): Promise<ReviewSession> =>
+    api(`/review/sessions/${encodeURIComponent(id)}/progress`, { method: 'PATCH', body: JSON.stringify({ position, ...settings }), keepalive: true }),
+  recordRecall: (sessionId: string, itemId: string, result: RecallResult, position?: number): Promise<{ item_id: string; result: RecallResult }> =>
+    api(`/review/sessions/${encodeURIComponent(sessionId)}/results/${encodeURIComponent(itemId)}`, { method: 'PUT', body: JSON.stringify({ result, position }) }),
   me: (): Promise<Account> => api('/auth/me'),
   register: (username: string, password: string): Promise<Account> =>
     api('/auth/register', { method: 'POST', body: JSON.stringify({ username, password }) }),
@@ -117,6 +145,8 @@ export const learningApi = {
     api(`/items/${encodeURIComponent(id)}/links/${encodeURIComponent(itemId)}`, { method: 'DELETE' }),
   trash: (): Promise<TrashEntry[]> => api('/trash'),
   trashItem: (id: string): Promise<void> => api(`/items/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  trashFolderItems: (folderId: string, itemIds?: string[]): Promise<{ count: number }> =>
+    api(`/folders/${encodeURIComponent(folderId)}/trash-items`, { method: 'POST', body: JSON.stringify({ item_ids: itemIds ?? null }) }),
   trashFolder: (id: string): Promise<void> => api(`/folders/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   restoreItem: (id: string): Promise<SavedLearningItem> => api(`/trash/items/${encodeURIComponent(id)}/restore`, { method: 'POST' }),
   restoreFolder: (id: string): Promise<LearningFolder> => api(`/trash/folders/${encodeURIComponent(id)}/restore`, { method: 'POST' }),

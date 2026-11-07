@@ -99,6 +99,15 @@ def test_folder_tree_rename_move_and_cycle_guards(tmp_path: Path) -> None:
         assert len(client.get("/api/folders").json()) == 3
 
 
+def test_folders_are_listed_in_creation_order(tmp_path: Path) -> None:
+    app = create_app(tmp_path / "folder-order.sqlite3")
+    with TestClient(app) as client:
+        register(client, "folder-order")
+        older = client.post("/api/folders", json={"name": "Zebra"}, headers=ORIGIN).json()
+        newer = client.post("/api/folders", json={"name": "Alpha"}, headers=ORIGIN).json()
+        assert [folder["id"] for folder in client.get("/api/folders").json()] == [older["id"], newer["id"]]
+
+
 def test_browser_mutations_reject_other_origins(tmp_path: Path) -> None:
     app = create_app(tmp_path / "origin.sqlite3")
     with TestClient(app) as client:

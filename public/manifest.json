@@ -23,6 +23,7 @@
   ],
   "host_permissions": [
     "https://translate.googleapis.com/*",
+    "https://oneshot-free.www.deepl.com/*",
     "<all_urls>",
     "file://*/*"
   ],

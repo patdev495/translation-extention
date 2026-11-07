@@ -90,4 +90,29 @@ describe('TranslationEngine', () => {
     expect(result.translation).toBe('Xin chào. Thế giới.');
     expect(result.detectedLang).toBe('en');
   });
+
+  test('routes DeepL Free without an API key and maps Chinese to zh-Hans', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ translations: [{ detected_source_language: 'EN', text: '你好，世界' }] }),
+    });
+
+    const result = await TranslationEngine.translateWithSettings('Hello world', 'zh', {
+      provider: 'deepl-free', deeplApiKey: 'saved-key-must-not-be-sent',
+    });
+
+    expect(result).toEqual({ translation: '你好，世界', detectedLang: 'en' });
+    expect(mockFetch).toHaveBeenCalledWith('https://oneshot-free.www.deepl.com/v1/translate', {
+      method: 'POST',
+      headers: { Authorization: 'None', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: ['Hello world'], target_lang: 'zh-Hans' }),
+    });
+  });
+
+  test('rejects an empty DeepL Free response', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ translations: [] }) });
+    await expect(TranslationEngine.translateWithSettings('Hello', 'vi', {
+      provider: 'deepl-free', deeplApiKey: '',
+    })).rejects.toThrow('empty result');
+  });
 });

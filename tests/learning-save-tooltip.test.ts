@@ -2,11 +2,18 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { TranslationTooltip } from '../src/content/tooltip';
 
+function stubLinkedChrome(value: any): void {
+  const send = value.runtime.sendMessage;
+  value.runtime.sendMessage = (message: any, callback: (response: any) => void) => message.type === 'GET_ACCOUNT_LINK_STATUS'
+    ? callback({ success: true, status: { state: 'linked' } }) : send(message, callback);
+  vi.stubGlobal('chrome', value);
+}
+
 afterEach(() => { document.body.innerHTML = ''; vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 test('Chinese row button and s expose same category choices; typing does not trigger shortcuts', () => {
   vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { cb(0); return 1; });
-  vi.stubGlobal('chrome', { runtime: { sendMessage: vi.fn((_message, callback) => callback({ success: true, result: [{ id: 'one', name: 'HSK' }] })) }, storage: { local: { get: vi.fn(async () => ({})), set: vi.fn(async () => {}) } } });
+  stubLinkedChrome( { runtime: { sendMessage: vi.fn((_message, callback) => callback({ success: true, result: [{ id: 'one', name: 'HSK' }] })) }, storage: { local: { get: vi.fn(async () => ({})), set: vi.fn(async () => {}) } } });
   const tooltip = new TranslationTooltip();
   tooltip.show(0, 0, 'hello', { detectedLang: 'en', translations: [{ lang: 'zh', text: '你好', phonetics: 'nǐ hǎo' }] });
   const root = document.getElementById('translation-extension-root')!.shadowRoot!;
@@ -22,9 +29,26 @@ test('Chinese row button and s expose same category choices; typing does not tri
   expect(root.querySelector('.tt-save-form')).toBeNull();
 });
 
+test('saving while unlinked shows a prominent account link prompt instead of category choices', () => {
+  vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { cb(0); return 1; });
+  const sendMessage = vi.fn((message, callback) => callback(message.type === 'GET_ACCOUNT_LINK_STATUS'
+    ? { success: true, status: { state: 'unlinked' } }
+    : { success: true, status: { state: 'pending' } }));
+  vi.stubGlobal('chrome', { runtime: { sendMessage } });
+  const tooltip = new TranslationTooltip();
+  tooltip.show(0, 0, '你好', { detectedLang: 'zh', translations: [] });
+  const root = document.getElementById('translation-extension-root')!.shadowRoot!;
+  root.querySelector<HTMLButtonElement>('.tt-save-button')!.click();
+  expect(root.querySelector('[role="alert"]')?.textContent).toContain('Chưa liên kết tài khoản web');
+  expect(root.querySelectorAll('.tt-save-choice')).toHaveLength(0);
+  expect(root.querySelector('.tt-save-form')).toBeNull();
+  root.querySelector<HTMLButtonElement>('.tt-save-link-account')!.click();
+  expect(sendMessage).toHaveBeenCalledWith({ type: 'START_ACCOUNT_LINK' }, expect.any(Function));
+});
+
 test('Chinese Save Selection keeps highlighted phrase and previews containing sentence', () => {
   vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { cb(0); return 1; });
-  vi.stubGlobal('chrome', { runtime: { sendMessage: vi.fn((_message, callback) => callback({ success: true, result: [{ id: 'one', name: 'HSK' }] })) }, storage: { local: { get: vi.fn(async () => ({})), set: vi.fn(async () => {}) } } });
+  stubLinkedChrome( { runtime: { sendMessage: vi.fn((_message, callback) => callback({ success: true, result: [{ id: 'one', name: 'HSK' }] })) }, storage: { local: { get: vi.fn(async () => ({})), set: vi.fn(async () => {}) } } });
   const tooltip = new TranslationTooltip();
   tooltip.show(0, 0, '我喜欢学习中文。你呢？', { detectedLang: 'zh', translations: [{ lang: 'en', text: 'I like learning Chinese. And you?' }] });
   const root = document.getElementById('translation-extension-root')!.shadowRoot!;
@@ -38,10 +62,51 @@ test('Chinese Save Selection keeps highlighted phrase and previews containing se
   expect((root.querySelector('.tt-save-sentence') as HTMLTextAreaElement).value).toBe('我喜欢学习中文。');
 });
 
+test('selecting Chinese characters in the phonetic row offers Both with the matching word and sentence', () => {
+  vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { cb(0); return 1; });
+  vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+  stubLinkedChrome( { runtime: { getURL: (path: string) => path, sendMessage: vi.fn((_message, callback) => callback({ success: false })) } });
+  const tooltip = new TranslationTooltip();
+  tooltip.show(0, 0, 'Không mở được', { detectedLang: 'vi', translations: [{ lang: 'zh', text: '但打不开', phonetics: '但 dàn · 打不开 dǎ bù kāi' }] });
+  const root = document.getElementById('translation-extension-root')!.shadowRoot!;
+  const phonetic = root.querySelector('.tt-phonetic')!;
+  const node = phonetic.firstChild!;
+  const start = node.textContent!.indexOf('不开');
+  const range = document.createRange();
+  range.setStart(node, start); range.setEnd(node, start + 2);
+  vi.spyOn(window, 'getSelection').mockReturnValue({ isCollapsed: false, rangeCount: 1, anchorNode: node, focusNode: node, getRangeAt: () => range, toString: () => range.toString() } as unknown as Selection);
+  phonetic.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, composed: true }));
+  root.querySelector<HTMLButtonElement>('.tt-save-button')!.click();
+  expect(root.querySelector<HTMLButtonElement>('[data-choice="both"]')).not.toBeNull();
+  root.querySelector<HTMLButtonElement>('[data-choice="both"]')!.click();
+  expect((root.querySelector('.tt-save-text') as HTMLInputElement).value).toBe('不开');
+  expect((root.querySelector('.tt-save-sentence') as HTMLTextAreaElement).value).toBe('但打不开');
+});
+
+test('selecting Pinyin maps to the correct repeated Chinese word and containing sentence', () => {
+  vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { cb(0); return 1; });
+  vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+  stubLinkedChrome( { runtime: { getURL: (path: string) => path, sendMessage: vi.fn((_message, callback) => callback({ success: false })) } });
+  const tooltip = new TranslationTooltip();
+  tooltip.show(0, 0, '他不开。你不开。', { detectedLang: 'zh', sourcePhonetics: '他 tā · 不开 bù kāi · 你 nǐ · 不开 bù kāi', translations: [] });
+  const root = document.getElementById('translation-extension-root')!.shadowRoot!;
+  const phonetic = root.querySelector('.tt-phonetic')!;
+  const node = phonetic.firstChild!;
+  const start = node.textContent!.lastIndexOf('bù kāi');
+  const range = document.createRange();
+  range.setStart(node, start); range.setEnd(node, start + 'bù kāi'.length);
+  vi.spyOn(window, 'getSelection').mockReturnValue({ isCollapsed: false, rangeCount: 1, anchorNode: node, focusNode: node, getRangeAt: () => range, toString: () => range.toString() } as unknown as Selection);
+  phonetic.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, composed: true }));
+  root.querySelector<HTMLButtonElement>('.tt-save-button')!.click();
+  root.querySelector<HTMLButtonElement>('[data-choice="both"]')!.click();
+  expect((root.querySelector('.tt-save-text') as HTMLInputElement).value).toBe('不开');
+  expect((root.querySelector('.tt-save-sentence') as HTMLTextAreaElement).value).toBe('你不开。');
+});
+
 test('selection survives Reading Focus and clicking Save after browser clears live selection', () => {
   vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { cb(0); return 1; });
   vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
-  vi.stubGlobal('chrome', { runtime: { getURL: (path: string) => path, sendMessage: vi.fn((_message, callback) => callback({ success: false })) } });
+  stubLinkedChrome( { runtime: { getURL: (path: string) => path, sendMessage: vi.fn((_message, callback) => callback({ success: false })) } });
   const tooltip = new TranslationTooltip();
   tooltip.show(0, 0, 'Lời khuyên', { detectedLang: 'vi', translations: [{ lang: 'zh', text: '建议', phonetics: '建议 jiàn yì' }] });
   const root = document.getElementById('translation-extension-root')!.shadowRoot!;
@@ -61,7 +126,7 @@ test('selection survives Reading Focus and clicking Save after browser clears li
 
 test('Sentence choice previews containing sentence when one character is selected', () => {
   vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { cb(0); return 1; });
-  vi.stubGlobal('chrome', { runtime: { sendMessage: vi.fn((_message, callback) => callback({ success: false })) } });
+  stubLinkedChrome( { runtime: { sendMessage: vi.fn((_message, callback) => callback({ success: false })) } });
   const tooltip = new TranslationTooltip();
   tooltip.show(0, 0, '我有建议。你呢？', { detectedLang: 'zh', translations: [] });
   const root = document.getElementById('translation-extension-root')!.shadowRoot!;
@@ -80,7 +145,7 @@ test('Both saves selected character and containing sentence as distinct linked i
     : message.type === 'LEARNING_SUGGEST_MEANING'
       ? { success: true, meaning: message.text === '议' ? 'ý kiến' : 'Tôi có đề xuất.' }
       : { success: true }));
-  vi.stubGlobal('chrome', { runtime: { sendMessage }, storage: { local: { get: vi.fn(async () => ({})), set: vi.fn(async () => {}) } } });
+  stubLinkedChrome( { runtime: { sendMessage }, storage: { local: { get: vi.fn(async () => ({})), set: vi.fn(async () => {}) } } });
   const tooltip = new TranslationTooltip();
   tooltip.show(0, 0, '我有建议。', { detectedLang: 'zh', translations: [] });
   const root = document.getElementById('translation-extension-root')!.shadowRoot!;
@@ -96,7 +161,7 @@ test('Both saves selected character and containing sentence as distinct linked i
   await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith({
     type: 'LEARNING_SAVE', choice: 'both', item: {
       folder_id: 'folder', word_text: '议', word_meaning: 'ý kiến',
-      sentence_text: '我有建议。', sentence_meaning: 'Tôi có đề xuất.', update_existing_sentence_meaning: false,
+      sentence_text: '我有建议。', sentence_meaning: 'Tôi có đề xuất.', update_existing_word_meaning: false, update_existing_sentence_meaning: false,
     },
   }, expect.any(Function)));
 });
@@ -109,7 +174,7 @@ test('Both fills a saved sentence meaning and updates it only after editing', as
     else if (message.type === 'LEARNING_SUGGEST_MEANING') callback({ success: true, meaning: 'nghĩa gợi ý' });
     else callback({ success: true, state: 'completed' });
   });
-  vi.stubGlobal('chrome', { runtime: { sendMessage }, storage: { local: { get: vi.fn(async () => ({ defaultLearningFolder: 'folder' })), set: vi.fn(async () => {}) } } });
+  stubLinkedChrome( { runtime: { sendMessage }, storage: { local: { get: vi.fn(async () => ({ defaultLearningFolder: 'folder' })), set: vi.fn(async () => {}) } } });
   const tooltip = new TranslationTooltip();
   tooltip.show(0, 0, '标准教程', { detectedLang: 'zh', translations: [] });
   const root = document.getElementById('translation-extension-root')!.shadowRoot!;
@@ -131,19 +196,46 @@ test('Both fills a saved sentence meaning and updates it only after editing', as
   });
 
   await openForm();
+  const wordMeaning = root.querySelector<HTMLInputElement>('.tt-save-meaning')!;
+  wordMeaning.value = 'sách giáo khoa';
+  wordMeaning.dispatchEvent(new Event('input', { bubbles: true }));
   const meaning = root.querySelector<HTMLInputElement>('.tt-save-sentence-meaning')!;
   meaning.value = 'giáo trình tiêu chuẩn';
   meaning.dispatchEvent(new Event('input', { bubbles: true }));
   root.querySelector<HTMLFormElement>('.tt-save-form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
   await vi.waitFor(() => expect(sendMessage.mock.calls.filter(([message]) => message.type === 'LEARNING_SAVE')).toHaveLength(2));
   expect(sendMessage.mock.calls.filter(([message]) => message.type === 'LEARNING_SAVE')[1]![0].item).toMatchObject({
+    word_meaning: 'sách giáo khoa', update_existing_word_meaning: true,
     sentence_meaning: 'giáo trình tiêu chuẩn', update_existing_sentence_meaning: true,
   });
 });
 
+test('Word or Phrase save sends the corrected meaning instead of its suggestion', async () => {
+  vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { cb(0); return 1; });
+  const sendMessage = vi.fn((message, callback) => callback(message.type === 'LEARNING_FOLDERS'
+    ? { success: true, result: [{ id: 'folder', name: 'HSK', parent_id: null }] }
+    : message.type === 'LEARNING_SUGGEST_MEANING'
+      ? { success: true, meaning: 'tái thiết' }
+      : { success: true, state: 'completed' }));
+  stubLinkedChrome( { runtime: { sendMessage }, storage: { local: { get: vi.fn(async () => ({ defaultLearningFolder: 'folder' })), set: vi.fn(async () => {}) } } });
+  const tooltip = new TranslationTooltip();
+  tooltip.show(0, 0, '重建', { detectedLang: 'zh', translations: [] });
+  const root = document.getElementById('translation-extension-root')!.shadowRoot!;
+  root.querySelector<HTMLButtonElement>('.tt-save-button')!.click();
+  root.querySelector<HTMLButtonElement>('[data-choice="word"]')!.click();
+  const meaning = root.querySelector<HTMLInputElement>('.tt-save-meaning')!;
+  await vi.waitFor(() => expect(meaning.value).toBe('tái thiết'));
+  meaning.value = 'xây dựng lại';
+  meaning.dispatchEvent(new Event('input', { bubbles: true }));
+  root.querySelector<HTMLFormElement>('.tt-save-form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith({
+    type: 'LEARNING_SAVE', choice: 'word', item: { folder_id: 'folder', category: 'word', text: '重建', meaning: 'xây dựng lại' },
+  }, expect.any(Function)));
+});
+
 test('no Learning Folder offers website creation path', async () => {
   vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { cb(0); return 1; });
-  vi.stubGlobal('chrome', { runtime: { sendMessage: vi.fn((message, callback) => callback({ success: true, result: message.type === 'LEARNING_FOLDERS' ? [] : {} })) }, storage: { local: { get: vi.fn(async () => ({})), set: vi.fn(async () => {}) } } });
+  stubLinkedChrome( { runtime: { sendMessage: vi.fn((message, callback) => callback({ success: true, result: message.type === 'LEARNING_FOLDERS' ? [] : {} })) }, storage: { local: { get: vi.fn(async () => ({})), set: vi.fn(async () => {}) } } });
   const tooltip = new TranslationTooltip();
   tooltip.show(0, 0, '你好', { detectedLang: 'zh', translations: [] });
   const root = document.getElementById('translation-extension-root')!.shadowRoot!;
@@ -155,7 +247,7 @@ test('no Learning Folder offers website creation path', async () => {
 
 test('folder chooser shows ancestry and never uses Chinese source as Meaning Suggestion', async () => {
   vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { cb(0); return 1; });
-  vi.stubGlobal('chrome', {
+  stubLinkedChrome( {
     runtime: { sendMessage: vi.fn((message, callback) => callback(message.type === 'LEARNING_FOLDERS'
       ? { success: true, result: [{ id: 'child', name: 'Bài 1', parent_id: 'root' }, { id: 'root', name: 'HSK 1', parent_id: null }] }
       : { success: true, meaning: '让我们' })) },
@@ -174,7 +266,7 @@ test('folder chooser shows ancestry and never uses Chinese source as Meaning Sug
 test('saving whole translated sentence uses Vietnamese Source Text as confirmed meaning', () => {
   vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { cb(0); return 1; });
   const sendMessage = vi.fn((_message, callback) => callback({ success: false }));
-  vi.stubGlobal('chrome', { runtime: { sendMessage } });
+  stubLinkedChrome( { runtime: { sendMessage } });
   const tooltip = new TranslationTooltip();
   tooltip.show(0, 0, 'Nếu định làm extension thương mại', {
     detectedLang: 'vi', translations: [{ lang: 'zh', text: '如果您计划进行商业扩展' }],
@@ -191,7 +283,7 @@ test('Both uses Vietnamese Source Text for full sentence but translates selected
   vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { cb(0); return 1; });
   const sendMessage = vi.fn((message, callback) => callback(message.type === 'LEARNING_SUGGEST_MEANING'
     ? { success: true, meaning: 'kinh doanh' } : { success: false }));
-  vi.stubGlobal('chrome', { runtime: { sendMessage } });
+  stubLinkedChrome( { runtime: { sendMessage } });
   const tooltip = new TranslationTooltip();
   tooltip.show(0, 0, 'Nếu định làm extension thương mại', {
     detectedLang: 'vi', translations: [{ lang: 'zh', text: '如果您计划进行商业扩展' }],
@@ -209,7 +301,7 @@ test('Both uses Vietnamese Source Text for full sentence but translates selected
 
 test('offline save visibly says pending instead of saved on website', async () => {
   vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { cb(0); return 1; });
-  vi.stubGlobal('chrome', {
+  stubLinkedChrome( {
     runtime: { sendMessage: vi.fn((message, callback) => callback(message.type === 'LEARNING_FOLDERS'
       ? { success: true, result: [{ id: 'f1', name: 'HSK', parent_id: null }] }
       : { success: true, state: 'pending' })) },

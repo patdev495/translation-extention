@@ -287,4 +287,53 @@ A save request made before an Account Link exists. The extension asks the learne
 **Duplicate Learning Item**:
 An attempt to save a new Word or Phrase, Sentence, or Grammar entry with the same complete text and Learning Category as an active item in the same Learning Folder. For Grammar, the compared text is its learner-written structure; matching items in different folders remain distinct. Notes are exempt.
 
+**Learning Review**:
+The companion website area for reviewing entries from the Learning Library through Vocabulary Review or Grammar Review.
+
+**Review Session**:
+One pass through eligible entries in a chosen Review Scope and review activity.
+
+**Review Summary**:
+The remembered and not-yet-remembered totals for a completed Review Session.
+
+**Review Scratchpad**:
+Free-form text the learner types while answering any Vocabulary Review card or Grammar Review question to compare with the revealed answer. The learner judges its correctness; the scratchpad is not automatically graded.
+
+**Recall Statistics**:
+The accumulated remembered and not-yet-remembered counts for reviewed Word or Phrase, Sentence, and Grammar entries across Review Sessions.
+
+**Review Scope**:
+The Learning Folder chosen for a Review Session, including its descendants, or the entire Learning Library. It determines which Word or Phrase, Sentence, and Grammar entries are reviewed; linked Example Sentences may be outside the scope.
+
+**Vocabulary Review**:
+The Learning Review activity that tests recall of Word or Phrase and Sentence entries through flashcards, optionally with Listen and Repeat Practice or Meaning-to-Speech Practice.
+
+**Flashcard Prompt Mode**:
+The learner's choice of which one of a Word or Phrase or Sentence entry's Vietnamese meaning, Chinese text, or Pinyin appears before an ordinary flashcard is flipped. Flipping the card reveals the other two.
+
+**Vocabulary Recall Result**:
+The learner's explicit remembered or not-yet-remembered assessment for one Word or Phrase or Sentence in one Review Session; moving between flashcards does not create an assessment. The latest result in the session counts toward that entry's Recall Statistics, including when the session ends early.
+
+**Grammar Review**:
+The Learning Review activity that tests recall of Grammar entries through their linked Example Sentences. A Grammar entry without an Example Sentence is ineligible, and results belong to individual Grammar entries even when a sentence tests several of them.
+
+**Grammar Recall Result**:
+The remembered or not-yet-remembered result for one Grammar entry in one Review Session. The latest result in the session counts toward that entry's Recall Statistics, including when the session ends early.
+
+**Temporary Practice Recording**:
+The learner's latest audio recording for one flashcard in the current practice session, available for immediate playback and when revisiting that card, with a new recording replacing the previous one and remaining separate from Saved Learning Items. Recordings may remain available during temporary app switches or screen locks while the same page remains loaded; recording stops when the page is hidden, and all recordings are discarded when practice ends or the learner leaves, closes, or reloads the page.
+_Avoid_: Saved audio, Recording library
+
+**Listen and Repeat Practice**:
+The listening and speaking activity where the learner hears saved Chinese learning content before revealing its text or Pinyin, then may record themselves repeating it and compare their recording with the model audio.
+_Avoid_: Conversation practice
+
+**Meaning-to-Speech Practice**:
+The speaking activity where the learner sees a saved item's Vietnamese meaning and attempts to say it in Chinese before revealing the original Chinese text and model audio for self-comparison. The saved Chinese wording is a reference rather than the only acceptable expression.
+_Avoid_: Automatic speech grading, Conversation practice
+
+**Practice Resume**:
+Continuing an unfinished flashcard practice session at its remembered position, with the same card order and previously recorded self-assessments. Temporary Practice Recordings are not restored after leaving or reloading the practice website.
+_Avoid_: Starting a new review, Restoring recordings
+
 

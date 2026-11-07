@@ -5,6 +5,8 @@ web/.venv/
 web/dist/
 web/data/
 web/.pytest_cache/
+web/test-results/
+web/playwright-report/
 __pycache__/
 *.pyc
 

@@ -1,0 +1,38 @@
+[
+ {
+  "mode": "redesign",
+  "depth": "full",
+  "scope": "app",
+  "theme": "coral",
+  "shape": "app screen",
+  "axes": "light/grotesk-sans/warm",
+  "nav": "language-first settings sheet and document toolbar",
+  "footer": "inline save feedback",
+  "imagery": "none; live product controls",
+  "photos": [],
+  "entry": "popup/index.html",
+  "fingerprint": "language strip, paired settings, OCR controls",
+  "sections": [
+   "Languages",
+   "Translation Engine",
+   "Tooltip & Display",
+   "Behavior & OCR"
+  ],
+  "signature": "multilingual reading sheet",
+  "waived": [],
+  "prompt": "Keep PolyTranslate name and functions, replace all UI with a compact light modern interface",
+  "sweep": {
+   "floor": 0,
+   "reflex": 0,
+   "warn": 0,
+   "keptFields": "19/19",
+   "keptScriptHooks": "44/44"
+  },
+  "finishReview": {
+   "reviewer": "subagent",
+   "resolved": 3,
+   "unresolved": 0
+  },
+  "date": "2026-10-27"
+ }
+]

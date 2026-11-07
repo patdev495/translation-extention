@@ -10,7 +10,7 @@ export interface Settings {
   ocrModelTier: 'tiny' | 'small' | 'medium';
   ocrLanguage: 'ch' | 'latin';
   ttsEnabled: boolean;
-  provider: 'google' | 'deepl';
+  provider: 'google' | 'deepl' | 'deepl-free';
   deeplApiKey: string;
   tooltipFontSize: '12' | '14' | '16' | '18' | '20' | '24' | '28' | '32' | '36' | '40' | '48' | '56' | '64' | '72' | '80';
   hanziStrokeSpeed: 0.5 | 1 | 1.5 | 2 | 3;

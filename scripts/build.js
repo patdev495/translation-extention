@@ -66,8 +66,8 @@ async function runBuild() {
     logLevel: 'silent',
     define: {
       'process.env.NODE_ENV': '"production"',
-      '__LEARNING_API_BASE__': JSON.stringify(process.env.LEARNING_API_BASE || 'http://127.0.0.1:8000'),
-      '__LEARNING_WEB_BASE__': JSON.stringify(process.env.LEARNING_WEB_BASE || 'http://127.0.0.1:5173'),
+      '__LEARNING_API_BASE__': JSON.stringify(process.env.LEARNING_API_BASE || 'https://learning.peebot.shop'),
+      '__LEARNING_WEB_BASE__': JSON.stringify(process.env.LEARNING_WEB_BASE || 'https://learning.peebot.shop'),
     },
     tsconfig: resolve(__dirname, '../tsconfig.json'),
   });

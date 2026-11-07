@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import random
 import secrets
 import sqlite3
 import time
@@ -150,6 +151,7 @@ class BothInput(BaseModel):
     word_meaning: str = Field(min_length=1)
     sentence_text: str = Field(min_length=1)
     sentence_meaning: str = Field(min_length=1)
+    update_existing_word_meaning: bool = False
     update_existing_sentence_meaning: bool = False
 
     @field_validator('word_text', 'word_meaning', 'sentence_text', 'sentence_meaning')
@@ -209,6 +211,31 @@ def _folder(row: sqlite3.Row) -> Folder:
     return Folder(id=str(row["id"]), name=str(row["name"]), parent_id=row["parent_id"])
 
 
+class ReviewStart(BaseModel):
+    kind: Literal["vocabulary", "grammar"]
+    folder_id: str | None = None
+    category: Literal["word", "sentence", "all"] = "word"
+    practice: Literal["classic", "listen", "speak"] = "classic"
+    prompt_mode: Literal["meaning", "chinese", "pinyin"] = "meaning"
+    autoplay: bool = True
+
+
+class RecallInput(BaseModel):
+    result: Literal["remembered", "not_yet"]
+    position: int | None = Field(default=None, ge=0)
+
+
+class ReviewProgress(BaseModel):
+    position: int = Field(ge=0)
+    practice: Literal["classic", "listen", "speak"] | None = None
+    prompt_mode: Literal["meaning", "chinese", "pinyin"] | None = None
+    autoplay: bool | None = None
+
+
+class BulkTrashInput(BaseModel):
+    item_ids: list[str] | None = None
+
+
 def create_app(database_path: Path | None = None) -> FastAPI:
     db_path = database_path or Path(os.getenv("POLY_LEARNING_DB", "web/data/learning.sqlite3"))
     web_origin = os.getenv("POLY_WEB_ORIGIN", "http://127.0.0.1:5173").rstrip("/")
@@ -248,6 +275,19 @@ def create_app(database_path: Path | None = None) -> FastAPI:
 
     def web_account(request: Request) -> Account:
         return current_account(request, "web")
+
+    def scoped_items(connection: sqlite3.Connection, user_id: str, folder_id: str | None) -> list[sqlite3.Row]:
+        if folder_id is not None:
+            found = connection.execute("SELECT 1 FROM folders WHERE id = ? AND user_id = ? AND deleted_at IS NULL", (folder_id, user_id)).fetchone()
+            if found is None:
+                raise HTTPException(status_code=404, detail="Review folder not found")
+        return connection.execute("""WITH RECURSIVE scope(id) AS (
+            SELECT id FROM folders WHERE id = ? AND user_id = ? AND deleted_at IS NULL
+            UNION ALL SELECT f.id FROM folders f JOIN scope s ON f.parent_id = s.id
+            WHERE f.user_id = ? AND f.deleted_at IS NULL
+        ) SELECT * FROM learning_items WHERE user_id = ? AND deleted_at IS NULL
+          AND (? IS NULL OR folder_id IN (SELECT id FROM scope)) ORDER BY created_at, id""",
+            (folder_id, user_id, user_id, user_id, folder_id)).fetchall()
 
     def extension_account(request: Request) -> Account:
         return current_account(request, "extension")
@@ -418,9 +458,15 @@ def create_app(database_path: Path | None = None) -> FastAPI:
     def create_paired_items(connection: sqlite3.Connection, user_id: str, body: BothInput) -> dict[str, Item]:
         if body.word_text not in body.sentence_text:
             raise HTTPException(status_code=422, detail="Sentence must contain selected text")
+        existing_word = connection.execute(
+            "SELECT id, meaning FROM learning_items WHERE user_id = ? AND folder_id = ? AND category = 'word' AND text = ? AND deleted_at IS NULL",
+            (user_id, body.folder_id, body.word_text),
+        ).fetchone()
         word = create_item(connection, user_id, ItemInput(
             folder_id=body.folder_id, category="word", text=body.word_text, meaning=body.word_meaning,
         ), reuse=True)
+        if existing_word is not None and body.update_existing_word_meaning and existing_word["meaning"] != body.word_meaning:
+            connection.execute("UPDATE learning_items SET meaning = ? WHERE id = ?", (body.word_meaning, word.id))
         existing_sentence = connection.execute(
             "SELECT id, meaning FROM learning_items WHERE user_id = ? AND folder_id = ? AND category = 'sentence' AND text = ? AND deleted_at IS NULL",
             (user_id, body.folder_id, body.sentence_text),
@@ -517,6 +563,134 @@ def create_app(database_path: Path | None = None) -> FastAPI:
         with connect(db_path) as connection:
             rows = connection.execute("SELECT * FROM learning_items WHERE user_id = ? AND deleted_at IS NULL ORDER BY created_at DESC, id", (account.id,)).fetchall()
             return [item(connection, row) for row in rows]
+
+    @app.get("/api/review/overview")
+    def review_overview(folder_id: str | None = None, account: Account = Depends(web_account)) -> dict:
+        with connect(db_path) as connection:
+            eligible = [row for row in scoped_items(connection, account.id, folder_id) if row["category"] in ("word", "sentence", "grammar")]
+            rows = connection.execute("""SELECT r.item_id, r.result, COUNT(*) AS count FROM recall_results r
+                JOIN review_sessions s ON s.id = r.session_id
+                WHERE s.user_id = ? GROUP BY r.item_id, r.result""", (account.id,)).fetchall()
+            counts: dict[str, dict[str, int]] = {}
+            for row in rows:
+                counts.setdefault(str(row["item_id"]), {})[str(row["result"])] = int(row["count"])
+            entries = [{"id": row["id"], "category": row["category"], "text": row["text"],
+                        "remembered": counts.get(str(row["id"]), {}).get("remembered", 0),
+                        "not_yet": counts.get(str(row["id"]), {}).get("not_yet", 0)} for row in eligible]
+            return {"entries": entries, "totals": {key: sum(entry[key] for entry in entries) for key in ("remembered", "not_yet")}}
+
+    def review_payload(connection: sqlite3.Connection, session: sqlite3.Row) -> dict:
+        results = connection.execute("SELECT item_id, result FROM recall_results WHERE session_id = ?", (session["id"],)).fetchall()
+        return {"id": session["id"], "kind": session["kind"], "questions": json.loads(session["questions_json"]),
+                "position": session["position"], "settings": json.loads(session["settings_json"] or "{}"),
+                "results": {row["item_id"]: row["result"] for row in results},
+                "completed": session["completed_at"] is not None, "ineligible_count": 0}
+
+    def owned_review(connection: sqlite3.Connection, session_id: str, user_id: str) -> sqlite3.Row:
+        session = connection.execute("SELECT * FROM review_sessions WHERE id = ? AND user_id = ?", (session_id, user_id)).fetchone()
+        if session is None:
+            raise HTTPException(status_code=404, detail="Review session not found")
+        return session
+
+    def review_available(connection: sqlite3.Connection, session: sqlite3.Row) -> bool:
+        required = set()
+        for question in json.loads(session["questions_json"]):
+            required.update(question["item_ids"])
+            if question["sentence"] is not None:
+                required.add(question["sentence"]["id"])
+        active = {row["id"] for row in connection.execute(
+            "SELECT id FROM learning_items WHERE user_id = ? AND deleted_at IS NULL", (session["user_id"],))}
+        return required <= active
+
+    def save_review_position(connection: sqlite3.Connection, session: sqlite3.Row, position: int) -> None:
+        size = len(json.loads(session["questions_json"]))
+        if position > size:
+            raise HTTPException(status_code=422, detail="Review position out of range")
+        connection.execute("UPDATE review_sessions SET position = ?, completed_at = ? WHERE id = ?",
+                           (position, _now_ms() if position == size else None, session["id"]))
+
+    @app.get("/api/review/sessions/current")
+    def current_review(account: Account = Depends(web_account)) -> dict | None:
+        with connect(db_path) as connection:
+            session = connection.execute("""SELECT * FROM review_sessions WHERE user_id = ? AND kind = 'vocabulary'
+                AND settings_json IS NOT NULL AND completed_at IS NULL ORDER BY created_at DESC, id DESC LIMIT 1""", (account.id,)).fetchone()
+            return review_payload(connection, session) if session is not None and review_available(connection, session) else None
+
+    @app.get("/api/review/sessions/{session_id}")
+    def get_review(session_id: str, account: Account = Depends(web_account)) -> dict:
+        with connect(db_path) as connection:
+            session = owned_review(connection, session_id, account.id)
+            if not review_available(connection, session):
+                raise HTTPException(status_code=409, detail="Nội dung buổi ôn đã bị xóa. Hãy bắt đầu buổi mới.")
+            return review_payload(connection, session)
+
+    @app.patch("/api/review/sessions/{session_id}/progress", dependencies=[Depends(require_browser_origin)])
+    def review_progress(session_id: str, body: ReviewProgress, account: Account = Depends(web_account)) -> dict:
+        with connect(db_path) as connection:
+            session = owned_review(connection, session_id, account.id)
+            if not review_available(connection, session):
+                raise HTTPException(status_code=409, detail="Nội dung buổi ôn đã bị xóa. Hãy bắt đầu buổi mới.")
+            save_review_position(connection, session, body.position)
+            settings = json.loads(session["settings_json"] or "{}")
+            settings.update(body.model_dump(exclude={"position"}, exclude_none=True))
+            connection.execute("UPDATE review_sessions SET settings_json = ? WHERE id = ?", (json.dumps(settings), session_id))
+            return review_payload(connection, owned_review(connection, session_id, account.id))
+
+    @app.post("/api/review/sessions", status_code=201, dependencies=[Depends(require_browser_origin)])
+    def start_review(body: ReviewStart, account: Account = Depends(web_account)) -> dict:
+        with connect(db_path) as connection:
+            scoped = scoped_items(connection, account.id, body.folder_id)
+            if body.kind == "vocabulary":
+                questions = [{"sentence": None, "item_ids": [str(row["id"])], "items": [dict(item(connection, row))]}
+                             for row in scoped if row["category"] in (("word", "sentence") if body.category == "all" else (body.category,))]
+                ineligible_count = 0
+                ineligible_item_ids: list[str] = []
+            else:
+                questions_by_sentence: dict[str, dict] = {}
+                ineligible_count = 0
+                ineligible_item_ids = []
+                for row in scoped:
+                    if row["category"] != "grammar":
+                        continue
+                    sentences = connection.execute("""SELECT sentence.* FROM learning_item_links link
+                        JOIN learning_items sentence ON sentence.id = link.sentence_id
+                        WHERE link.word_id = ? AND sentence.user_id = ? AND sentence.category = 'sentence'
+                        AND sentence.deleted_at IS NULL""", (row["id"], account.id)).fetchall()
+                    if not sentences:
+                        ineligible_count += 1
+                        ineligible_item_ids.append(str(row["id"]))
+                        continue
+                    sentence = random.choice(sentences)
+                    key = str(sentence["id"])
+                    question = questions_by_sentence.setdefault(key, {"sentence": dict(item(connection, sentence)), "item_ids": [], "items": []})
+                    question["item_ids"].append(str(row["id"]))
+                    question["items"].append(dict(item(connection, row)))
+                questions = list(questions_by_sentence.values())
+            random.shuffle(questions)
+            session_id = _new_id()
+            connection.execute("UPDATE review_sessions SET completed_at = ? WHERE user_id = ? AND kind = ? AND completed_at IS NULL",
+                               (_now_ms(), account.id, body.kind))
+            connection.execute("""INSERT INTO review_sessions
+                (id, user_id, kind, questions_json, created_at, settings_json, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (session_id, account.id, body.kind, json.dumps(questions), _now_ms(),
+                 json.dumps(body.model_dump(exclude={"kind"})), None if questions else _now_ms()))
+            return {**review_payload(connection, owned_review(connection, session_id, account.id)),
+                    "ineligible_count": ineligible_count, "ineligible_item_ids": ineligible_item_ids}
+
+    @app.put("/api/review/sessions/{session_id}/results/{item_id}", dependencies=[Depends(require_browser_origin)])
+    def record_recall(session_id: str, item_id: str, body: RecallInput, account: Account = Depends(web_account)) -> dict:
+        with connect(db_path) as connection:
+            session = owned_review(connection, session_id, account.id)
+            questions = json.loads(session["questions_json"])
+            if not any(item_id in question["item_ids"] for question in questions):
+                raise HTTPException(status_code=404, detail="Review item not found")
+            if connection.execute("SELECT 1 FROM learning_items WHERE id = ? AND user_id = ? AND deleted_at IS NULL", (item_id, account.id)).fetchone() is None:
+                raise HTTPException(status_code=404, detail="Review item not found")
+            if body.position is not None:
+                save_review_position(connection, session, body.position)
+            connection.execute("""INSERT INTO recall_results (session_id, item_id, result) VALUES (?, ?, ?)
+                ON CONFLICT(session_id, item_id) DO UPDATE SET result = excluded.result""", (session_id, item_id, body.result))
+            return {"item_id": item_id, "result": body.result}
 
     @app.post("/api/items", response_model=Item, status_code=201, dependencies=[Depends(require_browser_origin)])
     def create_web_item(body: ItemInput, account: Account = Depends(web_account)) -> Item:
@@ -640,6 +814,30 @@ def create_app(database_path: Path | None = None) -> FastAPI:
             if changed.rowcount != 1:
                 raise HTTPException(status_code=404, detail="Saved Learning Item not found")
 
+    @app.post("/api/folders/{folder_id}/trash-items", dependencies=[Depends(require_browser_origin)])
+    def trash_folder_items(folder_id: str, body: BulkTrashInput, account: Account = Depends(web_account)) -> dict[str, int]:
+        with connect(db_path) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            folder = connection.execute(
+                "SELECT id FROM folders WHERE id = ? AND user_id = ? AND deleted_at IS NULL", (folder_id, account.id),
+            ).fetchone()
+            if folder is None:
+                raise HTTPException(status_code=404, detail="Folder not found")
+            owned = connection.execute(
+                "SELECT id FROM learning_items WHERE folder_id = ? AND user_id = ? AND deleted_at IS NULL",
+                (folder_id, account.id),
+            ).fetchall()
+            owned_ids = {str(row["id"]) for row in owned}
+            selected_ids = owned_ids if body.item_ids is None else set(body.item_ids)
+            if not selected_ids.issubset(owned_ids):
+                raise HTTPException(status_code=404, detail="Saved Learning Item not found")
+            timestamp = _now()
+            connection.executemany(
+                "UPDATE learning_items SET deleted_at = ? WHERE id = ? AND user_id = ? AND folder_id = ? AND deleted_at IS NULL",
+                [(timestamp, item_id, account.id, folder_id) for item_id in selected_ids],
+            )
+            return {"count": len(selected_ids)}
+
     @app.get("/api/trash", response_model=list[TrashEntry])
     def list_trash(account: Account = Depends(web_account)) -> list[TrashEntry]:
         with connect(db_path) as connection:
@@ -668,7 +866,7 @@ def create_app(database_path: Path | None = None) -> FastAPI:
                 folder_id = _new_id()
                 connection.execute(
                     "INSERT INTO folders (id, user_id, parent_id, name, name_key, created_at) VALUES (?, ?, NULL, ?, ?, ?)",
-                    (folder_id, user_id, name, name.casefold(), _now()),
+                    (folder_id, user_id, name, name.casefold(), _now_ms()),
                 )
                 return folder_id
             collision = connection.execute(
@@ -761,7 +959,7 @@ def create_app(database_path: Path | None = None) -> FastAPI:
     def list_folders(account: Account = Depends(web_account)) -> list[Folder]:
         with connect(db_path) as connection:
             rows = connection.execute(
-                "SELECT id, name, parent_id FROM folders WHERE user_id = ? AND deleted_at IS NULL ORDER BY name_key, id",
+                "SELECT id, name, parent_id FROM folders WHERE user_id = ? AND deleted_at IS NULL ORDER BY created_at, rowid",
                 (account.id,),
             ).fetchall()
         return [_folder(row) for row in rows]
@@ -775,7 +973,7 @@ def create_app(database_path: Path | None = None) -> FastAPI:
                 connection.execute(
                     """INSERT INTO folders (id, user_id, parent_id, name, name_key, created_at)
                        VALUES (?, ?, ?, ?, ?, ?)""",
-                    (folder_id, account.id, body.parent_id, body.name, body.name.casefold(), _now()),
+                    (folder_id, account.id, body.parent_id, body.name, body.name.casefold(), _now_ms()),
                 )
             except sqlite3.IntegrityError as error:
                 raise HTTPException(status_code=409, detail="Folder name already used here") from error

@@ -21,10 +21,18 @@ async function getCmuDict(): Promise<Record<string, string>> {
 
 export class PhoneticEngine {
   static getPinyin(text: string): string {
+    const isolatedCharacter = text.trim();
+    if (/^\p{Script=Han}$/u.test(isolatedCharacter)) {
+      return `${isolatedCharacter} ${PhoneticEngine.getPinyinReadings(isolatedCharacter).join(' / ')}`;
+    }
     return text
       .split('\n')
       .map(line => line.replace(zhRunPattern, run => formatZhPinyinRun(run)).replace(/\s+([,.;:?!])/g, '$1'))
       .join('\n');
+  }
+
+  static getPinyinReadings(character: string): string[] {
+    return pinyin(character, { multiple: true, type: 'array' }) as string[];
   }
 
   static async getEnglishIPA(text: string): Promise<string> {

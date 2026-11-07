@@ -67,7 +67,7 @@ describe('extension account link', () => {
     expect(openedTabs).toEqual(['http://127.0.0.1:5173/?link=request-1']);
     expect(alarms.size).toBe(1);
     await link.pollAccountLink();
-    expect(await link.getAccountLinkStatus()).toEqual({ state: 'linked', username: 'learner' });
+    expect(await link.getAccountLinkStatus()).toEqual({ state: 'linked', username: 'learner', webUrl: 'https://learning.peebot.shop' });
     expect(JSON.stringify([...publicStorage.entries()])).not.toContain('private-access-token');
     expect(JSON.stringify([...publicStorage.entries()])).not.toContain('private-secret');
     expect(fetchMock.mock.calls.some(([url]) => url.endsWith('/api/extension/revoke'))).toBe(false);
@@ -86,7 +86,7 @@ describe('extension account link', () => {
     const link = await import('../src/background/learning-account-link');
     await link.startAccountLink();
     await link.pollAccountLink();
-    expect(publicStorage.get('learningAccountStatus')).toEqual({ state: 'error', message: 'Yêu cầu liên kết hết hạn. Hãy thử lại.' });
+    expect(publicStorage.get('learningAccountStatus')).toEqual({ state: 'error', message: 'Yêu cầu liên kết hết hạn. Hãy thử lại.', webUrl: 'https://learning.peebot.shop' });
     expect(alarms.size).toBe(0);
   });
 });

@@ -1,7 +1,9 @@
 import TOOLTIP_CSS from '../ui/tooltip.css?inline';
 import HanziWriter, { type CharacterJson } from 'hanzi-writer';
+import { pinyin } from 'pinyin-pro';
 import BREAKDOWN_CSS from '../ui/hanzi-breakdown.css?inline';
 import { getHanziBreakdown } from '../services/hanzi-breakdown';
+import { PhoneticEngine } from '../services/phonetics';
 import {
   getHanziMemoryNote, getPersonalHanziMeaning, getUnidentifiedStrokeExplanation,
   saveHanziMemoryNote, savePersonalHanziMeaning, saveUnidentifiedStrokeExplanation,
@@ -46,6 +48,7 @@ export class TranslationTooltip {
   private breakdownRoot: HTMLDivElement | null = null;
   private breakdownCharacter: string | null = null;
   private breakdownPath: string[] = [];
+  private breakdownContextReading = '';
   private breakdownRequest = 0;
   private breakdownDragCleanup: (() => void) | null = null;
   private breakdownPositionLocked = false;
@@ -56,6 +59,7 @@ export class TranslationTooltip {
   private saveChoice: 'word' | 'sentence' | 'both' = 'word';
   private readingFocusSection: Element | null = null;
   private readingFocusKey: string | null = null;
+  private selectionGlossRequest = 0;
 
   constructor() {
     this.init();
@@ -87,6 +91,7 @@ export class TranslationTooltip {
 
     this.tooltipEl = document.createElement('div');
     this.tooltipEl.id = 'tooltip';
+    this.tooltipEl.tabIndex = -1;
     this.shadow.appendChild(this.tooltipEl);
 
     this.triggerEl = document.createElement('button');
@@ -108,6 +113,16 @@ export class TranslationTooltip {
       const target = event.target as HTMLElement;
       const saveButton = target.closest('.tt-save-button');
       if (saveButton) { this.openSaveChoices(saveButton.closest('.tt-section')!); return; }
+      if (target.closest('.tt-save-link-account')) {
+        const status = this.tooltipEl?.querySelector<HTMLElement>('.tt-save-link-status');
+        if (status) status.textContent = 'Đang mở trang liên kết…';
+        void this.sendLearningMessage({ type: 'START_ACCOUNT_LINK' }).then(response => {
+          if (status?.isConnected) status.textContent = response?.success
+            ? 'Đã mở trang liên kết. Xác nhận trên web rồi bấm Lưu lại.'
+            : response?.error ?? 'Không mở được trang liên kết.';
+        });
+        return;
+      }
       const choice = target.closest<HTMLButtonElement>('.tt-save-choice');
       if (choice) { this.openSaveForm(choice.dataset.choice as 'word' | 'sentence' | 'both'); return; }
       if (target.closest('.tt-save-close')) { this.closeSavePanel(); return; }
@@ -129,6 +144,7 @@ export class TranslationTooltip {
         if (looping && this.breakdownCharacter === character) {
           this.closeHanziBreakdown();
         } else if (!looping && this.hanziBreakdownEnabled && character) {
+          this.breakdownContextReading = hanziButton.dataset.reading ?? '';
           void this.showHanziBreakdown(character);
         }
         return;
@@ -242,7 +258,7 @@ export class TranslationTooltip {
       if (!textElement || !this.tooltipEl?.contains(textElement)) return;
       const section = textElement.closest('.tt-section');
       const lang = section?.getAttribute('data-lang')?.toLowerCase() ?? '';
-      if (!section || (!lang.startsWith('zh') && !lang.startsWith('en'))) return;
+      if (!section || !['zh', 'en', 'vi'].some(code => lang.startsWith(code))) return;
       // Chrome retargets window Selection endpoints to BODY for native selections
       // inside a shadow root, so read the shadow-local Selection when available.
       const selection = (this.shadow as ShadowRoot & { getSelection?: () => Selection | null })
@@ -255,6 +271,7 @@ export class TranslationTooltip {
           this.saveSelection = '';
           this.stopHanziAnimations();
           this.tooltipEl?.querySelector('.tt-hanzi-strip')?.remove();
+          this.clearSelectionGloss();
           if (this.tooltipEl?.querySelector('.tt-save-panel')) this.openSaveChoices(section);
         }
         return;
@@ -262,20 +279,35 @@ export class TranslationTooltip {
       if (!selection.anchorNode || !selection.focusNode
         || !textElement.contains(selection.anchorNode)
         || !textElement.contains(selection.focusNode)) return;
+      const selectedText = selection.toString().trim();
       const previousSaveSelection = this.saveSelection;
       if (textElement.matches('.tt-source-text, .tt-translation-text') && /\p{Script=Han}/u.test(selection.toString())) {
         this.saveSection = section;
         this.captureSaveSelection(section, selection);
       }
-      const { characters: mappedCharacters, toggled } = this.highlightReading(section, textElement, selection, lang);
+      const { characters: mappedCharacters, toggled, textStart, textEnd } = this.highlightReading(section, textElement, selection, lang);
       if (toggled) {
         this.saveSelection = '';
         this.saveSelectionOffset = -1;
         this.stopHanziAnimations();
         this.tooltipEl?.querySelector('.tt-hanzi-strip')?.remove();
+        this.clearSelectionGloss();
         selection.removeAllRanges?.();
         if (this.tooltipEl?.querySelector('.tt-save-panel')) this.openSaveChoices(section);
         return;
+      }
+      const glossText = textElement.matches('.tt-phonetic')
+        ? lang.startsWith('zh') && textStart !== undefined && textEnd !== undefined
+          ? (section.querySelector('.tt-source-text, .tt-translation-text')?.textContent ?? '').slice(textStart, textEnd)
+          : ''
+        : selectedText;
+      this.showSelectionGloss(section, glossText);
+      if (lang.startsWith('zh') && textElement.matches('.tt-phonetic')) {
+        const source = section.querySelector('.tt-source-text, .tt-translation-text')?.textContent ?? '';
+        this.saveSection = section;
+        this.saveSelectionOffset = textStart ?? -1;
+        this.saveSelection = textStart !== undefined && textEnd !== undefined
+          ? source.slice(textStart, textEnd) : '';
       }
       if (this.saveSelection !== previousSaveSelection && this.tooltipEl?.querySelector('.tt-save-panel')) {
         this.openSaveChoices(section);
@@ -284,7 +316,18 @@ export class TranslationTooltip {
         const characters = textElement.matches('.tt-phonetic')
           ? mappedCharacters
           : selection.toString().match(/\p{Script=Han}/gu);
-        if (characters?.length) this.showHanziChoices(section, characters);
+        if (characters?.length) {
+          const text = section.querySelector('.tt-source-text, .tt-translation-text')?.textContent ?? '';
+          let start = text.indexOf(characters.join(''));
+          if (textElement.matches('.tt-source-text, .tt-translation-text') && selection.rangeCount > 0 && typeof selection.getRangeAt === 'function') {
+            const range = selection.getRangeAt(0);
+            const prefix = range.cloneRange();
+            prefix.selectNodeContents(textElement);
+            prefix.setEnd(range.startContainer, range.startOffset);
+            start = prefix.toString().length;
+          }
+          this.showHanziChoices(section, characters, text, start);
+        }
       }
     });
 
@@ -320,30 +363,38 @@ export class TranslationTooltip {
         (activeElement as HTMLInputElement).blur();
       }
     }, true);
-    document.addEventListener('keydown', (event) => {
+    window.addEventListener('keydown', (event) => {
       if (!this.tooltipEl?.isConnected || this.tooltipEl.style.display === 'none' || !this.tooltipEl.classList.contains('visible')) return;
       const activeElement = this.shadow?.activeElement ?? document.activeElement;
       const eventElements = event.composedPath().filter((node): node is Element => node instanceof Element);
       if (activeElement instanceof Element) eventElements.push(activeElement);
       if (eventElements.some(node => node.matches('input, textarea, [contenteditable="true"]')
         || node instanceof HTMLElement && node.isContentEditable)) return;
+      if (event.ctrlKey || event.altKey || event.metaKey) return;
+      if (event.key.toLowerCase() === 'x' && !event.repeat) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        if (this.tooltipEl.querySelector('.tt-save-panel')) this.closeSavePanel();
+        else this.hide();
+        return;
+      }
       if (eventElements.some(node => node.matches('select'))
         && !(event.key.toLowerCase() === 's' && eventElements.some(node => node.matches('.tt-save-form .tt-save-folder')))) return;
-      if (event.ctrlKey || event.altKey || event.metaKey) return;
       if (event.key.toLowerCase() === 's' && !event.repeat) {
         const form = this.tooltipEl.querySelector<HTMLFormElement>('.tt-save-form');
         if (form) {
           event.preventDefault();
+          event.stopImmediatePropagation();
           if (!form.querySelector<HTMLButtonElement>('.tt-save-submit')?.disabled) form.requestSubmit();
           return;
         }
         const section = this.saveSection ?? this.tooltipEl.querySelector('.tt-save-button')?.closest('.tt-section');
-        if (section) { event.preventDefault(); this.openSaveChoices(section); }
+        if (section) { event.preventDefault(); event.stopImmediatePropagation(); this.openSaveChoices(section); }
       } else {
         const numberKey = /^[1-3]$/.test(event.key) ? event.key : event.code?.match(/^(?:Digit|Numpad)([1-3])$/)?.[1];
         if (!numberKey) return;
         const choice = this.tooltipEl.querySelector<HTMLButtonElement>(`.tt-save-choice[data-key="${numberKey}"]`);
-        if (choice) { event.preventDefault(); choice.click(); }
+        if (choice) { event.preventDefault(); event.stopImmediatePropagation(); choice.click(); }
       }
     }, true);
   }
@@ -366,6 +417,28 @@ export class TranslationTooltip {
   }
 
   private openSaveChoices(section: Element): void {
+    this.closeSavePanel();
+    const panel = document.createElement('div');
+    panel.className = 'tt-save-panel';
+    panel.setAttribute('role', 'status');
+    panel.textContent = 'Đang kiểm tra liên kết tài khoản web…';
+    section.append(panel);
+    const checked = (response: any): void => {
+      if (!panel.isConnected) return;
+      if (response?.success && response.status?.state === 'linked') {
+        panel.remove();
+        this.renderSaveChoices(section);
+        return;
+      }
+      panel.classList.add('tt-save-unlinked');
+      panel.setAttribute('role', 'alert');
+      panel.innerHTML = '<strong>Chưa liên kết tài khoản web</strong><p>Liên kết tài khoản để lưu mục học tập vào thư viện.</p><button type="button" class="tt-save-link-account">Liên kết tài khoản</button><button type="button" class="tt-save-close" aria-label="Đóng thông báo lưu" title="Đóng · phím X">×</button><p class="tt-save-link-status" role="status"></p>';
+    };
+    try { chrome.runtime.sendMessage({ type: 'GET_ACCOUNT_LINK_STATUS' }, checked); }
+    catch { checked(null); }
+  }
+
+  private renderSaveChoices(section: Element): void {
     const previousSection = this.saveSection;
     this.saveSection = section;
     const row = section.querySelector('.tt-source-text, .tt-translation-text');
@@ -386,11 +459,11 @@ export class TranslationTooltip {
     panel.className = 'tt-save-panel';
     panel.setAttribute('role', 'group');
     panel.setAttribute('aria-label', 'Save Choice Menu');
-    panel.innerHTML = `<div class="tt-save-heading"><strong class="tt-save-title"></strong><button type="button" class="tt-save-close" aria-label="Đóng menu lưu">×</button></div>
-      <small class="tt-save-shortcut">${this.saveSelection ? 'Nhấn 1, 2 hoặc 3 để chọn' : 'Nhấn 1 hoặc 2 để chọn'}</small>
-      <button type="button" class="tt-save-choice" data-choice="word" data-key="1">1 · Từ / cụm từ</button>
-      <button type="button" class="tt-save-choice" data-choice="sentence" data-key="2">2 · Câu</button>
-      ${this.saveSelection ? '<button type="button" class="tt-save-choice" data-choice="both" data-key="3">3 · Cả hai</button>' : ''}`;
+    panel.innerHTML = `<div class="tt-save-heading"><strong class="tt-save-title"></strong><button type="button" class="tt-save-close" aria-label="Đóng menu lưu" title="Đóng · phím X">×</button></div>
+      <small class="tt-save-shortcut">${this.saveSelection ? 'Nhấn 1, 2 hoặc 3 để chọn' : 'Nhấn 1 hoặc 2 để chọn'} · X để thoát</small>
+      <button type="button" class="tt-save-choice" data-choice="word" data-key="1" title="Chọn từ / cụm từ · phím 1">1 · Từ / cụm từ</button>
+      <button type="button" class="tt-save-choice" data-choice="sentence" data-key="2" title="Chọn câu · phím 2">2 · Câu</button>
+      ${this.saveSelection ? '<button type="button" class="tt-save-choice" data-choice="both" data-key="3" title="Chọn cả hai · phím 3">3 · Cả hai</button>' : ''}`;
     panel.querySelector('.tt-save-title')!.textContent = `Lưu “${this.saveSelection || source}” vào thư viện`;
     section.append(panel);
   }
@@ -401,13 +474,13 @@ export class TranslationTooltip {
     const row = this.saveSection.querySelector('.tt-source-text, .tt-translation-text')!;
     const text = choice === 'sentence' && this.saveSelection ? this.saveSentence : this.saveSelection || row.textContent || '';
     const panel = this.saveSection.querySelector('.tt-save-panel')!;
-    panel.innerHTML = `<div class="tt-save-heading"><strong class="tt-save-title"></strong><button type="button" class="tt-save-close" aria-label="Đóng menu lưu">×</button></div>
+    panel.innerHTML = `<div class="tt-save-heading"><strong class="tt-save-title"></strong><button type="button" class="tt-save-close" aria-label="Đóng menu lưu" title="Đóng · phím X">×</button></div>
       <form class="tt-save-form"><label>Thư mục học tập<select class="tt-save-folder" required><option value="">Đang tải…</option></select></label>
       <label>${choice === 'sentence' && this.saveSelection ? 'Câu chứa chữ đã chọn · kiểm tra trước khi lưu' : 'Chữ Trung'}<input class="tt-save-text" required /></label>
       <label>Nghĩa gợi ý<input class="tt-save-meaning" required placeholder="Sửa nghĩa trước khi lưu" /></label>
       ${choice === 'both' ? '<label>Câu chứa từ · kiểm tra trước khi lưu<textarea class="tt-save-sentence" required></textarea></label><label>Nghĩa câu<input class="tt-save-sentence-meaning" required /></label><small class="tt-save-existing-sentence" role="status"></small>' : ''}
-      <small class="tt-save-shortcut">Nhấn S để lưu khi không nhập liệu</small>
-      <p class="tt-save-status" role="status"></p><button type="submit" class="tt-save-submit">Lưu</button></form>`;
+      <small class="tt-save-shortcut">Nhấn S để lưu · X để thoát khi không nhập liệu</small>
+      <p class="tt-save-status" role="status"></p><button type="submit" class="tt-save-submit" title="Lưu · phím S">Lưu</button></form>`;
     panel.querySelector('.tt-save-title')!.textContent = `Lưu “${text}” vào thư viện`;
     panel.querySelector<HTMLInputElement>('.tt-save-text')!.value = text;
     const sentence = panel.querySelector<HTMLTextAreaElement>('.tt-save-sentence');
@@ -429,7 +502,9 @@ export class TranslationTooltip {
     };
     const meaningField = panel.querySelector<HTMLInputElement>('.tt-save-meaning')!;
     fillMeaning(text, meaningField);
+    meaningField.addEventListener('input', () => { meaningField.dataset.userEdited = '1'; });
     panel.querySelector<HTMLInputElement>('.tt-save-text')!.addEventListener('change', event => {
+      meaningField.dataset.userEdited = '';
       meaningField.value = '';
       fillMeaning((event.target as HTMLInputElement).value, meaningField);
     });
@@ -455,6 +530,49 @@ export class TranslationTooltip {
     return new Promise(resolve => chrome.runtime.sendMessage(message, resolve));
   }
 
+  private clearSelectionGloss(): void {
+    this.selectionGlossRequest++;
+    this.tooltipEl?.querySelectorAll('.tt-selection-gloss').forEach(node => node.remove());
+  }
+
+  private showSelectionGloss(selectedSection: Element, text: string): void {
+    this.clearSelectionGloss();
+    const selected = text.trim();
+    if (!selected || selected.length > 500 || typeof chrome === 'undefined' || typeof chrome.runtime?.sendMessage !== 'function') return;
+    const selectedLang = selectedSection.getAttribute('data-lang')?.toLowerCase().split('-')[0];
+    const targets = [...(this.tooltipEl?.querySelectorAll('.tt-section') ?? [])]
+      .filter(section => section !== selectedSection && section.getAttribute('data-lang')?.toLowerCase().split('-')[0] !== selectedLang);
+    const request = this.selectionGlossRequest;
+    for (const section of targets) {
+      const targetLang = section.getAttribute('data-lang')?.toLowerCase().split('-')[0];
+      const row = section.querySelector('.tt-source-text, .tt-translation-text');
+      if (!row || !targetLang || !['vi', 'en', 'zh'].includes(targetLang)) continue;
+      void this.sendLearningMessage({ type: 'TRANSLATE_SELECTION', text: selected, targetLang }).then(response => {
+        if (request !== this.selectionGlossRequest || !section.isConnected || !this.tooltipEl?.isConnected) return;
+        const translation = typeof response?.translation === 'string' ? response.translation.trim() : '';
+        if (!response?.success || !translation || translation === selected) return;
+        const gloss = document.createElement('span');
+        gloss.className = 'tt-selection-gloss';
+        gloss.setAttribute('role', 'status');
+        gloss.append('(');
+        const strong = document.createElement('strong');
+        strong.textContent = translation;
+        gloss.append(strong);
+        const reading = typeof response?.phonetics === 'string' ? response.phonetics.trim() : '';
+        const pronunciation = targetLang === 'en' && reading.startsWith(`${translation} `)
+          ? reading.slice(translation.length + 1) : reading;
+        if (targetLang !== 'vi' && pronunciation && pronunciation !== translation) {
+          const phonetic = document.createElement('span');
+          phonetic.className = 'tt-selection-gloss-pronunciation';
+          phonetic.textContent = pronunciation;
+          gloss.append(' · ', phonetic);
+        }
+        gloss.append(')');
+        row.after(gloss);
+      }).catch(() => { /* Existing full-sentence translation stays visible. */ });
+    }
+  }
+
   private async loadSaveFolders(panel: Element, onLoaded?: () => void): Promise<void> {
     const result = await this.sendLearningMessage({ type: 'LEARNING_FOLDERS' });
     const status = panel.querySelector<HTMLElement>('.tt-save-status')!;
@@ -472,6 +590,7 @@ export class TranslationTooltip {
     const select = panel.querySelector<HTMLSelectElement>('.tt-save-folder')!;
     select.innerHTML = '<option value="">Chọn thư mục</option>';
     const stored = await chrome.storage.local.get('defaultLearningFolder');
+    if (!panel.isConnected) return;
     const byId = new Map(folders.map(folder => [folder.id, folder]));
     const pathFor = (folder: (typeof folders)[number]): string => {
       const names = [folder.name];
@@ -551,6 +670,7 @@ export class TranslationTooltip {
     const item = this.saveChoice === 'both'
       ? { folder_id, word_text: text, word_meaning: meaning, sentence_text: form.querySelector<HTMLTextAreaElement>('.tt-save-sentence')!.value.trim(),
           sentence_meaning: sentenceMeaningField!.value.trim(),
+          update_existing_word_meaning: form.querySelector<HTMLInputElement>('.tt-save-meaning')!.dataset.userEdited === '1',
           update_existing_sentence_meaning: sentenceMeaningField!.dataset.userEdited === '1'
             && (existingSentenceMeaning === undefined || sentenceMeaningField!.value.trim() !== existingSentenceMeaning) }
       : { folder_id, category: this.saveChoice, text, meaning };
@@ -574,6 +694,7 @@ export class TranslationTooltip {
 
   show(x: number, y: number, sourceText: string, data: any, ttsEnabled: boolean = true, phoneticsVisible: boolean = true, ocrWidth?: number) {
     if (!this.tooltipEl || !this.shadow) return;
+    this.clearSelectionGloss();
     this.stopHanziAnimations();
     this.saveSection = null;
     this.saveSelection = '';
@@ -608,7 +729,7 @@ export class TranslationTooltip {
       `;
     };
     const renderSaveButton = (text: string) => /\p{Script=Han}/u.test(text)
-      ? '<button type="button" class="tt-btn tt-save-button" aria-label="Lưu chữ Trung" title="Lưu chữ Trung"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2.8 2.8 5.8 6.4.9-4.6 4.5 1.1 6.3-5.7-3-5.7 3 1.1-6.3-4.6-4.5 6.4-.9z"/></svg></button>' : '';
+      ? '<button type="button" class="tt-btn tt-save-button" aria-label="Lưu chữ Trung" title="Lưu chữ Trung · phím S"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2.8 2.8 5.8 6.4.9-4.6 4.5 1.1 6.3-5.7-3-5.7 3 1.1-6.3-4.6-4.5 6.4-.9z"/></svg></button>' : '';
 
     const isOcrTooltip = typeof ocrWidth === 'number' && ocrWidth > 0;
     const viewportMargin = 16;
@@ -740,6 +861,10 @@ export class TranslationTooltip {
     // Reset state, then trigger appear animation
     this.tooltipEl.classList.remove('hidden', 'visible');
     this.tooltipEl.style.display = 'block';
+    const focused = document.activeElement;
+    if (focused instanceof HTMLElement && (focused.matches('input, textarea, [contenteditable="true"]') || focused.isContentEditable)) {
+      this.tooltipEl.focus({ preventScroll: true });
+    }
     const initialWidth = this.tooltipEl.getBoundingClientRect().width;
     if (initialWidth > 0) {
       this.tooltipEl.style.width = `${initialWidth}px`;
@@ -755,6 +880,7 @@ export class TranslationTooltip {
 
   hide() {
     if (this.tooltipEl) {
+      this.clearSelectionGloss();
       this.closeHanziBreakdown();
       this.stopHanziAnimations();
       this.readingFocusSection = null;
@@ -764,7 +890,7 @@ export class TranslationTooltip {
     }
   }
 
-  private showHanziChoices(section: Element, characters: string[]): void {
+  private showHanziChoices(section: Element, characters: string[], text: string, start: number): void {
     this.stopHanziAnimations();
     this.tooltipEl?.querySelector('.tt-hanzi-strip')?.remove();
     const header = section.querySelector('.tt-section-header');
@@ -772,12 +898,20 @@ export class TranslationTooltip {
     if (!header || !badge) return;
     const strip = document.createElement('div');
     strip.className = 'tt-hanzi-strip';
+    const readings = pinyin(text, { type: 'array', nonZh: 'consecutive' }) as string[];
+    const glyphs = Array.from(text);
+    let position = start >= 0 ? Array.from(text.slice(0, start)).length : -1;
     for (const character of characters) {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'tt-hanzi-button';
       button.setAttribute('aria-label', `Loop stroke order for ${character}`);
       button.setAttribute('aria-pressed', 'false');
+      if (position >= 0 && text.trim() !== character) {
+        while (position < glyphs.length && glyphs[position] !== character) position++;
+        button.dataset.reading = readings[position] ?? '';
+        position++;
+      }
       const fallback = document.createElement('span');
       fallback.className = 'tt-hanzi-fallback';
       fallback.textContent = character;
@@ -803,16 +937,19 @@ export class TranslationTooltip {
           this.hanziWriters.delete(button);
         },
       });
+      // Scale the actual stroke geometry with the CSS-sized button, including
+      // when Tooltip Font Size changes while an animation is running.
+      drawing.querySelector('svg')?.setAttribute('viewBox', '0 0 56 56');
       this.hanziWriters.set(button, writer);
       void writer.animateCharacter();
     }
     badge.after(strip);
   }
 
-  private highlightReading(section: Element, selectedElement: Element, selection: Selection, lang: string): { characters: string[]; toggled: boolean } {
+  private highlightReading(section: Element, selectedElement: Element, selection: Selection, lang: string): { characters: string[]; toggled: boolean; textStart?: number; textEnd?: number } {
     const phoneticElement = section.querySelector('.tt-phonetic');
     const textElement = section.querySelector('.tt-source-text, .tt-translation-text');
-    if (!textElement || !phoneticElement || selection.rangeCount === 0) return { characters: [], toggled: false };
+    if (!textElement || (lang.startsWith('zh') || lang.startsWith('en')) && !phoneticElement || selection.rangeCount === 0) return { characters: [], toggled: false };
     const range = selection.getRangeAt(0);
     const before = range.cloneRange();
     before.selectNodeContents(selectedElement);
@@ -820,10 +957,12 @@ export class TranslationTooltip {
     const start = before.toString().length;
     const end = start + range.toString().length;
     const source = textElement.textContent ?? '';
-    const phonetics = phoneticElement.textContent ?? '';
+    const phonetics = phoneticElement?.textContent ?? '';
     type ReadingUnit = { text: { start: number; end: number }; phonetic: Array<{ start: number; end: number }> };
     const units: ReadingUnit[] = [];
-    if (lang.startsWith('en')) {
+    if (lang.startsWith('vi')) {
+      units.push({ text: { start, end }, phonetic: [] });
+    } else if (lang.startsWith('en')) {
       const words = [...source.matchAll(/[A-Za-z'-]+/g)];
       const groups: Array<{ start: number; end: number }> = [];
       let groupStart = 0;
@@ -857,7 +996,8 @@ export class TranslationTooltip {
             text: { start: textGlyph.index, end: textGlyph.index + glyph.length },
             phonetic: [
               { start: match.index + localIndex, end: match.index + localIndex + glyph.length },
-              { start: runEnd + syllable.index, end: runEnd + syllable.index + syllable[0].length },
+              { start: runEnd + syllable.index, end: run.length === 1 && textGlyphs.length === 1
+                ? runEnd + tail.length : runEnd + syllable.index + syllable[0].length },
             ],
           });
         });
@@ -879,12 +1019,14 @@ export class TranslationTooltip {
     this.readingFocusKey = focusKey || null;
     if (focused.length) {
       this.markReadingRanges(textElement, focused.map(unit => unit.text));
-      this.markReadingRanges(phoneticElement, focused.flatMap(unit => unit.phonetic));
+      if (phoneticElement) this.markReadingRanges(phoneticElement, focused.flatMap(unit => unit.phonetic));
     }
     this.restoreReadingSelection(selection, range, selectedElement, start, end);
     return { characters: lang.startsWith('zh')
       ? focused.map(unit => source.slice(unit.text.start, unit.text.end))
-      : [], toggled: false };
+      : [], toggled: false,
+      textStart: focused[0]?.text.start,
+      textEnd: focused[focused.length - 1]?.text.end };
   }
 
   private restoreReadingSelection(selection: Selection, range: Range, element: Element, start: number, end: number): void {
@@ -1021,6 +1163,10 @@ export class TranslationTooltip {
     if (this.tooltipEl) {
       this.tooltipEl.style.setProperty('--tooltip-font-size', `${size}px`);
     }
+    if (this.breakdownRoot) {
+      this.breakdownRoot.style.setProperty('--tooltip-font-size', `${size}px`);
+      this.positionHanziBreakdown();
+    }
   }
 
   updateHanziStrokeSpeed(speed: number): void {
@@ -1053,7 +1199,10 @@ export class TranslationTooltip {
     pendingClose.setAttribute('aria-label', this.hanziBreakdownLanguage === 'vi' ? 'Đóng phân rã' : 'Close breakdown');
     pendingClose.textContent = '×';
     pendingClose.addEventListener('click', () => this.closeHanziBreakdown());
-    loading.append(pendingClose, document.createTextNode(`${character} · ${this.hanziBreakdownLanguage === 'vi' ? 'Đang tải' : 'Loading'}`));
+    const loadingText = document.createElement('span');
+    loadingText.className = 'hanzi-breakdown-loading';
+    loadingText.textContent = `${character} · ${this.hanziBreakdownLanguage === 'vi' ? 'Đang tải' : 'Loading'}`;
+    loading.append(pendingClose, loadingText);
     shadow.appendChild(loading);
     this.positionHanziBreakdown();
     try {
@@ -1104,7 +1253,10 @@ export class TranslationTooltip {
         card.appendChild(back);
       }
       const title = document.createElement('h2');
-      title.textContent = `${breakdown.character} ${breakdown.pinyin.join(', ')}`;
+      const contextualReading = path.length === 1 ? this.breakdownContextReading : '';
+      const readings = path.length === 1 && !contextualReading
+        ? PhoneticEngine.getPinyinReadings(character) : breakdown.pinyin;
+      title.textContent = `${breakdown.character} ${contextualReading || readings.join(' / ')}`;
       const heading = document.createElement('p');
       heading.className = 'hanzi-breakdown-heading';
       heading.textContent = labels.title;
@@ -1136,6 +1288,17 @@ export class TranslationTooltip {
       });
       card.appendChild(heading);
       card.appendChild(title);
+      const otherReadings = breakdown.pinyin.filter(reading => reading !== contextualReading);
+      if (contextualReading && otherReadings.length) {
+        const readingNote = document.createElement('p');
+        readingNote.className = 'hanzi-breakdown-reading-note';
+        readingNote.textContent = `${language === 'vi' ? 'Âm ghi trong nguồn phân rã' : 'Reading in breakdown source'}: ${otherReadings.join(', ')}`;
+        card.appendChild(readingNote);
+      }
+      const meaningLabel = document.createElement('p');
+      meaningLabel.className = 'hanzi-breakdown-meaning-label';
+      meaningLabel.textContent = language === 'vi' ? 'Nghĩa của chữ (có thể gồm nhiều cách đọc)' : 'Character meanings (may span multiple readings)';
+      card.appendChild(meaningLabel);
       card.appendChild(this.createHanziMeaningEditor(character, language, ownMeaning ?? labels.unknown, personalMeaning, true));
       if (!breakdown.components.length) {
         const empty = document.createElement('p');
@@ -1354,6 +1517,7 @@ export class TranslationTooltip {
     root.style.top = '16px';
     root.style.right = '16px';
     root.style.zIndex = '2147483647';
+    root.style.setProperty('--tooltip-font-size', this.tooltipEl?.style.getPropertyValue('--tooltip-font-size') || '14px');
     const shadow = root.attachShadow({ mode: 'open' });
     const style = document.createElement('style');
     style.textContent = BREAKDOWN_CSS;

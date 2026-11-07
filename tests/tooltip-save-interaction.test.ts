@@ -2,6 +2,13 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { TranslationTooltip } from '../src/content/tooltip';
 
+function stubLinkedChrome(value: any): void {
+  const send = value.runtime.sendMessage;
+  value.runtime.sendMessage = (message: any, callback: (response: any) => void) => message.type === 'GET_ACCOUNT_LINK_STATUS'
+    ? callback({ success: true, status: { state: 'linked' } }) : send(message, callback);
+  vi.stubGlobal('chrome', value);
+}
+
 afterEach(() => { document.body.innerHTML = ''; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 function setup(text = '我喜欢学习。你呢？') {
@@ -10,7 +17,7 @@ function setup(text = '我喜欢学习。你呢？') {
   const sendMessage = vi.fn((message, callback) => callback(message.type === 'LEARNING_FOLDERS'
     ? { success: true, result: [{ id: 'folder', name: 'HSK', parent_id: null }] }
     : message.type === 'LEARNING_SUGGEST_MEANING' ? { success: true, meaning: 'học' } : { success: true }));
-  vi.stubGlobal('chrome', { runtime: { getURL: (path: string) => path, sendMessage }, storage: { local: { get: vi.fn(async () => ({ defaultLearningFolder: 'folder' })), set: vi.fn(async () => {}) } } });
+  stubLinkedChrome( { runtime: { getURL: (path: string) => path, sendMessage }, storage: { local: { get: vi.fn(async () => ({ defaultLearningFolder: 'folder' })), set: vi.fn(async () => {}) } } });
   const tooltip = new TranslationTooltip();
   tooltip.show(0, 0, text, { detectedLang: 'zh', sourcePhonetics: '我 wǒ · 喜欢 xǐ huān · 学习 xué xí · 你 nǐ · 呢 ne', translations: [] });
   return { root: document.getElementById('translation-extension-root')!.shadowRoot!, sendMessage };
@@ -75,6 +82,50 @@ test('number keys choose visible category despite bubbling being stopped inside 
   choice.dispatchEvent(new KeyboardEvent('keydown', { key: '3', bubbles: true, composed: true }));
   expect(root.querySelector('.tt-save-form')).not.toBeNull();
   expect(root.querySelector('.tt-save-sentence')).not.toBeNull();
+});
+
+test('opening tooltip from a focused page editor moves shortcut focus into tooltip and advertises keys on hover', () => {
+  const editor = document.createElement('div');
+  editor.setAttribute('contenteditable', 'true');
+  editor.tabIndex = 0;
+  document.body.append(editor);
+  editor.focus();
+  expect(document.activeElement).toBe(editor);
+  const { root } = setup('你好');
+  const tooltip = root.querySelector<HTMLElement>('#tooltip')!;
+  expect(root.activeElement).toBe(tooltip);
+  const save = root.querySelector<HTMLButtonElement>('.tt-save-button')!;
+  expect(save.title).toContain('S');
+  tooltip.dispatchEvent(new KeyboardEvent('keydown', { key: 's', bubbles: true, composed: true }));
+  const word = root.querySelector<HTMLButtonElement>('.tt-save-choice[data-key="1"]')!;
+  expect(word.title).toContain('1');
+  tooltip.dispatchEvent(new KeyboardEvent('keydown', { key: '1', bubbles: true, composed: true }));
+  expect(root.querySelector('.tt-save-form')).not.toBeNull();
+});
+
+test('x closes Save Choice Menu and save form back to original Translation Tooltip', async () => {
+  const { root, sendMessage } = setup('你好');
+  root.querySelector<HTMLButtonElement>('.tt-save-button')!.click();
+  expect(root.querySelector('.tt-save-panel')).not.toBeNull();
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'x', bubbles: true }));
+  expect(root.querySelector('.tt-save-panel')).toBeNull();
+  expect(root.querySelector('.tt-source-text')?.textContent).toBe('你好');
+  root.querySelector<HTMLButtonElement>('.tt-save-button')!.click();
+  root.querySelector<HTMLButtonElement>('[data-choice="word"]')!.click();
+  expect(root.querySelector('.tt-save-form')).not.toBeNull();
+  await vi.waitFor(() => expect((root.querySelector('.tt-save-folder') as HTMLSelectElement).options.length).toBe(2));
+  const meaning = root.querySelector<HTMLInputElement>('.tt-save-meaning')!;
+  meaning.focus();
+  meaning.dispatchEvent(new KeyboardEvent('keydown', { key: 'x', bubbles: true, composed: true }));
+  expect(root.querySelector('.tt-save-form')).not.toBeNull();
+  const folder = root.querySelector<HTMLSelectElement>('.tt-save-folder')!;
+  folder.focus();
+  folder.dispatchEvent(new KeyboardEvent('keydown', { key: 'X', bubbles: true, composed: true }));
+  expect(root.querySelector('.tt-save-panel')).toBeNull();
+  expect(root.querySelector('.tt-source-text')?.textContent).toBe('你好');
+  expect(sendMessage.mock.calls.some(([message]) => message.type === 'LEARNING_SAVE')).toBe(false);
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'x', bubbles: true }));
+  expect((root.querySelector('#tooltip') as HTMLElement).style.display).toBe('none');
 });
 
 test('s submits ready save form and announces success without reopening choices', async () => {
