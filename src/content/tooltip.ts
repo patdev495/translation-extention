@@ -937,6 +937,9 @@ export class TranslationTooltip {
           this.hanziWriters.delete(button);
         },
       });
+      // Scale the actual stroke geometry with the CSS-sized button, including
+      // when Tooltip Font Size changes while an animation is running.
+      drawing.querySelector('svg')?.setAttribute('viewBox', '0 0 56 56');
       this.hanziWriters.set(button, writer);
       void writer.animateCharacter();
     }
@@ -1160,6 +1163,10 @@ export class TranslationTooltip {
     if (this.tooltipEl) {
       this.tooltipEl.style.setProperty('--tooltip-font-size', `${size}px`);
     }
+    if (this.breakdownRoot) {
+      this.breakdownRoot.style.setProperty('--tooltip-font-size', `${size}px`);
+      this.positionHanziBreakdown();
+    }
   }
 
   updateHanziStrokeSpeed(speed: number): void {
@@ -1192,7 +1199,10 @@ export class TranslationTooltip {
     pendingClose.setAttribute('aria-label', this.hanziBreakdownLanguage === 'vi' ? 'Đóng phân rã' : 'Close breakdown');
     pendingClose.textContent = '×';
     pendingClose.addEventListener('click', () => this.closeHanziBreakdown());
-    loading.append(pendingClose, document.createTextNode(`${character} · ${this.hanziBreakdownLanguage === 'vi' ? 'Đang tải' : 'Loading'}`));
+    const loadingText = document.createElement('span');
+    loadingText.className = 'hanzi-breakdown-loading';
+    loadingText.textContent = `${character} · ${this.hanziBreakdownLanguage === 'vi' ? 'Đang tải' : 'Loading'}`;
+    loading.append(pendingClose, loadingText);
     shadow.appendChild(loading);
     this.positionHanziBreakdown();
     try {
@@ -1507,6 +1517,7 @@ export class TranslationTooltip {
     root.style.top = '16px';
     root.style.right = '16px';
     root.style.zIndex = '2147483647';
+    root.style.setProperty('--tooltip-font-size', this.tooltipEl?.style.getPropertyValue('--tooltip-font-size') || '14px');
     const shadow = root.attachShadow({ mode: 'open' });
     const style = document.createElement('style');
     style.textContent = BREAKDOWN_CSS;

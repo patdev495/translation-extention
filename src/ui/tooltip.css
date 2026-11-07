@@ -10,20 +10,21 @@
 .tt-section-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2xs) var(--space-xs); min-height: 44px; margin-bottom: var(--space-2xs); }
 .tt-lang-badge { font-size: max(12px, 0.78em); font-weight: 600; color: var(--color-muted); line-height: 1.5; }
 .tt-lang-badge.tr1, .tt-lang-badge.tr2 { color: var(--color-ink); }
-.tt-hanzi-strip { display: flex; flex: 1 1 0; align-items: center; gap: var(--space-2xs); min-width: 0; max-width: 100%; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
-.tt-hanzi-button { display: grid; place-items: center; position: relative; flex: 0 0 56px; width: 56px; height: 56px; padding: 0; border: 1px solid var(--color-tooltip-edge); border-radius: var(--radius-input); background: var(--color-transparent); color: var(--color-ink); cursor: pointer; }
+.tt-hanzi-strip { --hanzi-size: min(max(56px, 4em), calc(100vw - 64px)); display: flex; flex: 1 1 var(--hanzi-size); align-items: center; gap: max(var(--space-2xs), calc(4em / 14)); min-width: min(100%, var(--hanzi-size)); max-width: 100%; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+.tt-hanzi-button { display: grid; place-items: center; position: relative; flex: 0 0 var(--hanzi-size); width: var(--hanzi-size); height: var(--hanzi-size); padding: 0; border: 1px solid var(--color-tooltip-edge); border-radius: var(--radius-input); background: var(--color-transparent); color: var(--color-ink); cursor: pointer; }
 .tt-hanzi-button[aria-pressed="true"] { border-color: var(--color-accent); background: var(--color-accent-soft); }
 .tt-hanzi-button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
-.tt-hanzi-fallback { position: absolute; font-size: 32px; line-height: 1; }
-.tt-hanzi-drawing { display: block; width: 56px; height: 56px; }
-.tt-hanzi-drawing svg { width: 56px; height: 56px; }
-.tt-actions { display: flex; align-items: center; gap: var(--space-xs); flex-shrink: 0; }
-.tt-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: var(--radius-input); color: var(--color-muted); background: var(--color-transparent); cursor: pointer; flex-shrink: 0; }
+.tt-hanzi-fallback { position: absolute; font-size: calc(var(--hanzi-size) * 4 / 7); line-height: 1; }
+.tt-hanzi-drawing { display: block; width: 100%; height: 100%; }
+.tt-hanzi-drawing svg { width: 100%; height: 100%; }
+/* Keep the 14px layout as the minimum; scale actions with Tooltip Font Size. */
+.tt-actions { display: flex; flex-wrap: wrap; align-items: center; gap: max(var(--space-xs), calc(8em / 14)); max-width: 100%; min-width: 0; flex-shrink: 0; }
+.tt-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; width: max(36px, calc(36em / 14)); height: max(36px, calc(36em / 14)); padding: 0; border: 0; border-radius: var(--radius-input); color: var(--color-muted); background: var(--color-transparent); cursor: pointer; flex-shrink: 0; }
 .tt-btn::before { content: ""; position: absolute; inset: -4px; }
 .tt-btn:focus-visible, #trigger:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
 .tt-btn:active { background: var(--color-paper-3); }
 .tt-btn:disabled, #trigger:disabled { opacity: 0.55; cursor: not-allowed; }
-.tt-btn svg { width: 16px !important; height: 16px !important; }
+.tt-btn svg { width: max(16px, calc(16em / 14)) !important; height: max(16px, calc(16em / 14)) !important; }
 .tt-source-text, .tt-translation-text { display: block; color: var(--color-ink); font-weight: 400; line-height: 1.6; }
 .tt-source-text, .tt-translation-text, .tt-phonetic, .tt-lang-badge { cursor: text; user-select: text; }
 .tt-source-text { color: var(--color-ink-2); }
@@ -39,7 +40,7 @@
 .break-normal { word-break: normal; white-space: pre; }
 .tt-copy-ok { color: var(--color-success); background: var(--color-success-soft); }
 .tt-save-button { border: 1px solid var(--color-accent); background: var(--color-accent-soft); color: var(--color-accent); }
-.tt-save-button svg { width: 19px !important; height: 19px !important; }
+.tt-save-button svg { width: max(19px, calc(19em / 14)) !important; height: max(19px, calc(19em / 14)) !important; }
 .tt-btn.tt-save-button:hover, .tt-btn.tt-save-button:focus-visible { background: var(--color-accent); color: var(--color-accent-ink); }
 .tt-save-panel { display: grid; gap: 8px; margin-top: 12px; padding: 14px; border: 1px solid var(--color-rule); border-radius: var(--radius-card); background: var(--color-paper-2); color: var(--color-ink); box-shadow: var(--shadow-card); }
 .tt-save-unlinked { position: relative; border: 2px solid #e35d35; background: #fff2e9; color: #7e2411; box-shadow: 0 8px 24px #7e241133; }
@@ -68,4 +69,4 @@
 #trigger svg { width: 24px; height: 24px; }
 #trigger:active { background: var(--color-ink); }
 @media (hover: hover) { .tt-btn:hover { background: var(--color-paper-2); color: var(--color-ink); } #trigger:hover { background: var(--color-ink-2); } }
-@media (max-width: 480px) { .tt-actions { gap: var(--space-2xs); } }
+@media (max-width: 480px) { .tt-actions { gap: max(var(--space-2xs), calc(4em / 14)); } }
