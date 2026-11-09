@@ -1,5 +1,7 @@
 import { ref } from 'vue';
 
+const missingMandarinVoice = 'Chưa có giọng đọc tiếng Trung phổ thông. Trên iPhone: Cài đặt → Trợ năng → Đọc & Nói (hoặc Nội dung được đọc) → Giọng nói → Tiếng Trung → Mandarin; tải một giọng phổ thông. Trên thiết bị khác, cài giọng tiếng Trung trong cài đặt giọng đọc. Sau đó mở lại trình duyệt và bấm Nghe mẫu.';
+
 export function usePracticeAudio() {
   const sampleError = ref('');
   const samplePlaying = ref(false);
@@ -38,14 +40,16 @@ export function usePracticeAudio() {
     const voice = voices.find(candidate => /^zh[-_]CN$/i.test(candidate.lang))
       ?? voices.find(candidate => /^(cmn([-_]|$)|zh$|zh[-_](TW|SG|Hans|Hant)([-_]|$))/i.test(candidate.lang)
         && !/[-_](HK|MO)([-_]|$)/i.test(candidate.lang));
-    if (!voice) {
-      sampleError.value = 'Chưa có giọng đọc tiếng Trung phổ thông. Hãy bật giọng tiếng Trung trên thiết bị rồi bấm Nghe mẫu để thử lại.';
+    if (!voice && voices.length > 0) {
+      sampleError.value = missingMandarinVoice;
       return;
     }
     const token = playback;
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = voice.lang;
-    utterance.voice = voice;
+    // An empty list can mean voices have not loaded yet. Request Mandarin
+    // synchronously so the browser can select it without losing the tap gesture.
+    utterance.lang = voice?.lang ?? 'zh-CN';
+    if (voice) utterance.voice = voice;
     const finish = () => {
       if (token !== playback) return;
       clearTimeout(startTimer);
@@ -56,7 +60,11 @@ export function usePracticeAudio() {
     utterance.onerror = event => {
       if (token !== playback || event.error === 'canceled' || event.error === 'interrupted') return;
       finish();
-      sampleError.value = 'Không phát được mẫu. Bấm Nghe mẫu để thử lại.';
+      sampleError.value = event.error === 'language-unavailable' || event.error === 'voice-unavailable'
+        ? missingMandarinVoice
+        : event.error === 'not-allowed'
+          ? 'Bấm Nghe mẫu để cho phép phát âm thanh.'
+          : 'Không phát được mẫu. Bấm Nghe mẫu để thử lại.';
     };
     samplePlaying.value = true;
     startTimer = setTimeout(() => {

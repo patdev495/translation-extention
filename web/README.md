@@ -35,6 +35,8 @@ Mở website bằng Safari trên iPhone, đăng nhập cùng Learning Account v�
 
 **Nhớ / Chưa nhớ** ghi kết quả và sang thẻ kế; **Lùi / Tiếp** chỉ chuyển thẻ. **Tiếp tục bài dở** khôi phục đúng thứ tự, vị trí và kết quả. Phần nghe mẫu dùng giọng tiếng Trung phổ thông của thiết bị; nếu chưa có giọng hoặc trình duyệt chặn tự phát, trang hướng dẫn thử lại bằng nút Nghe mẫu.
 
+Nếu iPhone báo chưa có giọng tiếng Trung phổ thông: vào **Cài đặt → Trợ năng → Đọc & Nói** (hoặc **Nội dung được đọc** trên iOS cũ) **→ Giọng nói → Tiếng Trung**, chọn và tải một giọng **Mandarin**. Mở lại trình duyệt rồi bấm **Nghe mẫu**. Website kiểm tra lại danh sách giọng mỗi lần bấm; nếu danh sách còn rỗng, website yêu cầu đọc bằng `zh-CN` ngay trong thao tác bấm để trình duyệt tự chọn giọng. Đây vẫn là giọng của thiết bị; website chưa cung cấp giọng đọc từ server.
+
 Thu âm yêu cầu HTTPS và quyền micro. Mỗi thẻ giữ một bản thu mới nhất trong bộ nhớ trang, không tải âm thanh lên server hoặc lưu vào bộ nhớ bền vững. Chuyển ứng dụng/khóa màn hình dừng micro; kết thúc luyện, rời trang hoặc tải lại sẽ xóa các bản thu. Tiếp tục bài dở không khôi phục bản thu.
 
 Kiểm tra luồng trình duyệt với API và SQLite tạm riêng:
