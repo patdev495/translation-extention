@@ -36,4 +36,17 @@ lerna-debug.log*
 
 # Local/Scratch files
 .gemini/
+test-results/
+playwright-report/
+.pytest_cache/
+/.claude/worktrees/
+/.codegraph/*.pid
+/web/web/data/
+
+# Generated validation and deployment artifacts; keep scratch docs and scripts.
+/.scratch/**/browser-results/
+/.scratch/**/pytest-*/
+/.scratch/**/*.tar
+/.scratch/**/smoke.json
+/.scratch/**/production-*.png
 
