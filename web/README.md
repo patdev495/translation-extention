@@ -31,6 +31,8 @@ npm run build
 
 ## Flashcard trên điện thoại
 
+Ở màn hình thư viện, mỗi mục **Từ / cụm từ** và **Câu** có nút loa để nghe trực tiếp, kể cả khi ẩn chữ Trung hoặc Pinyin. Nút cũng có trong cửa sổ mục liên kết. Bấm lại để dừng; bấm mục khác để chuyển sang đọc mục đó. Giọng đọc dùng cùng thiết lập tiếng Trung phổ thông của thiết bị như phần ôn tập. Trên iPhone, nếu không nghe được, kiểm tra chế độ Im lặng và âm lượng.
+
 Mở website bằng Safari trên iPhone, đăng nhập cùng Learning Account và chọn **Ôn tập**. Chọn thư mục, **Từ/cụm**, **Câu** hoặc **Cả hai**, rồi dùng flashcard thường, **Nghe và nói theo** hoặc **Nhìn nghĩa và tự nói**. Thiết lập tự thu gọn khi bắt đầu; ô nháp có thể mở khi cần.
 
 **Nhớ / Chưa nhớ** ghi kết quả và sang thẻ kế; **Lùi / Tiếp** chỉ chuyển thẻ. **Tiếp tục bài dở** khôi phục đúng thứ tự, vị trí và kết quả. Phần nghe mẫu dùng giọng tiếng Trung phổ thông của thiết bị; nếu chưa có giọng hoặc trình duyệt chặn tự phát, trang hướng dẫn thử lại bằng nút Nghe mẫu.

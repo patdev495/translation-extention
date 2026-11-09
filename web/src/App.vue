@@ -3,6 +3,8 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { ArrowRight, BookOpen, ChevronRight, Ellipsis, Folder, FolderPlus, Home, Link2, LogOut, MoveRight, Pencil, RotateCcw, Sparkles, Trash2 } from '@lucide/vue';
 import { ApiError, learningApi, type Account, type ExampleSentenceDraft, type LearningFolder, type SavedLearningItem, type TrashEntry } from './api';
 import Review from './Review.vue';
+import PronunciationButton from './PronunciationButton.vue';
+import { usePracticeAudio } from './use-practice-audio';
 
 type EditorMode = 'create' | 'rename' | 'move';
 
@@ -128,6 +130,30 @@ watch(cardFields, (fields) => {
 }, { deep: true });
 const sortOrder = ref<'newest' | 'oldest'>('newest');
 const page = ref(1);
+const { sampleError: libraryAudioError, samplePlaying: libraryAudioPlaying,
+  playSample: playLibrarySample, stopPlayback: stopLibraryPlayback } = usePracticeAudio();
+const spokenItemId = ref<string | null>(null);
+
+function stopLibraryAudio(): void {
+  stopLibraryPlayback();
+  spokenItemId.value = null;
+  libraryAudioError.value = '';
+}
+
+function playItemPronunciation(item: SavedLearningItem): void {
+  if (spokenItemId.value === item.id && libraryAudioPlaying.value) {
+    stopLibraryAudio();
+    return;
+  }
+  spokenItemId.value = item.id;
+  playLibrarySample(item.text);
+}
+
+watch([showReview, showTrash, selectedId, account, page, categoryFilter, sortOrder, linkedSourceId], stopLibraryAudio);
+
+function stopHiddenLibraryAudio(): void {
+  if (document.visibilityState === 'hidden') stopLibraryAudio();
+}
 const PAGE_SIZE = 20;
 const folderContextMenu = ref<FolderContextMenu | null>(null);
 const showAddChoices = ref(false);
@@ -299,15 +325,20 @@ function handleContextMenuEscape(event: KeyboardEvent): void {
 
 onMounted(() => {
   document.addEventListener('pointerdown', dismissFolderContextMenu);
+  document.addEventListener('visibilitychange', stopHiddenLibraryAudio);
+  window.addEventListener('pagehide', stopLibraryAudio);
   document.addEventListener('keydown', handleContextMenuEscape);
   window.addEventListener('resize', closeFolderContextMenu);
   window.addEventListener('scroll', closeFolderContextMenu, true);
 });
 
 onUnmounted(() => {
+  stopLibraryAudio();
   cancelFolderMenuClose();
   if (feedbackTimer) clearTimeout(feedbackTimer);
   document.removeEventListener('pointerdown', dismissFolderContextMenu);
+  document.removeEventListener('visibilitychange', stopHiddenLibraryAudio);
+  window.removeEventListener('pagehide', stopLibraryAudio);
   document.removeEventListener('keydown', handleContextMenuEscape);
   window.removeEventListener('resize', closeFolderContextMenu);
   window.removeEventListener('scroll', closeFolderContextMenu, true);
@@ -856,7 +887,7 @@ async function submitEditor(): Promise<void> {
           <div v-else class="saved-items-list">
             <article v-for="(item, index) in pagedItems" :id="`learning-item-${item.id}`" :key="item.id" class="saved-item-row" :class="{ focused: focusedItemId === item.id, selected: selectedItemIds.has(item.id) }" :aria-label="`Mục học tập số ${(currentPage - 1) * PAGE_SIZE + index + 1}`" tabindex="-1">
               <input v-if="selectedId" type="checkbox" class="saved-item-select" :aria-label="`Chọn ${item.text}`" :checked="selectedItemIds.has(item.id)" @change="toggleItemSelection(item.id)" /><span v-else class="saved-item-number">{{ (currentPage - 1) * PAGE_SIZE + index + 1 }}</span>
-              <div class="saved-item-body"><div class="saved-item-title"><h3 v-if="cardFields.chinese || item.category === 'note'" :lang="item.category === 'note' ? undefined : 'zh'" :class="{ 'multiline-content': item.category === 'grammar' }">{{ item.text }}</h3><span class="saved-item-category">{{ item.category === 'word' ? 'Từ / cụm từ' : item.category === 'sentence' ? 'Câu' : item.category === 'grammar' ? 'Ngữ pháp' : 'Ghi chú' }}</span></div><p v-if="cardFields.pinyin && item.pinyin && (item.category === 'word' || item.category === 'sentence')" class="saved-item-pinyin">{{ item.pinyin }}</p><p v-if="cardFields.vietnamese || item.category === 'note'" class="saved-item-meaning" :class="{ 'note-body': item.category === 'note', 'multiline-content': item.category === 'grammar' }">{{ item.meaning }}</p></div>
+              <div class="saved-item-body"><div class="saved-item-title"><PronunciationButton v-if="item.category === 'word' || item.category === 'sentence'" :text="item.text" :playing="spokenItemId === item.id && libraryAudioPlaying" @play="playItemPronunciation(item)" /><h3 v-if="cardFields.chinese || item.category === 'note'" :lang="item.category === 'note' ? undefined : 'zh'" :class="{ 'multiline-content': item.category === 'grammar' }">{{ item.text }}</h3><span class="saved-item-category">{{ item.category === 'word' ? 'Từ / cụm từ' : item.category === 'sentence' ? 'Câu' : item.category === 'grammar' ? 'Ngữ pháp' : 'Ghi chú' }}</span></div><p v-if="cardFields.pinyin && item.pinyin && (item.category === 'word' || item.category === 'sentence')" class="saved-item-pinyin">{{ item.pinyin }}</p><p v-if="cardFields.vietnamese || item.category === 'note'" class="saved-item-meaning" :class="{ 'note-body': item.category === 'note', 'multiline-content': item.category === 'grammar' }">{{ item.meaning }}</p><p v-if="spokenItemId === item.id && libraryAudioError" class="library-audio-feedback" role="status">{{ libraryAudioError }}</p></div>
               <div class="saved-item-meta"><time :datetime="new Date(item.created_at < 100_000_000_000 ? item.created_at * 1000 : item.created_at).toISOString()">{{ formatAddedAt(item.created_at) }}</time><div class="saved-item-controls"><button v-if="item.linked_item_ids.length" type="button" class="linked-open-button" :aria-label="`Xem ${item.linked_item_ids.length} ${linkedKind(item)} liên kết của ${item.text}`" :title="`Xem ${item.linked_item_ids.length} mục liên kết`" @click="openLinkedItems(item)"><Link2 :size="16" aria-hidden="true" /><span>{{ item.linked_item_ids.length }}</span></button><button type="button" :aria-label="`Sửa ${item.text}`" @click="openItemEditor(item)"><Pencil :size="16" aria-hidden="true" /></button><button type="button" :aria-label="`Xóa ${item.text}`" @click="askToDelete(`Chuyển “${item.text}” vào thùng rác?`, () => learningApi.trashItem(item.id), 'Đã chuyển mục học tập vào thùng rác.')"><Trash2 :size="16" aria-hidden="true" /></button></div></div>
             </article>
           </div>
@@ -921,7 +952,7 @@ async function submitEditor(): Promise<void> {
     </dialog>
     <dialog ref="linkedItemsDialog" class="editor-dialog linked-items-dialog" aria-labelledby="linked-items-title" @click.self="closeLinkedItems" @close="linkedSourceId = null">
       <div class="linked-dialog-header"><div><h2 id="linked-items-title">{{ linkedSource?.category === 'sentence' ? (linkedSource.linked_item_ids.some(id => itemById.get(id)?.category === 'grammar') ? 'Mục liên kết' : 'Từ liên kết') : 'Câu liên kết' }}</h2><p>Liên kết với “{{ linkedSource?.text }}”</p></div><button type="button" class="plain-button" aria-label="Đóng mục liên kết" @click="closeLinkedItems">Đóng</button></div>
-      <div class="linked-items-list"><article v-for="entry in linkedEntries" :key="entry.id" class="linked-entry"><h3 lang="zh">{{ entry.text }}</h3><p class="linked-entry-pinyin">{{ entry.pinyin }}</p><p class="linked-entry-meaning">{{ entry.meaning }}</p><span class="linked-entry-folder">{{ folderById.get(entry.folder_id)?.name ?? 'Thư viện' }}</span><div class="linked-entry-actions"><button type="button" :aria-label="`Mở ${entry.text}`" @click="followLinkedItem(entry.id)"><ArrowRight :size="16" aria-hidden="true" /> Mở</button><button type="button" :aria-label="`Sửa ${entry.text} trong liên kết`" @click="editLinkedItem(entry)"><Pencil :size="16" aria-hidden="true" /> Sửa</button></div></article></div>
+      <div class="linked-items-list"><article v-for="entry in linkedEntries" :key="entry.id" class="linked-entry"><h3 lang="zh">{{ entry.text }}</h3><p class="linked-entry-pinyin">{{ entry.pinyin }}</p><p class="linked-entry-meaning">{{ entry.meaning }}</p><span class="linked-entry-folder">{{ folderById.get(entry.folder_id)?.name ?? 'Thư viện' }}</span><p v-if="spokenItemId === entry.id && libraryAudioError" class="library-audio-feedback" role="status">{{ libraryAudioError }}</p><div class="linked-entry-actions"><PronunciationButton v-if="entry.category === 'word' || entry.category === 'sentence'" :text="entry.text" :playing="spokenItemId === entry.id && libraryAudioPlaying" @play="playItemPronunciation(entry)" /><button type="button" :aria-label="`Mở ${entry.text}`" @click="followLinkedItem(entry.id)"><ArrowRight :size="16" aria-hidden="true" /> Mở</button><button type="button" :aria-label="`Sửa ${entry.text} trong liên kết`" @click="editLinkedItem(entry)"><Pencil :size="16" aria-hidden="true" /> Sửa</button></div></article></div>
       <p v-if="!linkedEntries.length" class="saved-items-empty">Không còn mục liên kết nào.</p>
     </dialog>
     <dialog ref="confirmDialog" class="editor-dialog confirm-dialog" @click.self="confirmDialog?.close()">

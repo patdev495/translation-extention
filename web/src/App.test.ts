@@ -195,8 +195,92 @@ test('restore feedback names recovery folder when original folder is unavailable
 });
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   vi.useRealTimers();
   vi.restoreAllMocks();
+});
+
+test('library words and sentences play their Chinese text and can stop or replace playback', async () => {
+  storedFolders = [{ id: 'f1', name: 'Bài học', parent_id: null }];
+  const base = { folder_id: 'f1', meaning: 'nghĩa', pinyin: '', created_at: 1, linked_item_ids: [] };
+  storedItems = [
+    { ...base, id: 'word', category: 'word', text: '学习' },
+    { ...base, id: 'sentence', category: 'sentence', text: '我学习。' },
+    { ...base, id: 'grammar', category: 'grammar', text: '把 + N' },
+    { ...base, id: 'note', category: 'note', text: 'Ghi chú' },
+  ];
+  const utterances: SpeechSynthesisUtterance[] = [];
+  const cancel = vi.fn();
+  vi.stubGlobal('SpeechSynthesisUtterance', class { constructor(public text: string) {} });
+  vi.stubGlobal('speechSynthesis', { getVoices: () => [{ lang: 'zh-CN' }], cancel,
+    speak: (utterance: SpeechSynthesisUtterance) => { utterances.push(utterance); utterance.onstart?.({} as SpeechSynthesisEvent); },
+  });
+  const page = mount(App, { attachTo: document.body });
+  try {
+    await flushPromises();
+    expect(page.findAll('.library-pronunciation-button')).toHaveLength(2);
+    await page.get('input[aria-label="Hiển thị tiếng Trung"]').setValue(false);
+    await page.get('button[aria-label="Phát âm 学习"]').trigger('click');
+    expect(utterances.map(utterance => utterance.text)).toEqual(['学习']);
+    expect(utterances[0]!.lang).toBe('zh-CN');
+    expect(page.get('button[aria-label="Dừng phát âm 学习"]').attributes('aria-pressed')).toBe('true');
+    await page.get('button[aria-label="Phát âm 我学习。"]').trigger('click');
+    expect(utterances.map(utterance => utterance.text)).toEqual(['学习', '我学习。']);
+    utterances[0]!.onend?.({} as SpeechSynthesisEvent);
+    expect(page.get('button[aria-label="Dừng phát âm 我学习。"]').attributes('aria-pressed')).toBe('true');
+    const cancels = cancel.mock.calls.length;
+    await page.get('button[aria-label="Dừng phát âm 我学习。"]').trigger('click');
+    expect(cancel).toHaveBeenCalledTimes(cancels + 1);
+    expect(utterances).toHaveLength(2);
+    expect(api.updateItem).not.toHaveBeenCalled();
+  } finally { page.unmount(); }
+});
+
+test('linked sentences have pronunciation and show audio errors inside the dialog', async () => {
+  storedFolders = [{ id: 'f1', name: 'Bài học', parent_id: null }];
+  const base = { folder_id: 'f1', meaning: 'nghĩa', pinyin: '', created_at: 1 };
+  storedItems = [
+    { ...base, id: 'word', category: 'word', text: '学习', linked_item_ids: ['sentence'] },
+    { ...base, id: 'sentence', category: 'sentence', text: '我学习。', linked_item_ids: ['word'] },
+  ];
+  const speak = vi.fn((utterance: SpeechSynthesisUtterance) => {
+    utterance.onerror?.({ error: 'language-unavailable' } as SpeechSynthesisErrorEvent);
+  });
+  vi.stubGlobal('SpeechSynthesisUtterance', class { constructor(public text: string) {} });
+  vi.stubGlobal('speechSynthesis', { getVoices: () => [], cancel: vi.fn(), speak });
+  const page = mount(App, { attachTo: document.body });
+  try {
+    await flushPromises();
+    await page.get('button[aria-label="Xem 1 câu liên kết của 学习"]').trigger('click');
+    const dialog = page.get('.linked-items-dialog');
+    await dialog.get('button[aria-label="Phát âm 我学习。"]').trigger('click');
+    expect(speak.mock.calls[0]![0].text).toBe('我学习。');
+    expect(dialog.get('.library-audio-feedback').text()).toContain('Mandarin');
+    await dialog.get('button[aria-label="Đóng mục liên kết"]').trigger('click');
+    expect(page.find('.library-audio-feedback').exists()).toBe(false);
+  } finally { page.unmount(); }
+});
+
+test('library pronunciation stops when navigating, hiding the page or leaving the app', async () => {
+  storedFolders = [{ id: 'f1', name: 'Bài học', parent_id: null }];
+  storedItems = [{ id: 'word', folder_id: 'f1', category: 'word', text: '学习', meaning: 'học', pinyin: '', created_at: 1, linked_item_ids: [] }];
+  const cancel = vi.fn();
+  vi.stubGlobal('SpeechSynthesisUtterance', class { constructor(public text: string) {} });
+  vi.stubGlobal('speechSynthesis', { getVoices: () => [{ lang: 'zh-CN' }], cancel, speak() {} });
+  const page = mount(App, { attachTo: document.body });
+  await flushPromises();
+  await page.get('button[aria-label="Phát âm 学习"]').trigger('click');
+  let cancels = cancel.mock.calls.length;
+  await page.get('button[aria-label="Mở thư mục Bài học"]').trigger('click');
+  expect(cancel).toHaveBeenCalledTimes(cancels + 1);
+  await page.get('button[aria-label="Phát âm 学习"]').trigger('click');
+  cancels = cancel.mock.calls.length;
+  vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+  document.dispatchEvent(new Event('visibilitychange'));
+  expect(cancel).toHaveBeenCalledTimes(cancels + 1);
+  cancels = cancel.mock.calls.length;
+  page.unmount();
+  expect(cancel).toHaveBeenCalledTimes(cancels + 1);
 });
 
 test('delete confirmation disappears after a short time', async () => {

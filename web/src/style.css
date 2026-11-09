@@ -266,6 +266,10 @@ body:has(.new-item-editor[open]) { overflow: hidden; }
 .linked-entry-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 9px; }
 .linked-entry-actions button { display: inline-flex; align-items: center; gap: 5px; min-height: 34px; padding: 0 11px; border: 1px solid #d9deef; border-radius: 7px; background: #fff; color: var(--indigo); font-size: 12px; font-weight: 700; cursor: pointer; }
 .linked-entry-actions button:hover { background: #f2f1ff; }
+.library-pronunciation-button, .linked-entry-actions .library-pronunciation-button { display: inline-flex; flex: none; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0; border: 1px solid #e2e0fa; border-radius: 10px; background: #f6f5ff; color: var(--indigo); cursor: pointer; }
+.library-pronunciation-button:hover, .library-pronunciation-button[aria-pressed="true"] { background: #e9e6ff; }
+.library-pronunciation-button:focus-visible { outline: 2px solid var(--indigo); outline-offset: 2px; }
+.library-audio-feedback, .linked-entry .library-audio-feedback { margin: 8px 0 0; color: #994216; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
 .dialog-actions { @apply flex justify-end gap-2; margin-top: 22px; }
 .plain-button { min-height: 43px; padding: 0 14px; border: 0; border-radius: 9px; background: #f0f1f8; color: #4b5470; font-size: 13px; font-weight: 700; }
 .plain-button:hover { background: #e7e9f4; }
