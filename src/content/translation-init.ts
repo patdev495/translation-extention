@@ -1,4 +1,5 @@
 import { TranslationTooltip } from './tooltip';
+import { forwardFrameUi, type FrameSource } from './frame-ui';
 import { SettingsManager, Settings } from '../services/settings';
 
 export interface TranslationContext {
@@ -6,6 +7,14 @@ export interface TranslationContext {
   settings: Settings | null;
   active: boolean;
   lastSelection: { text: string; x: number; y: number };
+}
+
+const translationGenerations = new WeakMap<TranslationContext, number>();
+
+export function dismissTranslation(ctx: TranslationContext): void {
+  translationGenerations.set(ctx, (translationGenerations.get(ctx) ?? 0) + 1);
+  ctx.tooltip.hide();
+  ctx.tooltip.hideTrigger();
 }
 
 /**
@@ -46,12 +55,22 @@ export async function loadSettings(ctx: TranslationContext): Promise<void> {
 /**
  * Sends a translation request to the service worker and shows the tooltip.
  */
-export function performTranslation(ctx: TranslationContext, text: string, x: number, y: number, ocrWidth?: number): void {
+export function performTranslation(ctx: TranslationContext, text: string, x: number, y: number, ocrWidth?: number, source?: FrameSource): void {
   if (!ctx.settings) return;
+  if (forwardFrameUi({ action: 'translate', text })) return;
+  const generation = (translationGenerations.get(ctx) ?? 0) + 1;
+  translationGenerations.set(ctx, generation);
 
   chrome.runtime.sendMessage(
     { type: 'TRANSLATE', text },
-    (response) => {
+    async (response) => {
+      if (source) {
+        try {
+          const validation = await chrome.runtime.sendMessage({ type: 'FRAME_UI_VALIDATE_SOURCE', source });
+          if (!validation?.valid) return;
+        } catch { return; }
+      }
+      if (translationGenerations.get(ctx) !== generation || !ctx.active) return;
       if (response && response.success) {
         ctx.tooltip.show(
           x,
@@ -179,8 +198,8 @@ export function initTranslationListeners(
     );
     if (isInsidePinned) return;
 
-    ctx.tooltip.hide();
-    ctx.tooltip.hideTrigger();
+    dismissTranslation(ctx);
+    forwardFrameUi({ action: 'dismiss' });
   });
 }
 

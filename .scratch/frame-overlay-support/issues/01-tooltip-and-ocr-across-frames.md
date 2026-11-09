@@ -1,6 +1,6 @@
 # Translation Tooltip and OCR across frames
 
-Status: ready-for-agent
+Status: done
 
 Baseline: `f6314f5` — current code snapshot before implementation.
 
@@ -103,4 +103,28 @@ The checkpoint includes source, local skills, OCR experiments/models, and store 
 
 ## Comments
 
-- User requested a checkpoint commit followed by a repair plan. This issue records the plan only; no extension behavior has been changed.
+- User requested a checkpoint commit followed by a repair plan, then authorized implementation with the TDD skill.
+- Confirmed test seams before writing tests: child-frame selection to visible/clickable Translation Tooltip; child-frame OCR activation/selection/cancellation to actual captured pixels; existing tooltip, ordinary-page, and PDF OCR behavior.
+
+## Implementation notes
+
+- Child frames now relay requests through the extension background to frame zero. The background attaches the browser's sender frame/document identity; delayed translations verify the originating document still exists before rendering.
+- The existing Translation Tooltip deliberately opens in the center of the viewport and ignores its source anchor. That behavior is retained at the top level, so no cross-origin anchor geometry handshake is needed in this repair. A future change to anchor-based placement would require that separate work.
+- Legacy framesets use one shared manual-popover presentation layer, mounted alongside the frameset, with input passing through outside visible cards. Tooltip, Hanzi Breakdown Tooltip, pinned panels, and OCR use their z-index within that shared layer. Separate popovers were rejected after a browser test showed newly synced pinned panels intercepting tooltip controls.
+- Webpage OCR selects in top-viewport coordinates, hides extension UI only for capture, and restores progress after capture. The background checks the sender tab before/after capture and routes progress by a job/request identity rather than the current active tab.
+- Cancellation generations prevent stale translation/OCR responses from reopening UI or stopping a newer OCR selection. OCR event listeners use stable references and are removed on stop.
+- Translation Tooltip dragging and Hanzi Breakdown Tooltip dragging capture the pointer, so a drag continues when it crosses underlying frame boundaries. Existing text-selection and card controls retain their behavior.
+- Pinned panels are synced once per webpage tab, and about:blank/srcdoc injection is enabled. OCR request IDs use getRandomValues so activation also works on non-secure HTTP intranet pages.
+- The browser harness uses a fresh profile and deterministic external translation/recognition responses, while exercising the built extension, actual runtime messaging, captureVisibleTab, screenshot cropping, and PDF rendering. An opt-in smoke test runs the real packaged OCR model.
+- Real-browser mounting and behavior checks use Chromium 158.0.8127.18. Browser guidance: [popover top-layer behavior](https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/showPopover), [browser frame/document identity](https://developer.chrome.com/docs/extensions/reference/api/webNavigation#method-getFrame).
+
+## Original-site verification
+
+After reloading the extension and refreshing the internal site, select text in leftBottom, use the tooltip over NotesView, activate OCR from each frame, and drag across frame boundaries. The internal site itself was not accessible in this session; fixtures reproduce its supplied frameset layout.
+
+## Verification results
+
+- Full unit/package suite: 35 files, 153 tests passed. After the final pointer-capture change, the 39 affected tooltip tests also passed.
+- Final production build: `npm run build` passed, including TypeScript checking and PDF/offscreen packaging.
+- Final browser run against that production build, with `RUN_REAL_OCR=1`: all 21 checks passed on Chromium 158.0.8127.18. This includes real-model OCR, actual cross-frame screenshot crop pixels, cross-origin/nested/srcdoc frames, insecure HTTP, pending-response cancellation, tab switching, pinned panels, cross-frame dragging, PDF selection/cancellation, and scrolled/resized DPR-2 selection.
+- `git diff --check` passed. The browser harness documentation contains repeatable commands, and its artifacts include a frameset screenshot with the tooltip spanning the header/content boundary.

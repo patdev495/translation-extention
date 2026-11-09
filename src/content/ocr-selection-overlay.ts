@@ -1,4 +1,5 @@
 import OCR_CSS from '../ui/ocr.css?inline';
+import { mountOverlay } from './overlay-host';
 
 export interface OcrSelectionOverlayOptions {
   isPdfMode?: boolean;
@@ -79,8 +80,9 @@ export class OcrSelectionOverlay {
     } else {
       this.rootElement.removeEventListener('mousedown', this.mousedownRef, true);
       this.rootElement.removeEventListener('mousemove', this.mousemoveRef, true);
-      window.removeEventListener('mouseup', this.mouseupRef, true);
     }
+
+    window.removeEventListener('mouseup', this.mouseupRef, true);
 
     document.removeEventListener('keydown', this.keydownRef, true);
 
@@ -95,7 +97,7 @@ export class OcrSelectionOverlay {
     this.overlayContainer.id = 'polytranslate-ocr-overlay-root';
     this.overlayContainer.style.position = 'fixed';
     this.overlayContainer.style.inset = '0';
-    this.overlayContainer.style.zIndex = '2147483640';
+    this.overlayContainer.style.zIndex = '2147483647';
     this.overlayContainer.style.pointerEvents = 'auto';
 
     this.shadow = this.overlayContainer.attachShadow({ mode: 'open' });
@@ -109,11 +111,13 @@ export class OcrSelectionOverlay {
     overlayEl.className = 'overlay';
     this.shadow.appendChild(overlayEl);
 
-    overlayEl.addEventListener('mousedown', (e) => this.handleMouseDown(e));
-    overlayEl.addEventListener('mousemove', (e) => this.handleMouseMove(e));
-    window.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+    overlayEl.addEventListener('mousedown', this.mousedownRef);
+    overlayEl.addEventListener('mousemove', this.mousemoveRef);
+    window.addEventListener('mouseup', this.mouseupRef, true);
 
-    document.body.appendChild(this.overlayContainer);
+    mountOverlay(this.overlayContainer);
+    this.overlayContainer.tabIndex = -1;
+    this.overlayContainer.focus({ preventScroll: true });
   }
 
   private handleMouseDown(e: MouseEvent): void {

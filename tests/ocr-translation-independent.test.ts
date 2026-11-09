@@ -35,7 +35,7 @@ test('an OCR image region opens its translation tooltip when Auto Translate is o
   const ctx = {
     active: true,
     settings: { ...SettingsManager.DEFAULT_SETTINGS, autoTranslate: false, ocrPinImage: false, ocrCopyToClipboard: false },
-    tooltip: { setPointerPassthrough: vi.fn(), show },
+    tooltip: { setPointerPassthrough: vi.fn(), show, hide: vi.fn(), hideTrigger: vi.fn() },
   } as unknown as TranslationContext;
 
   toggleWebpageOcr(ctx);

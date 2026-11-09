@@ -166,7 +166,34 @@ async function translateText(text: string) {
 
 // ─── Message Handlers ──────────────────────────────────────────────────────
 
+const ocrJobs = new Map<string, { tabId: number; requestId: string }>();
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'FRAME_UI_VALIDATE_SOURCE') {
+    if (sender.tab?.id === undefined || sender.frameId !== 0 || !Number.isInteger(message.source?.frameId)
+      || message.source.frameId <= 0 || typeof message.source.documentId !== 'string') {
+      sendResponse({ valid: false });
+      return false;
+    }
+    chrome.webNavigation.getFrame({ tabId: sender.tab.id, frameId: message.source.frameId }).then(
+      frame => sendResponse({ valid: !!frame && frame.documentId === message.source.documentId }),
+      () => sendResponse({ valid: false }),
+    );
+    return true;
+  }
+  if (message.type === 'FRAME_UI_REQUEST') {
+    if (sender.tab?.id === undefined || !sender.frameId || !['translate', 'dismiss', 'ocr'].includes(message.action)
+      || (message.action === 'translate' && (typeof message.text !== 'string' || !message.text.trim() || message.text.length > 100000))) {
+      sendResponse({ success: false, error: 'Invalid frame UI request' });
+      return false;
+    }
+    chrome.tabs.sendMessage(sender.tab.id, {
+      type: 'FRAME_UI_DELIVERY', action: message.action,
+      ...(message.action === 'translate' ? { text: message.text, source: { frameId: sender.frameId, documentId: sender.documentId } } : {}),
+    }, { frameId: 0 }).then(() => sendResponse({ success: true }),
+      () => sendResponse({ success: false, error: 'Top document unavailable' }));
+    return true;
+  }
   if (message.type === 'TRANSLATE_SELECTION') {
     void (async () => {
       const text = typeof message.text === 'string' ? message.text.trim() : '';
@@ -319,13 +346,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === 'CAPTURE_TAB') {
     const { rect, viewport } = message;
+    const tabId = sender.tab?.id;
+    const windowId = sender.tab?.windowId;
+    const requestId = typeof message.requestId === 'string' ? message.requestId : '';
+    const jobId = crypto.randomUUID();
 
     (async () => {
       try {
+        if (tabId === undefined || windowId === undefined || sender.frameId !== 0 || !requestId) {
+          throw new Error('OCR capture must originate from the top document');
+        }
+        if (!rect || !viewport || ![rect.x, rect.y, rect.width, rect.height, viewport.width, viewport.height].every(Number.isFinite)
+          || rect.x < 0 || rect.y < 0 || rect.width <= 0 || rect.height <= 0 || viewport.width <= 0 || viewport.height <= 0
+          || rect.x + rect.width > viewport.width + 1 || rect.y + rect.height > viewport.height + 1) {
+          throw new Error('Invalid OCR Image Region');
+        }
         const { privacyConsentGranted } = await chrome.storage.local.get('privacyConsentGranted');
         if (privacyConsentGranted !== true) throw new Error('Privacy consent required');
+        if (!(await chrome.tabs.get(tabId)).active) throw new Error('The OCR tab is no longer active');
         // 1. Capture the screen viewport of the current active tab
-        const dataUrl = await chrome.tabs.captureVisibleTab(chrome.windows.WINDOW_ID_CURRENT, { format: 'png' });
+        const dataUrl = await chrome.tabs.captureVisibleTab(windowId, { format: 'png' });
+        if (!(await chrome.tabs.get(tabId)).active) throw new Error('The OCR tab changed during capture');
+        await chrome.tabs.sendMessage(tabId, { type: 'OCR_CAPTURED', requestId }, { frameId: 0 }).catch(() => {});
 
         // Crop screenshot in service worker first using OffscreenCanvas
         const croppedDataUrl = await cropScreenshot(dataUrl, rect, viewport);
@@ -333,11 +375,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         // 2. Ensure Offscreen Document is opened
         await ensureOffscreenDocument();
         resetOffscreenTimeout();
+        ocrJobs.set(jobId, { tabId, requestId });
 
         // 3. Request OCR from the Offscreen Document on the pre-cropped image
         const settings = await SettingsManager.getSettings();
         const ocrResponse = await chrome.runtime.sendMessage({
           type: 'RUN_OCR',
+          jobId,
           dataUrl: croppedDataUrl,
           rect: null,
           viewport: null,
@@ -370,6 +414,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       } catch (error: any) {
         console.error('Service worker CAPTURE_TAB error:', error);
         sendResponse({ success: false, error: error.message });
+      } finally {
+        ocrJobs.delete(jobId);
       }
     })();
 
@@ -377,18 +423,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === 'OCR_PROGRESS') {
-    // Relay OCR progress message from offscreen document to active tab content script
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const activeTab = tabs[0];
-      if (activeTab?.id) {
-        chrome.tabs.sendMessage(activeTab.id, {
-          type: 'OCR_PROGRESS',
-          progress: message.progress
-        }).catch(() => {
-          // Ignore
-        });
-      }
-    });
+    const job = ocrJobs.get(message.jobId);
+    if (job && sender.url === chrome.runtime.getURL('offscreen.html')) {
+      void chrome.tabs.sendMessage(job.tabId, {
+        type: 'OCR_PROGRESS', requestId: job.requestId, progress: message.progress,
+      }, { frameId: 0 }).catch(() => {});
+    }
     return false;
   }
 });

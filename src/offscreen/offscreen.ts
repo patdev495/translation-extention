@@ -6,7 +6,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     (async () => {
       try {
-        const result = await processOcr(dataUrl, rect, viewport, tier, language, skipOcr);
+        const result = await processOcr(dataUrl, rect, viewport, tier, language, skipOcr, message.jobId);
         sendResponse({ success: true, text: result.text, croppedDataUrl: result.croppedDataUrl });
       } catch (err: any) {
         console.error('OCR Error in offscreen document:', err);
@@ -24,7 +24,8 @@ async function processOcr(
   viewport?: { width: number; height: number } | null,
   tier: 'tiny' | 'small' | 'medium' = 'small',
   language: 'ch' | 'latin' = 'ch',
-  skipOcr = false
+  skipOcr = false,
+  jobId?: string
 ): Promise<{ text: string; croppedDataUrl: string }> {
   return new Promise<{ text: string; croppedDataUrl: string }>((resolve, reject) => {
     const img = new Image();
@@ -78,6 +79,7 @@ async function processOcr(
             // Send progress back to background (which will relay it to content script)
             chrome.runtime.sendMessage({
               type: 'OCR_PROGRESS',
+              jobId,
               progress
             }).catch(() => {
               // Ignore channel closed errors if background is not listening

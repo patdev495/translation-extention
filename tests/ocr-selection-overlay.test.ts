@@ -48,6 +48,7 @@ global.document = {
         element.children.push(child);
       }),
       remove: vi.fn(),
+      focus: vi.fn(),
       addEventListener: vi.fn((event: string, callback: Function) => {
         element[`on${event}`] = callback;
       }),

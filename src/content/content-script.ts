@@ -4,6 +4,8 @@ import {
   initTranslationListeners,
   matchesOcrShortcut,
   translateSelectedPageText,
+  performTranslation,
+  dismissTranslation,
 } from './translation-init';
 import { toggleWebpageOcr } from './ocr-selection';
 import { initPinnedSnippetsSync } from './pinned-panel';
@@ -20,10 +22,19 @@ console.log('PolyTranslate Content Script initialized!');
 
 // Load settings on startup
 loadSettings(ctx);
-initPinnedSnippetsSync(document);
+if (window.top === window) initPinnedSnippetsSync(document);
 
 // Listen for updates from settings popup
 chrome.runtime.onMessage.addListener((message) => {
+  if (message.type === 'FRAME_UI_DELIVERY' && window.top === window && ctx.active && ctx.settings) {
+    if (message.action === 'translate' && typeof message.text === 'string') {
+      performTranslation(ctx, message.text, window.scrollX + window.innerWidth / 2, window.scrollY + window.innerHeight / 2, undefined, message.source);
+    } else if (message.action === 'dismiss') {
+      dismissTranslation(ctx);
+    } else if (message.action === 'ocr') {
+      toggleWebpageOcr(ctx);
+    }
+  }
   if (message.type === 'SETTINGS_UPDATED') {
     loadSettings(ctx);
   }

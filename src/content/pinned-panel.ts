@@ -1,4 +1,5 @@
 import PINNED_CSS from '../ui/pinned.css?inline';
+import { mountOverlay } from './overlay-host';
 
 export interface PinnedSnippet {
   id: string;
@@ -94,7 +95,7 @@ export class PinnedSnippetPanel {
     this.render(imageUrl);
 
     // 6. Append to document body
-    this.doc.body.appendChild(this.wrapper);
+    mountOverlay(this.wrapper, this.doc);
     this.constrainPosition();
     this.doc.defaultView?.addEventListener('resize', this.resizeRef);
 

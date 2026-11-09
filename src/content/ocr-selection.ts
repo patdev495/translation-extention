@@ -1,13 +1,23 @@
-import { TranslationContext, performTranslation } from './translation-init';
+import { TranslationContext, performTranslation, dismissTranslation } from './translation-init';
 import { addPinnedSnippet } from './pinned-panel';
 import { OcrSelectionOverlay } from './ocr-selection-overlay';
+import { forwardFrameUi } from './frame-ui';
+import { hideOverlaysForCapture } from './overlay-host';
 
 let overlay: OcrSelectionOverlay | null = null;
 let currentCtx: TranslationContext | null = null;
 let ocrBusy = false;
+let generation = 0;
+let restoreCaptureUi: (() => void) | null = null;
+let activeRequestId: string | null = null;
 
 // Listen to progress updates relayed from the service worker
 const chromeMessageListener = (message: any) => {
+  if (message.requestId !== activeRequestId) return;
+  if (message.type === 'OCR_CAPTURED') {
+    restoreCaptureUi?.();
+    restoreCaptureUi = null;
+  }
   if (message.type === 'OCR_PROGRESS' && overlay) {
     overlay.updateProgressText(message.progress.message);
   }
@@ -18,11 +28,13 @@ export function isWebpageOcrActive(): boolean {
 }
 
 export function toggleWebpageOcr(ctx: TranslationContext): void {
+  if (forwardFrameUi({ action: 'ocr' })) return;
   if (ocrBusy) return;
 
   if (overlay) {
     cleanupOverlay();
   } else {
+    dismissTranslation(ctx);
     currentCtx = ctx;
     initOverlay();
   }
@@ -30,6 +42,10 @@ export function toggleWebpageOcr(ctx: TranslationContext): void {
 
 function initOverlay() {
   if (!currentCtx) return;
+  const session = ++generation;
+  // Content scripts on HTTP intranets cannot use secure-context-only randomUUID.
+  const requestId = crypto.getRandomValues(new Uint32Array(4)).join('-');
+  activeRequestId = requestId;
 
   currentCtx.tooltip.setPointerPassthrough(true);
   chrome.runtime.onMessage.addListener(chromeMessageListener);
@@ -46,15 +62,18 @@ function initOverlay() {
       overlay?.showProgress('Preparing OCR...', { left, top: top + height });
 
       ocrBusy = true;
+      restoreCaptureUi = hideOverlaysForCapture();
 
       // Wait for browser repaint before capturing
       await new Promise((r) => setTimeout(r, 50));
+      if (session !== generation) return;
 
       try {
         const response: any = await new Promise((resolve) => {
           chrome.runtime.sendMessage(
             {
               type: 'CAPTURE_TAB',
+              requestId,
               rect: {
                 x: left,
                 y: top,
@@ -71,6 +90,9 @@ function initOverlay() {
           );
         });
 
+        if (session !== generation) return;
+        restoreCaptureUi?.();
+        restoreCaptureUi = null;
         if (response && response.success) {
           if (response.data && currentCtx) {
             const { text, croppedDataUrl } = response.data;
@@ -106,11 +128,14 @@ function initOverlay() {
           await new Promise((r) => setTimeout(r, 2000));
         }
       } catch (err: any) {
+        if (session !== generation) return;
+        restoreCaptureUi?.();
+        restoreCaptureUi = null;
         console.error('OCR failed:', err);
         overlay?.updateProgressText(err.message || 'OCR selection failed.');
         await new Promise((r) => setTimeout(r, 2000));
       } finally {
-        cleanupOverlay();
+        if (session === generation) cleanupOverlay();
       }
     },
     onCancel: () => {
@@ -122,6 +147,10 @@ function initOverlay() {
 }
 
 function cleanupOverlay() {
+  generation++;
+  activeRequestId = null;
+  restoreCaptureUi?.();
+  restoreCaptureUi = null;
   chrome.runtime.onMessage.removeListener(chromeMessageListener);
   currentCtx?.tooltip.setPointerPassthrough(false);
 

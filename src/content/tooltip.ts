@@ -1,4 +1,5 @@
 import TOOLTIP_CSS from '../ui/tooltip.css?inline';
+import { mountOverlay } from './overlay-host';
 import HanziWriter, { type CharacterJson } from 'hanzi-writer';
 import { pinyin } from 'pinyin-pro';
 import BREAKDOWN_CSS from '../ui/hanzi-breakdown.css?inline';
@@ -106,7 +107,7 @@ export class TranslationTooltip {
     `;
     this.shadow.appendChild(this.triggerEl);
 
-    document.body.appendChild(this.container);
+    mountOverlay(this.container);
 
     // Click handler with delegation
     this.shadow.addEventListener('click', (event) => {
@@ -332,13 +333,15 @@ export class TranslationTooltip {
     });
 
     // Draggable event handlers
-    this.tooltipEl.addEventListener('mousedown', (e) => {
+    this.tooltipEl.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
       const target = e.target as HTMLElement;
       // Let users select tooltip text without starting a drag.
       if (target.closest('button, select, input, .tt-source-text, .tt-translation-text, .tt-phonetic, .tt-lang-badge')) {
         return;
       }
       this.isDragging = true;
+      this.tooltipEl!.setPointerCapture(e.pointerId);
       this.dragStartX = e.clientX;
       this.dragStartY = e.clientY;
       this.dragInitialLeft = parseFloat(this.tooltipEl!.style.left || '0');
@@ -346,7 +349,7 @@ export class TranslationTooltip {
       e.preventDefault(); // Prevents selection
     });
 
-    document.addEventListener('mousemove', (e) => {
+    this.tooltipEl.addEventListener('pointermove', (e) => {
       if (!this.isDragging || !this.tooltipEl) return;
       const dx = e.clientX - this.dragStartX;
       const dy = e.clientY - this.dragStartY;
@@ -354,9 +357,11 @@ export class TranslationTooltip {
       this.tooltipEl.style.top = `${this.dragInitialTop + dy}px`;
     });
 
-    document.addEventListener('mouseup', () => {
+    this.tooltipEl.addEventListener('lostpointercapture', () => {
       this.isDragging = false;
     });
+    this.tooltipEl.addEventListener('pointerup', () => { this.isDragging = false; });
+    this.tooltipEl.addEventListener('pointercancel', () => { this.isDragging = false; });
     document.addEventListener('mousedown', (event) => {
       const activeElement = this.shadow?.activeElement;
       if (activeElement?.matches('.tt-save-meaning, .tt-save-sentence-meaning') && !event.composedPath().includes(activeElement)) {
@@ -1260,6 +1265,11 @@ export class TranslationTooltip {
       const heading = document.createElement('p');
       heading.className = 'hanzi-breakdown-heading';
       heading.textContent = labels.title;
+      heading.addEventListener('pointerdown', event => {
+        if (event.button === 0) heading.setPointerCapture(event.pointerId);
+      });
+      heading.addEventListener('lostpointercapture', () => this.breakdownDragCleanup?.());
+      heading.addEventListener('pointercancel', () => this.breakdownDragCleanup?.());
       heading.addEventListener('mousedown', event => {
         if (event.button !== 0 || !this.breakdownRoot) return;
         event.preventDefault();
@@ -1522,7 +1532,7 @@ export class TranslationTooltip {
     const style = document.createElement('style');
     style.textContent = BREAKDOWN_CSS;
     shadow.appendChild(style);
-    document.body.appendChild(root);
+    mountOverlay(root);
     this.breakdownRoot = root;
     return root;
   }
@@ -1551,7 +1561,7 @@ export class TranslationTooltip {
 
   setPointerPassthrough(enabled: boolean) {
     if (this.container) {
-      this.container.style.pointerEvents = enabled ? 'none' : '';
+      this.container.style.pointerEvents = enabled ? 'none' : 'auto';
     }
   }
 
