@@ -31,6 +31,8 @@ npm run build
 
 ## Flashcard trên điện thoại
 
+Trong một thư mục có thư mục con, bấm **Mở tất cả danh sách** để xem chung Từ / cụm từ, Câu, Ngữ pháp và Ghi chú của thư mục đó cùng toàn bộ các cấp bên dưới. Danh sách dùng cùng thẻ, bộ lọc, sắp xếp, phân trang và nút phát âm như thư mục thường; bấm **Về thư mục** để trở lại cấp hiện tại. Chọn/xóa trong danh sách gộp áp dụng cho phạm vi đang xem; dọn sạch giữ nguyên cấu trúc thư mục và yêu cầu xác nhận trước khi chuyển các mục vào thùng rác.
+
 Ở màn hình thư viện, mỗi mục **Từ / cụm từ** và **Câu** có nút loa để nghe trực tiếp, kể cả khi ẩn chữ Trung hoặc Pinyin. Nút cũng có trong cửa sổ mục liên kết. Bấm lại để dừng; bấm mục khác để chuyển sang đọc mục đó. Giọng đọc dùng cùng thiết lập tiếng Trung phổ thông của thiết bị như phần ôn tập. Trên iPhone, nếu không nghe được, kiểm tra chế độ Im lặng và âm lượng.
 
 Mở website bằng Safari trên iPhone, đăng nhập cùng Learning Account và chọn **Ôn tập**. Chọn thư mục, **Từ/cụm**, **Câu** hoặc **Cả hai**, rồi dùng flashcard thường, **Nghe và nói theo** hoặc **Nhìn nghĩa và tự nói**. Thiết lập tự thu gọn khi bắt đầu; ô nháp có thể mở khi cần.

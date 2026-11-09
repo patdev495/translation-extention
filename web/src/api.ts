@@ -145,8 +145,8 @@ export const learningApi = {
     api(`/items/${encodeURIComponent(id)}/links/${encodeURIComponent(itemId)}`, { method: 'DELETE' }),
   trash: (): Promise<TrashEntry[]> => api('/trash'),
   trashItem: (id: string): Promise<void> => api(`/items/${encodeURIComponent(id)}`, { method: 'DELETE' }),
-  trashFolderItems: (folderId: string, itemIds?: string[]): Promise<{ count: number }> =>
-    api(`/folders/${encodeURIComponent(folderId)}/trash-items`, { method: 'POST', body: JSON.stringify({ item_ids: itemIds ?? null }) }),
+  trashFolderItems: (folderId: string, itemIds?: string[], includeDescendants = false): Promise<{ count: number }> =>
+    api(`/folders/${encodeURIComponent(folderId)}/trash-items`, { method: 'POST', body: JSON.stringify({ item_ids: itemIds ?? null, ...(includeDescendants ? { include_descendants: true } : {}) }) }),
   trashFolder: (id: string): Promise<void> => api(`/folders/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   restoreItem: (id: string): Promise<SavedLearningItem> => api(`/trash/items/${encodeURIComponent(id)}/restore`, { method: 'POST' }),
   restoreFolder: (id: string): Promise<LearningFolder> => api(`/trash/folders/${encodeURIComponent(id)}/restore`, { method: 'POST' }),

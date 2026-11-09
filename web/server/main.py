@@ -234,6 +234,7 @@ class ReviewProgress(BaseModel):
 
 class BulkTrashInput(BaseModel):
     item_ids: list[str] | None = None
+    include_descendants: bool = False
 
 
 def create_app(database_path: Path | None = None) -> FastAPI:
@@ -823,7 +824,7 @@ def create_app(database_path: Path | None = None) -> FastAPI:
             ).fetchone()
             if folder is None:
                 raise HTTPException(status_code=404, detail="Folder not found")
-            owned = connection.execute(
+            owned = scoped_items(connection, account.id, folder_id) if body.include_descendants else connection.execute(
                 "SELECT id FROM learning_items WHERE folder_id = ? AND user_id = ? AND deleted_at IS NULL",
                 (folder_id, account.id),
             ).fetchall()
@@ -833,8 +834,8 @@ def create_app(database_path: Path | None = None) -> FastAPI:
                 raise HTTPException(status_code=404, detail="Saved Learning Item not found")
             timestamp = _now()
             connection.executemany(
-                "UPDATE learning_items SET deleted_at = ? WHERE id = ? AND user_id = ? AND folder_id = ? AND deleted_at IS NULL",
-                [(timestamp, item_id, account.id, folder_id) for item_id in selected_ids],
+                "UPDATE learning_items SET deleted_at = ? WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+                [(timestamp, item_id, account.id) for item_id in selected_ids],
             )
             return {"count": len(selected_ids)}
 

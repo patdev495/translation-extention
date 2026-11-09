@@ -139,6 +139,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .link-banner p { margin: 4px 0 0; color: #616991; font-size: 12px; }
 .link-button { flex: none; min-height: 37px; padding: 0 12px; border: 0; border-radius: 8px; background: var(--indigo); color: white; font-size: 12px; font-weight: 800; }
 .saved-items { margin-top: 10px; }
+.folder-list-scope { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 14px 0 18px; }
+.folder-list-scope .secondary-button { min-height: 44px; }
+.folder-list-scope span { color: var(--muted); font-size: 12px; line-height: 1.5; }
 .saved-items-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
 .saved-items-heading h2 { margin: 0; font-size: 18px; }
 .saved-items-heading h2 small { color: var(--muted); font-size: 12px; font-weight: 600; }

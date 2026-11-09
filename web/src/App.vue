@@ -120,6 +120,7 @@ function exampleLabel(draft: ExampleSentenceDraft): string {
 }
 const focusedItemId = ref<string | null>(null);
 const selectedId = ref<string | null>(null);
+const includeDescendants = ref(false);
 const selectedItemIds = ref<Set<string>>(new Set());
 const expandedFolderIds = ref<Set<string>>(new Set());
 const categoryFilter = ref<'all' | SavedLearningItem['category']>('all');
@@ -149,7 +150,7 @@ function playItemPronunciation(item: SavedLearningItem): void {
   playLibrarySample(item.text);
 }
 
-watch([showReview, showTrash, selectedId, account, page, categoryFilter, sortOrder, linkedSourceId], stopLibraryAudio);
+watch([showReview, showTrash, selectedId, includeDescendants, account, page, categoryFilter, sortOrder, linkedSourceId], stopLibraryAudio);
 
 function stopHiddenLibraryAudio(): void {
   if (document.visibilityState === 'hidden') stopLibraryAudio();
@@ -194,7 +195,7 @@ async function loadFolders(): Promise<void> {
   try {
     folders.value = await learningApi.folders();
     items.value = await learningApi.items();
-    selectedItemIds.value = new Set([...selectedItemIds.value].filter(id => items.value.some(item => item.id === id && item.folder_id === selectedId.value)));
+    selectedItemIds.value = new Set([...selectedItemIds.value].filter(id => visibleItems.value.some(item => item.id === id)));
     if (selectedId.value && !folders.value.some((folder) => folder.id === selectedId.value)) {
       selectedId.value = null;
     }
@@ -217,6 +218,7 @@ async function openTrash(): Promise<void> {
 }
 
 function openLibrary(folderId: string | null): void {
+  includeDescendants.value = false;
   showReview.value = false;
   showTrash.value = false;
   selectedId.value = folderId;
@@ -232,6 +234,7 @@ function openLibrary(folderId: string | null): void {
 }
 
 function openSidebarFolder(folderId: string): void {
+  includeDescendants.value = false;
   showReview.value = false;
   showTrash.value = false;
   selectedId.value = folderId;
@@ -400,7 +403,11 @@ async function approveLink(): Promise<void> {
 
 const folderById = computed(() => new Map(folders.value.map((folder) => [folder.id, folder])));
 const selectedFolder = computed(() => selectedId.value ? folderById.value.get(selectedId.value) ?? null : null);
-const visibleItems = computed(() => selectedId.value ? items.value.filter(item => item.folder_id === selectedId.value) : items.value);
+const visibleItems = computed(() => {
+  if (!selectedId.value) return items.value;
+  const folderIds = includeDescendants.value ? descendantIds(selectedId.value) : new Set([selectedId.value]);
+  return items.value.filter(item => folderIds.has(item.folder_id));
+});
 const itemById = computed(() => new Map(items.value.map(item => [item.id, item])));
 const linkedSource = computed(() => linkedSourceId.value ? itemById.value.get(linkedSourceId.value) ?? null : null);
 const linkedEntries = computed(() => (linkedSource.value?.linked_item_ids ?? [])
@@ -431,17 +438,24 @@ function toggleFilteredSelection(): void {
 function trashSelectedItems(): void {
   const folderId = selectedId.value;
   const itemIds = [...selectedItemIds.value];
+  const recursive = includeDescendants.value;
   if (!folderId || !itemIds.length) return;
   askToDelete(`Chuyển ${itemIds.length} mục đã chọn trong thư mục này vào thùng rác?`, async () => {
-    await learningApi.trashFolderItems(folderId, itemIds);
+    if (recursive) await learningApi.trashFolderItems(folderId, itemIds, true);
+    else await learningApi.trashFolderItems(folderId, itemIds);
     selectedItemIds.value = new Set();
   }, 'Đã chuyển các mục đã chọn vào thùng rác.');
 }
 function trashAllFolderItems(): void {
   const folderId = selectedId.value;
   if (!folderId || !visibleItems.value.length) return;
-  askToDelete(`Chuyển toàn bộ ${visibleItems.value.length} mục trực tiếp trong thư mục này vào thùng rác? Thư mục con được giữ nguyên.`, async () => {
-    await learningApi.trashFolderItems(folderId);
+  const recursive = includeDescendants.value;
+  const label = recursive
+    ? `Chuyển toàn bộ ${visibleItems.value.length} mục trong thư mục này và các thư mục con vào thùng rác? Cấu trúc thư mục được giữ nguyên.`
+    : `Chuyển toàn bộ ${visibleItems.value.length} mục trực tiếp trong thư mục này vào thùng rác? Thư mục con được giữ nguyên.`;
+  askToDelete(label, async () => {
+    if (recursive) await learningApi.trashFolderItems(folderId, undefined, true);
+    else await learningApi.trashFolderItems(folderId);
     selectedItemIds.value = new Set();
   }, 'Đã dọn sạch mục học tập trong thư mục.');
 }
@@ -452,26 +466,15 @@ const sortedItems = computed(() => [...filteredItems.value].sort((a, b) => {
 const pageCount = computed(() => Math.max(1, Math.ceil(sortedItems.value.length / PAGE_SIZE)));
 const currentPage = computed(() => Math.min(page.value, pageCount.value));
 const pagedItems = computed(() => sortedItems.value.slice((currentPage.value - 1) * PAGE_SIZE, currentPage.value * PAGE_SIZE));
-watch(selectedId, () => { page.value = 1; categoryFilter.value = 'all'; selectedItemIds.value = new Set(); }, { flush: 'sync' });
+watch(selectedId, () => { includeDescendants.value = false; page.value = 1; categoryFilter.value = 'all'; selectedItemIds.value = new Set(); }, { flush: 'sync' });
+watch(includeDescendants, () => { page.value = 1; categoryFilter.value = 'all'; selectedItemIds.value = new Set(); }, { flush: 'sync' });
 watch([sortOrder, categoryFilter], () => { page.value = 1; }, { flush: 'sync' });
 
 interface FolderStats { words: number; sentences: number }
-const folderStats = computed(() => {
-  const counts = new Map<string, FolderStats>();
-  for (const folder of folders.value) counts.set(folder.id, { words: 0, sentences: 0 });
-  for (const entry of items.value) {
-    const count = counts.get(entry.folder_id);
-    if (count) {
-      if (entry.category === 'word') count.words += 1;
-      else if (entry.category === 'sentence') count.sentences += 1;
-    }
-  }
-  return counts;
-});
-const currentStats = computed<FolderStats>(() => selectedId.value
-  ? folderStats.value.get(selectedId.value) ?? { words: 0, sentences: 0 }
-  : { words: items.value.filter(item => item.category === 'word').length,
-      sentences: items.value.filter(item => item.category === 'sentence').length });
+const currentStats = computed<FolderStats>(() => ({
+  words: visibleItems.value.filter(item => item.category === 'word').length,
+  sentences: visibleItems.value.filter(item => item.category === 'sentence').length,
+}));
 
 function formatAddedAt(value: number): string {
   const milliseconds = value < 100_000_000_000 ? value * 1000 : value;
@@ -875,7 +878,11 @@ async function submitEditor(): Promise<void> {
 
         <p v-if="folderError" class="form-error library-error" role="alert">{{ folderError }}</p>
         <div v-if="foldersLoading" class="content-state" role="status">Đang tải thư mục…</div>
-        <section v-if="currentChildren.length" class="child-folders" aria-label="Thư mục con">
+        <div v-if="selectedId && (currentChildren.length || includeDescendants)" class="folder-list-scope">
+          <button type="button" class="secondary-button" :aria-label="includeDescendants ? 'Về thư mục' : 'Mở tất cả danh sách'" @click="includeDescendants = !includeDescendants">{{ includeDescendants ? '← Về thư mục' : 'Mở tất cả danh sách' }}</button>
+          <span v-if="includeDescendants" role="status">Tất cả danh sách trong “{{ selectedFolder?.name }}” và các thư mục con</span>
+        </div>
+        <section v-if="currentChildren.length && !includeDescendants" class="child-folders" aria-label="Thư mục con">
           <h2>{{ selectedId ? 'Thư mục con' : 'Thư mục gốc' }}</h2>
           <div class="child-folder-grid"><div v-for="folder in currentChildren" :key="folder.id" class="child-folder-card" @contextmenu.prevent="showFolderContextMenu(folder.id, $event.clientX, $event.clientY)"><button type="button" class="child-folder-open" :aria-label="`Mở thư mục ${folder.name}`" @click="openLibrary(folder.id)" @keydown="handleFolderContextKey($event, folder.id)"><Folder :size="20" aria-hidden="true" /><span>{{ folder.name }}</span><ChevronRight :size="16" aria-hidden="true" /></button><button type="button" class="child-folder-menu" :aria-label="`Tùy chọn ${folder.name} trong lưới`" @mouseenter="hoverFolderMenuFromButton(folder.id, $event)" @mouseleave="scheduleFolderMenuClose" @click="openFolderMenuFromButton(folder.id, $event)"><Ellipsis :size="17" aria-hidden="true" /></button></div></div>
         </section>

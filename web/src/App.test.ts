@@ -966,6 +966,95 @@ test('items show added time, stable numbering, pagination and oldest first order
   page.unmount();
 });
 
+test('a folder opens one ordinary list of all descendant item categories and can return to its direct contents', async () => {
+  storedFolders = [
+    { id: 'root', name: 'Khóa học', parent_id: null },
+    { id: 'child', name: 'Bài 1', parent_id: 'root' },
+    { id: 'deep', name: 'Phần nhỏ', parent_id: 'child' },
+    { id: 'outside', name: 'Khác', parent_id: null },
+  ];
+  const base = { meaning: 'nghĩa', pinyin: '', created_at: 1, linked_item_ids: [] };
+  storedItems = [
+    { ...base, id: 'word', folder_id: 'root', category: 'word', text: '学习' },
+    { ...base, id: 'sentence', folder_id: 'child', category: 'sentence', text: '我学习。' },
+    { ...base, id: 'grammar', folder_id: 'deep', category: 'grammar', text: '把 + N' },
+    { ...base, id: 'note', folder_id: 'deep', category: 'note', text: 'Ghi chú' },
+    { ...base, id: 'other', folder_id: 'outside', category: 'word', text: '外面' },
+  ];
+  const page = mount(App, { attachTo: document.body });
+  try {
+    await flushPromises();
+    expect(page.find('button[aria-label="Mở tất cả danh sách"]').exists()).toBe(false);
+    await page.get('button[aria-label="Mở thư mục Khóa học"]').trigger('click');
+    expect(page.findAll('.saved-item-row')).toHaveLength(1);
+    await page.get('button[aria-label="Mở tất cả danh sách"]').trigger('click');
+    expect(page.findAll('.saved-item-row')).toHaveLength(4);
+    expect(page.find('#learning-item-other').exists()).toBe(false);
+    expect(page.find('.child-folders').exists()).toBe(false);
+    expect(page.get('[aria-label="Thống kê vị trí hiện tại"]').text()).toBe('(1 từ · 1 câu)');
+    await page.get('select[aria-label="Lọc mục học tập"]').setValue('grammar');
+    expect(page.findAll('.saved-item-row')).toHaveLength(1);
+    expect(page.get('.saved-item-row').attributes('id')).toBe('learning-item-grammar');
+    await page.get('button[aria-label="Về thư mục"]').trigger('click');
+    expect(page.findAll('.saved-item-row')).toHaveLength(1);
+    expect(page.find('.child-folders').exists()).toBe(true);
+    await page.get('button[aria-label="Mở tất cả danh sách"]').trigger('click');
+    await page.get('nav[aria-label="Cây thư mục"] button[aria-current="page"]').trigger('click');
+    expect(page.find('button[aria-label="Mở tất cả danh sách"]').exists()).toBe(true);
+    expect(page.findAll('.saved-item-row')).toHaveLength(1);
+  } finally { page.unmount(); }
+});
+
+test('an empty parent can paginate descendant notes and clear selection when switching list scope', async () => {
+  storedFolders = [{ id: 'root', name: 'Khóa học', parent_id: null }, { id: 'child', name: 'Bài 1', parent_id: 'root' }];
+  storedItems = Array.from({ length: 23 }, (_, index) => ({
+    id: `n${index}`, folder_id: 'child', category: 'note', text: `Ghi chú ${index}`, meaning: 'Nội dung', pinyin: '', created_at: index + 1, linked_item_ids: [],
+  }));
+  const page = mount(App, { attachTo: document.body });
+  try {
+    await flushPromises();
+    await page.get('button[aria-label="Mở thư mục Khóa học"]').trigger('click');
+    expect(page.findAll('.saved-item-row')).toHaveLength(0);
+    await page.get('button[aria-label="Mở tất cả danh sách"]').trigger('click');
+    expect(page.findAll('.saved-item-row')).toHaveLength(20);
+    await page.get('input[aria-label="Chọn Ghi chú 22"]').setValue(true);
+    await page.get('button[aria-label="Trang sau"]').trigger('click');
+    expect(page.findAll('.saved-item-row')).toHaveLength(3);
+    await page.get('button[aria-label="Về thư mục"]').trigger('click');
+    await page.get('button[aria-label="Mở tất cả danh sách"]').trigger('click');
+    expect(page.get('nav[aria-label="Phân trang mục học tập"]').text()).toContain('Trang 1 / 2');
+    expect(page.get('.saved-items-bulk').text()).toContain('0 đã chọn');
+  } finally { page.unmount(); }
+});
+
+test('bulk deletion in an aggregate list explicitly uses the selected subtree and preserves the folder structure', async () => {
+  storedFolders = [{ id: 'root', name: 'Khóa học', parent_id: null }, { id: 'child', name: 'Bài 1', parent_id: 'root' }];
+  const base = { meaning: 'nghĩa', pinyin: '', created_at: 1, linked_item_ids: [] };
+  storedItems = [
+    { ...base, id: 'word', folder_id: 'root', category: 'word', text: '学习' },
+    { ...base, id: 'note', folder_id: 'child', category: 'note', text: 'Ghi chú' },
+  ];
+  api.trashFolderItems.mockResolvedValue({ count: 2 });
+  const page = mount(App, { attachTo: document.body });
+  try {
+    await flushPromises();
+    await page.get('button[aria-label="Mở thư mục Khóa học"]').trigger('click');
+    await page.get('button[aria-label="Mở tất cả danh sách"]').trigger('click');
+    await page.get('input[aria-label="Chọn 学习"]').setValue(true);
+    await page.get('input[aria-label="Chọn Ghi chú"]').setValue(true);
+    await page.get('button[aria-label="Xóa mục đã chọn"]').trigger('click');
+    await page.get('.confirm-dialog button[type="submit"]').trigger('click');
+    await flushPromises();
+    expect(api.trashFolderItems).toHaveBeenCalledWith('root', ['word', 'note'], true);
+    await page.get('button[aria-label="Dọn sạch thư mục"]').trigger('click');
+    expect(page.get('.confirm-dialog').text()).toContain('các thư mục con');
+    expect(page.get('.confirm-dialog').text()).toContain('Cấu trúc thư mục được giữ nguyên');
+    await page.get('.confirm-dialog button[type="submit"]').trigger('click');
+    await flushPromises();
+    expect(api.trashFolderItems).toHaveBeenLastCalledWith('root', undefined, true);
+  } finally { page.unmount(); }
+});
+
 test('display dropdown independently hides card fields and remembers selection', async () => {
   storedFolders = [{ id: 'f1', name: 'HSK', parent_id: null }];
   storedItems = [{ id: 'w1', folder_id: 'f1', category: 'word', text: '学习', meaning: 'học', pinyin: 'xué xí', created_at: 1700000000000, linked_item_ids: [] }];
