@@ -362,7 +362,8 @@ export class TranslationTooltip {
     });
     this.tooltipEl.addEventListener('pointerup', () => { this.isDragging = false; });
     this.tooltipEl.addEventListener('pointercancel', () => { this.isDragging = false; });
-    document.addEventListener('mousedown', (event) => {
+    // Dragging cancels pointerdown's default action, so mousedown may never fire.
+    document.addEventListener('pointerdown', (event) => {
       const activeElement = this.shadow?.activeElement;
       if (activeElement?.matches('.tt-save-meaning, .tt-save-sentence-meaning') && !event.composedPath().includes(activeElement)) {
         (activeElement as HTMLInputElement).blur();

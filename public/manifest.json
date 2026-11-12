@@ -15,6 +15,7 @@
   "permissions": [
     "storage",
     "webNavigation",
+    "webRequest",
     "tabs",
     "offscreen",
     "activeTab",

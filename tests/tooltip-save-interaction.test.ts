@@ -20,7 +20,10 @@ function setup(text = '我喜欢学习。你呢？') {
   stubLinkedChrome( { runtime: { getURL: (path: string) => path, sendMessage }, storage: { local: { get: vi.fn(async () => ({ defaultLearningFolder: 'folder' })), set: vi.fn(async () => {}) } } });
   const tooltip = new TranslationTooltip();
   tooltip.show(0, 0, text, { detectedLang: 'zh', sourcePhonetics: '我 wǒ · 喜欢 xǐ huān · 学习 xué xí · 你 nǐ · 呢 ne', translations: [] });
-  return { root: document.getElementById('translation-extension-root')!.shadowRoot!, sendMessage };
+  const root = document.getElementById('translation-extension-root')!.shadowRoot!;
+  // jsdom does not implement the browser's pointer capture API.
+  root.querySelector<HTMLElement>('#tooltip')!.setPointerCapture = vi.fn();
+  return { root, sendMessage };
 }
 
 function selectText(root: ShadowRoot, start: number, end: number): void {
@@ -165,7 +168,7 @@ test('clicking outside the meaning field releases its focus so s can save', asyn
   const meaning = root.querySelector<HTMLInputElement>('.tt-save-meaning')!;
   meaning.focus();
   expect(root.activeElement).toBe(meaning);
-  root.querySelector<HTMLElement>('.tt-save-panel')!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, composed: true }));
+  root.querySelector<HTMLElement>('.tt-save-panel')!.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, composed: true }));
   expect(root.activeElement).not.toBe(meaning);
   document.dispatchEvent(new KeyboardEvent('keydown', { key: 's', bubbles: true }));
   await vi.waitFor(() => expect(sendMessage.mock.calls.some(([message]) => message.type === 'LEARNING_SAVE')).toBe(true));
@@ -182,7 +185,7 @@ test('clicking outside the sentence meaning field releases its focus so s can sa
   sentenceMeaning.value = 'Tôi thích học. Còn bạn?';
   sentenceMeaning.focus();
   expect(root.activeElement).toBe(sentenceMeaning);
-  root.querySelector<HTMLElement>('.tt-save-panel')!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, composed: true }));
+  root.querySelector<HTMLElement>('.tt-save-panel')!.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, composed: true }));
   expect(root.activeElement).not.toBe(sentenceMeaning);
   document.dispatchEvent(new KeyboardEvent('keydown', { key: 's', bubbles: true }));
   await vi.waitFor(() => expect(sendMessage.mock.calls.some(([message]) => message.type === 'LEARNING_SAVE')).toBe(true));

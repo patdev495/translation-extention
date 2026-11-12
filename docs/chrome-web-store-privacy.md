@@ -12,6 +12,7 @@ Translate user-selected text and text recognized from user-selected image region
 | --- | --- |
 | `storage` | Save language and feature settings, the user's optional DeepL API key, Hanzi learning notes, cached character meanings, and optionally pinned image regions on the user's device. |
 | `webNavigation` | Detect PDF navigation so the extension can open PDFs in its viewer for text selection and OCR translation. |
+| `webRequest` | Inspect response Content-Type headers for document navigations so actual PDFs open in the extension viewer while HTML preview pages remain in the browser. |
 | `tabs` | Open the extension settings page, redirect PDF tabs into the viewer, and notify open tabs when settings change. |
 | `offscreen` | Run local OCR in an offscreen document for image regions the user selects on a web page. |
 | `activeTab` | Capture the visible tab after the user activates OCR selection, so the selected image region can be recognized locally. Review whether this permission is redundant with broad host access before submission. |

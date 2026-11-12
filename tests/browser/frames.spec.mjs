@@ -20,11 +20,14 @@ function samplePdf() {
 
 test.beforeAll(async () => {
   const handler = (req, res) => {
-    if (req.url === '/sample.pdf') {
-      res.setHeader('Content-Type', 'application/pdf');
+    if (['/sample.pdf', '/download', '/binary.pdf'].includes(req.url)) {
+      res.setHeader('Content-Type', req.url === '/binary.pdf' ? 'application/octet-stream' : 'application/pdf');
       res.setHeader('Access-Control-Allow-Origin', '*'); res.end(samplePdf()); return;
     }
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    if (req.url.startsWith('/blob/')) {
+      res.end('<html><body><h1>PDF preview</h1><a href="/sample.pdf">Download raw file</a></body></html>'); return;
+    }
     if (req.url === '/ocr-smoke') res.end('<html><body style="margin:0;background:white"><p style="position:absolute;left:300px;top:230px;font:48px Arial;color:black">HELLO WORLD</p></body></html>');
     else if (req.url === '/scroll') res.end('<html><body style="margin:0;height:2000px;background:white"><div style="position:absolute;top:600px;left:300px;width:200px;height:100px;background:rgb(0,128,0)"></div></body></html>');
     else if (['/frames', '/cross', '/nested'].includes(req.url)) res.end(`<html><head><title>Frames</title></head><frameset frameborder="0" rows="98,*"><frame name="Up" src="/header"><frameset cols="18%,82%" frameborder="0"><frame name="leftBottom" src="${req.url === '/cross' ? crossOrigin : ''}${req.url === '/nested' ? '/container' : '/left'}"><frame name="NotesView" src="/right"></frameset></frameset></html>`);
@@ -119,6 +122,34 @@ for (const fixture of ['/cross', '/nested', '/iframes', '/blank']) {
     await tooltip.getByRole('button', { name: 'Toggle phonetics (IPA/Pinyin)' }).click();
     await page.frame({ name: 'NotesView' }).locator('#site').click();
     await expect(tooltip).toBeHidden();
+    await page.close();
+  });
+}
+
+test('HTML PDF preview stays open and its raw PDF link renders in the extension viewer', async () => {
+  const page = await context.newPage();
+  const previewUrl = `${origin}/blob/master/${encodeURIComponent('计算机程序的构造和解释（SICP中文第2版）.pdf')}`;
+  await page.goto(previewUrl).catch(error => {
+    if (!error.message.includes('net::ERR_ABORTED')) throw error;
+  });
+  await expect(page).toHaveURL(previewUrl);
+  await expect(page.getByRole('heading', { name: 'PDF preview' })).toBeVisible();
+  await page.getByRole('link', { name: 'Download raw file' }).click();
+  await expect(page).toHaveURL(new RegExp('^chrome-extension://.+/pdf-viewer/viewer.html\\?file='));
+  await expect(page.locator('#page-total')).toHaveText('/ 1');
+  await expect(page.locator('#pages-container canvas').first()).toBeVisible();
+  await page.close();
+});
+
+for (const path of ['/download', '/binary.pdf']) {
+  test(`PDF navigation to ${path} renders in the extension viewer`, async () => {
+    const page = await context.newPage();
+    await page.goto(`${origin}${path}`).catch(error => {
+      if (!/net::ERR_ABORTED|Download is starting/.test(error.message)) throw error;
+    });
+    await expect(page).toHaveURL(new RegExp('^chrome-extension://.+/pdf-viewer/viewer.html\\?file='));
+    await expect(page.locator('#page-total')).toHaveText('/ 1');
+    await expect(page.locator('#pages-container canvas').first()).toBeVisible();
     await page.close();
   });
 }

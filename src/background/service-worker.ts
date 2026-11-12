@@ -15,7 +15,7 @@ function buildViewerUrl(originalUrl: string): string {
   return chrome.runtime.getURL(`${PDF_VIEWER_PATH}?file=${encodeURIComponent(originalUrl)}`);
 }
 
-// Intercept navigation to PDF URLs (by URL pattern)
+// Local PDFs have no HTTP response headers, so intercept them by URL.
 chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   if (details.frameId !== 0) return; // main frame only
 
@@ -34,8 +34,8 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   chrome.tabs.update(tabId, { url: viewerUrl });
 });
 
-// Also intercept by Content-Type header for PDFs without .pdf in URL
-// (e.g. Google Drive, server-side downloads)
+// Wait for HTTP response headers so HTML preview pages ending in .pdf stay open.
+// This also catches PDF responses without .pdf in the URL.
 chrome.webRequest?.onHeadersReceived?.addListener(
   (details) => {
     if (details.frameId !== 0) return;
@@ -47,7 +47,7 @@ chrome.webRequest?.onHeadersReceived?.addListener(
     const contentType = details.responseHeaders?.find(
       (h) => h.name.toLowerCase() === 'content-type'
     );
-    if (!contentType?.value?.includes('application/pdf')) return;
+    if (!shouldUseExtensionPdfViewer(details.url, contentType?.value)) return;
 
     // Use tabs API asynchronously (non-blocking)
     chrome.storage.local.get(['active', 'privacyConsentGranted']).then((res) => {
