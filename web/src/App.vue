@@ -7,6 +7,9 @@ import FolderSharingDialog from './FolderSharingDialog.vue';
 import PronunciationButton from './PronunciationButton.vue';
 import { usePracticeAudio } from './use-practice-audio';
 
+const props = defineProps<{ sharedToken?: string }>();
+const readOnly = computed(() => props.sharedToken !== undefined);
+
 type EditorMode = 'create' | 'rename' | 'move';
 
 interface TreeRow {
@@ -44,6 +47,7 @@ const username = ref('');
 const password = ref('');
 const accountError = ref('');
 const folders = ref<LearningFolder[]>([]);
+const sharedRoot = computed(() => folders.value.find(folder => folder.parent_id === null));
 const foldersLoading = ref(false);
 const folderError = ref('');
 const items = ref<SavedLearningItem[]>([]);
@@ -294,10 +298,21 @@ async function restoreEntry(entry: TrashEntry): Promise<void> {
 
 onMounted(async () => {
   try {
-    account.value = await learningApi.me();
-    await loadFolders();
+    if (props.sharedToken !== undefined) {
+      const shared = await learningApi.sharedFolderContents(props.sharedToken);
+      folders.value = shared.folders;
+      items.value = shared.items;
+      openLibrary(shared.root_id);
+    } else {
+      account.value = await learningApi.me();
+      await loadFolders();
+    }
   } catch (error) {
-    if (!(error instanceof ApiError && error.status === 401)) {
+    if (readOnly.value) {
+      accountError.value = error instanceof ApiError && error.status === 404
+        ? 'Liên kết không hợp lệ hoặc đã bị tắt.'
+        : 'Không tải được thư mục. Hãy làm mới trang để thử lại.';
+    } else if (!(error instanceof ApiError && error.status === 401)) {
       accountError.value = errorMessage(error);
     }
   } finally {
@@ -646,7 +661,14 @@ function setAddChoices(open: boolean, event: Event): void {
   addSubmenuAbove.value = rect.top + 180 > window.innerHeight - 8;
 }
 
+function handleFolderContextMenu(event: MouseEvent, folderId: string | null): void {
+  if (readOnly.value) return;
+  event.preventDefault();
+  void showFolderContextMenu(folderId, event.clientX, event.clientY);
+}
+
 function handleFolderContextKey(event: KeyboardEvent, folderId: string | null): void {
+  if (readOnly.value) return;
   if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return;
   event.preventDefault();
   const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
@@ -806,9 +828,14 @@ async function submitEditor(): Promise<void> {
       </div>
     </header>
 
-    <main v-if="accountLoading" class="loading-screen" role="status">Đang mở thư viện…</main>
+    <main v-if="accountLoading" class="loading-screen" role="status">{{ readOnly ? 'Đang tải thư mục…' : 'Đang mở thư viện…' }}</main>
 
-    <main v-else-if="!account" class="auth-layout">
+    <main v-else-if="readOnly && accountError" class="library-main" aria-labelledby="shared-folder-error-title">
+      <div class="library-header"><h1 id="shared-folder-error-title">Thư mục được chia sẻ</h1></div>
+      <p class="form-error library-error" role="alert">{{ accountError }}</p>
+    </main>
+
+    <main v-else-if="!account && !readOnly" class="auth-layout">
       <section class="auth-intro" aria-label="Giới thiệu PolyTranslate Learning">
         <div class="eyebrow"><Sparkles :size="16" aria-hidden="true" /> HỌC TỪ NHỮNG GÌ BẠN GẶP</div>
         <h1>Chữ mới hôm nay.<br /><span>Một nơi để nhớ.</span></h1>
@@ -837,16 +864,16 @@ async function submitEditor(): Promise<void> {
 
     <main v-else class="workspace" :class="{ 'review-workspace': showReview }">
       <aside class="sidebar" aria-label="Thư mục học tập">
-        <div class="sidebar-heading"><span>THƯ VIỆN</span></div>
+        <div class="sidebar-heading"><span>{{ readOnly ? 'THƯ MỤC ĐƯỢC CHIA SẺ' : 'THƯ VIỆN' }}</span></div>
         <nav aria-label="Cây thư mục">
-          <div class="tree-row" :class="{ active: selectedId === null && !showTrash }"><button class="tree-button" :class="{ active: selectedId === null && !showTrash }" type="button" :aria-current="selectedId === null && !showTrash ? 'page' : undefined" @click="openLibrary(null)" @contextmenu.prevent="showFolderContextMenu(null, $event.clientX, $event.clientY)" @keydown="handleFolderContextKey($event, null)"><Home :size="17" aria-hidden="true" /> Tất cả thư mục</button><button class="tree-menu-button" type="button" aria-label="Tùy chọn Thư viện" title="Tùy chọn Thư viện" @mouseenter="hoverFolderMenuFromButton(null, $event)" @mouseleave="scheduleFolderMenuClose" @click="openFolderMenuFromButton(null, $event)"><Ellipsis :size="17" aria-hidden="true" /></button></div>
-          <div v-for="row in treeRows" :key="row.folder.id" class="tree-row" :class="{ active: selectedId === row.folder.id && !showTrash }"><button class="tree-button" :class="{ active: selectedId === row.folder.id && !showTrash }" :style="{ paddingLeft: `${14 + row.depth * 18}px` }" type="button" :aria-current="selectedId === row.folder.id && !showTrash ? 'page' : undefined" :aria-expanded="folders.some(folder => folder.parent_id === row.folder.id) ? expandedFolderIds.has(row.folder.id) : undefined" @click="openSidebarFolder(row.folder.id)" @contextmenu.prevent="showFolderContextMenu(row.folder.id, $event.clientX, $event.clientY)" @keydown="handleFolderContextKey($event, row.folder.id)"><Folder :size="17" aria-hidden="true" /> <span class="truncate">{{ row.folder.name }}</span><ChevronRight v-if="folders.some(folder => folder.parent_id === row.folder.id)" :size="14" class="tree-chevron" :class="{ expanded: expandedFolderIds.has(row.folder.id) }" aria-hidden="true" /></button><button class="tree-menu-button" type="button" :aria-label="`Tùy chọn ${row.folder.name}`" :title="`Tùy chọn ${row.folder.name}`" @mouseenter="hoverFolderMenuFromButton(row.folder.id, $event)" @mouseleave="scheduleFolderMenuClose" @click="openFolderMenuFromButton(row.folder.id, $event)"><Ellipsis :size="17" aria-hidden="true" /></button></div>
+          <div v-if="!readOnly" class="tree-row" :class="{ active: selectedId === null && !showTrash }"><button class="tree-button" :class="{ active: selectedId === null && !showTrash }" type="button" :aria-current="selectedId === null && !showTrash ? 'page' : undefined" @click="openLibrary(null)" @contextmenu="handleFolderContextMenu($event, null)" @keydown="handleFolderContextKey($event, null)"><Home :size="17" aria-hidden="true" /> Tất cả thư mục</button><button class="tree-menu-button" type="button" aria-label="Tùy chọn Thư viện" title="Tùy chọn Thư viện" @mouseenter="hoverFolderMenuFromButton(null, $event)" @mouseleave="scheduleFolderMenuClose" @click="openFolderMenuFromButton(null, $event)"><Ellipsis :size="17" aria-hidden="true" /></button></div>
+          <div v-for="row in treeRows" :key="row.folder.id" class="tree-row" :class="{ active: selectedId === row.folder.id && !showTrash }"><button class="tree-button" :class="{ active: selectedId === row.folder.id && !showTrash }" :style="{ paddingLeft: `${14 + row.depth * 18}px` }" type="button" :aria-current="selectedId === row.folder.id && !showTrash ? 'page' : undefined" :aria-expanded="folders.some(folder => folder.parent_id === row.folder.id) ? expandedFolderIds.has(row.folder.id) : undefined" @click="openSidebarFolder(row.folder.id)" @contextmenu="handleFolderContextMenu($event, row.folder.id)" @keydown="handleFolderContextKey($event, row.folder.id)"><Folder :size="17" aria-hidden="true" /> <span class="truncate">{{ row.folder.name }}</span><ChevronRight v-if="folders.some(folder => folder.parent_id === row.folder.id)" :size="14" class="tree-chevron" :class="{ expanded: expandedFolderIds.has(row.folder.id) }" aria-hidden="true" /></button><button v-if="!readOnly" class="tree-menu-button" type="button" :aria-label="`Tùy chọn ${row.folder.name}`" :title="`Tùy chọn ${row.folder.name}`" @mouseenter="hoverFolderMenuFromButton(row.folder.id, $event)" @mouseleave="scheduleFolderMenuClose" @click="openFolderMenuFromButton(row.folder.id, $event)"><Ellipsis :size="17" aria-hidden="true" /></button></div>
         </nav>
-        <button class="tree-button trash-nav" :class="{ active: showReview }" type="button" aria-label="Mở ôn tập" :aria-current="showReview ? 'page' : undefined" @click="showTrash = false; showReview = true"><BookOpen :size="17" aria-hidden="true" /> Ôn tập</button>
-        <button class="tree-button trash-nav" :class="{ active: showTrash }" type="button" aria-label="Mở thùng rác" :aria-current="showTrash ? 'page' : undefined" @click="openTrash"><Trash2 :size="17" aria-hidden="true" /> Thùng rác</button>
+        <button v-if="!readOnly" class="tree-button trash-nav" :class="{ active: showReview }" type="button" aria-label="Mở ôn tập" :aria-current="showReview ? 'page' : undefined" @click="showTrash = false; showReview = true"><BookOpen :size="17" aria-hidden="true" /> Ôn tập</button>
+        <button v-if="!readOnly" class="tree-button trash-nav" :class="{ active: showTrash }" type="button" aria-label="Mở thùng rác" :aria-current="showTrash ? 'page' : undefined" @click="openTrash"><Trash2 :size="17" aria-hidden="true" /> Thùng rác</button>
       </aside>
 
-      <div v-if="folderContextMenu" ref="folderContextMenuElement" class="folder-context-menu" role="menu" :style="{ left: `${folderContextMenu.left}px`, top: `${folderContextMenu.top}px` }" @mouseenter="cancelFolderMenuClose" @mouseleave="scheduleFolderMenuClose">
+      <div v-if="!readOnly && folderContextMenu" ref="folderContextMenuElement" class="folder-context-menu" role="menu" :style="{ left: `${folderContextMenu.left}px`, top: `${folderContextMenu.top}px` }" @mouseenter="cancelFolderMenuClose" @mouseleave="scheduleFolderMenuClose">
         <p class="folder-context-title">{{ folderContextMenu.folderId ? folderById.get(folderContextMenu.folderId)?.name : 'Thư viện' }}</p>
         <button type="button" role="menuitem" @click="chooseFolderContextAction('create')"><FolderPlus :size="17" aria-hidden="true" /> {{ folderContextMenu.folderId ? 'Tạo thư mục con' : 'Tạo thư mục gốc' }}</button>
         <template v-if="folderContextMenu.folderId">
@@ -878,13 +905,16 @@ async function submitEditor(): Promise<void> {
       </section>
       <section v-else class="library-main" aria-label="Thư viện học tập">
         <p v-if="feedback" class="trash-feedback" role="status">{{ feedback }}</p>
-        <div v-if="linkRequest" class="link-banner" role="status">
+        <div v-if="!readOnly && linkRequest" class="link-banner" role="status">
           <div class="link-banner-icon"><Link2 :size="20" aria-hidden="true" /></div>
           <div><strong>Liên kết extension với tài khoản này?</strong><p>{{ linkMessage || 'Chỉ xác nhận nếu chính bạn đã bắt đầu liên kết từ cài đặt extension.' }}</p></div>
           <button class="link-button" type="button" :disabled="linkBusy" @click="approveLink">{{ linkBusy ? 'Đang liên kết…' : 'Xác nhận liên kết' }}</button>
         </div>
+        <div v-if="readOnly" class="library-header">
+          <div><h1>{{ sharedRoot?.name }}</h1><p class="library-subtitle">Chỉ xem</p></div>
+        </div>
         <nav class="breadcrumb" aria-label="Đường dẫn thư mục">
-          <div class="breadcrumb-trail"><button type="button" :aria-current="selectedId === null ? 'page' : undefined" @click="openLibrary(null)">Thư viện</button><template v-for="(crumb, index) in breadcrumbs" :key="crumb.id"><ChevronRight :size="15" aria-hidden="true" /><button type="button" :aria-current="index === breadcrumbs.length - 1 ? 'page' : undefined" @click="openLibrary(crumb.id)">{{ crumb.name }}</button></template><span class="breadcrumb-count" aria-label="Thống kê vị trí hiện tại">({{ currentStats.words }} từ · {{ currentStats.sentences }} câu)</span></div>
+          <div class="breadcrumb-trail"><button v-if="!readOnly" type="button" :aria-current="selectedId === null ? 'page' : undefined" @click="openLibrary(null)">Thư viện</button><template v-for="(crumb, index) in breadcrumbs" :key="crumb.id"><ChevronRight v-if="!readOnly || index > 0" :size="15" aria-hidden="true" /><button type="button" :aria-current="index === breadcrumbs.length - 1 ? 'page' : undefined" @click="openLibrary(crumb.id)">{{ crumb.name }}</button></template><span class="breadcrumb-count" aria-label="Thống kê vị trí hiện tại">({{ currentStats.words }} từ · {{ currentStats.sentences }} câu)</span></div>
         </nav>
 
         <p v-if="folderError" class="form-error library-error" role="alert">{{ folderError }}</p>
@@ -895,18 +925,18 @@ async function submitEditor(): Promise<void> {
         </div>
         <section v-if="currentChildren.length && !includeDescendants" class="child-folders" aria-label="Thư mục con">
           <h2>{{ selectedId ? 'Thư mục con' : 'Thư mục gốc' }}</h2>
-          <div class="child-folder-grid"><div v-for="folder in currentChildren" :key="folder.id" class="child-folder-card" @contextmenu.prevent="showFolderContextMenu(folder.id, $event.clientX, $event.clientY)"><button type="button" class="child-folder-open" :aria-label="`Mở thư mục ${folder.name}`" @click="openLibrary(folder.id)" @keydown="handleFolderContextKey($event, folder.id)"><Folder :size="20" aria-hidden="true" /><span>{{ folder.name }}</span><ChevronRight :size="16" aria-hidden="true" /></button><button type="button" class="child-folder-menu" :aria-label="`Tùy chọn ${folder.name} trong lưới`" @mouseenter="hoverFolderMenuFromButton(folder.id, $event)" @mouseleave="scheduleFolderMenuClose" @click="openFolderMenuFromButton(folder.id, $event)"><Ellipsis :size="17" aria-hidden="true" /></button></div></div>
+          <div class="child-folder-grid"><div v-for="folder in currentChildren" :key="folder.id" class="child-folder-card" @contextmenu="handleFolderContextMenu($event, folder.id)"><button type="button" class="child-folder-open" :aria-label="`Mở thư mục ${folder.name}`" @click="openLibrary(folder.id)" @keydown="handleFolderContextKey($event, folder.id)"><Folder :size="20" aria-hidden="true" /><span>{{ folder.name }}</span><ChevronRight :size="16" aria-hidden="true" /></button><button v-if="!readOnly" type="button" class="child-folder-menu" :aria-label="`Tùy chọn ${folder.name} trong lưới`" @mouseenter="hoverFolderMenuFromButton(folder.id, $event)" @mouseleave="scheduleFolderMenuClose" @click="openFolderMenuFromButton(folder.id, $event)"><Ellipsis :size="17" aria-hidden="true" /></button></div></div>
         </section>
         <section class="saved-items" aria-labelledby="saved-items-title">
           <div class="saved-items-heading"><h2 id="saved-items-title">Mục học tập <small>({{ filteredItems.length }})</small></h2><div class="saved-items-filters"><label class="sort-control">Loại <select v-model="categoryFilter" aria-label="Lọc mục học tập"><option value="all">Tất cả</option><option value="word">Từ / cụm từ</option><option value="sentence">Câu</option><option value="grammar">Ngữ pháp</option><option value="note">Ghi chú</option></select></label><details ref="displayOptions" class="display-options"><summary>Hiển thị <ChevronRight :size="14" aria-hidden="true" /></summary><div class="display-options-panel" role="group" aria-label="Trường hiển thị trên thẻ"><label><input v-model="cardFields.vietnamese" type="checkbox" aria-label="Hiển thị tiếng Việt" /> Tiếng Việt</label><label><input v-model="cardFields.chinese" type="checkbox" aria-label="Hiển thị tiếng Trung" /> Tiếng Trung</label><label><input v-model="cardFields.pinyin" type="checkbox" aria-label="Hiển thị Pinyin" /> Pinyin</label></div></details><label class="sort-control">Sắp xếp <select v-model="sortOrder" aria-label="Sắp xếp mục học tập"><option value="newest">Mới thêm</option><option value="oldest">Cũ trước</option></select></label></div></div>
-          <div v-if="selectedId && visibleItems.length" class="saved-items-bulk"><label><input type="checkbox" aria-label="Chọn tất cả mục đang lọc" :checked="allFilteredSelected" :disabled="!filteredItems.length" @change="toggleFilteredSelection" /> Chọn tất cả đang lọc</label><span>{{ selectedItemIds.size }} đã chọn</span><button type="button" class="danger-button" aria-label="Xóa mục đã chọn" :disabled="!selectedItemIds.size || trashBusy" @click="trashSelectedItems">Xóa mục đã chọn</button><button type="button" class="danger-button" aria-label="Dọn sạch thư mục" :disabled="trashBusy" @click="trashAllFolderItems">Dọn sạch thư mục</button></div>
-          <p v-if="visibleItems.length === 0" class="saved-items-empty">Chưa có mục học tập trong vị trí này. Chọn Thêm trong menu thư mục hoặc lưu chữ Trung từ Translation Tooltip.</p>
+          <div v-if="!readOnly && selectedId && visibleItems.length" class="saved-items-bulk"><label><input type="checkbox" aria-label="Chọn tất cả mục đang lọc" :checked="allFilteredSelected" :disabled="!filteredItems.length" @change="toggleFilteredSelection" /> Chọn tất cả đang lọc</label><span>{{ selectedItemIds.size }} đã chọn</span><button type="button" class="danger-button" aria-label="Xóa mục đã chọn" :disabled="!selectedItemIds.size || trashBusy" @click="trashSelectedItems">Xóa mục đã chọn</button><button type="button" class="danger-button" aria-label="Dọn sạch thư mục" :disabled="trashBusy" @click="trashAllFolderItems">Dọn sạch thư mục</button></div>
+          <p v-if="visibleItems.length === 0" class="saved-items-empty">Chưa có mục học tập trong vị trí này.<template v-if="!readOnly"> Chọn Thêm trong menu thư mục hoặc lưu chữ Trung từ Translation Tooltip.</template></p>
           <p v-else-if="filteredItems.length === 0" class="saved-items-empty">Không có mục thuộc loại này trong thư mục.</p>
           <div v-else class="saved-items-list">
             <article v-for="(item, index) in pagedItems" :id="`learning-item-${item.id}`" :key="item.id" class="saved-item-row" :class="{ focused: focusedItemId === item.id, selected: selectedItemIds.has(item.id) }" :aria-label="`Mục học tập số ${(currentPage - 1) * PAGE_SIZE + index + 1}`" tabindex="-1">
-              <input v-if="selectedId" type="checkbox" class="saved-item-select" :aria-label="`Chọn ${item.text}`" :checked="selectedItemIds.has(item.id)" @change="toggleItemSelection(item.id)" /><span v-else class="saved-item-number">{{ (currentPage - 1) * PAGE_SIZE + index + 1 }}</span>
+              <input v-if="!readOnly && selectedId" type="checkbox" class="saved-item-select" :aria-label="`Chọn ${item.text}`" :checked="selectedItemIds.has(item.id)" @change="toggleItemSelection(item.id)" /><span v-else class="saved-item-number">{{ (currentPage - 1) * PAGE_SIZE + index + 1 }}</span>
               <div class="saved-item-body"><div class="saved-item-title"><PronunciationButton v-if="item.category === 'word' || item.category === 'sentence'" :text="item.text" :playing="spokenItemId === item.id && libraryAudioPlaying" @play="playItemPronunciation(item)" /><h3 v-if="cardFields.chinese || item.category === 'note'" :lang="item.category === 'note' ? undefined : 'zh'" :class="{ 'multiline-content': item.category === 'grammar' }">{{ item.text }}</h3><span class="saved-item-category">{{ item.category === 'word' ? 'Từ / cụm từ' : item.category === 'sentence' ? 'Câu' : item.category === 'grammar' ? 'Ngữ pháp' : 'Ghi chú' }}</span></div><p v-if="cardFields.pinyin && item.pinyin && (item.category === 'word' || item.category === 'sentence')" class="saved-item-pinyin">{{ item.pinyin }}</p><p v-if="cardFields.vietnamese || item.category === 'note'" class="saved-item-meaning" :class="{ 'note-body': item.category === 'note', 'multiline-content': item.category === 'grammar' }">{{ item.meaning }}</p><p v-if="spokenItemId === item.id && libraryAudioError" class="library-audio-feedback" role="status">{{ libraryAudioError }}</p></div>
-              <div class="saved-item-meta"><time :datetime="new Date(item.created_at < 100_000_000_000 ? item.created_at * 1000 : item.created_at).toISOString()">{{ formatAddedAt(item.created_at) }}</time><div class="saved-item-controls"><button v-if="item.linked_item_ids.length" type="button" class="linked-open-button" :aria-label="`Xem ${item.linked_item_ids.length} ${linkedKind(item)} liên kết của ${item.text}`" :title="`Xem ${item.linked_item_ids.length} mục liên kết`" @click="openLinkedItems(item)"><Link2 :size="16" aria-hidden="true" /><span>{{ item.linked_item_ids.length }}</span></button><button type="button" :aria-label="`Sửa ${item.text}`" @click="openItemEditor(item)"><Pencil :size="16" aria-hidden="true" /></button><button type="button" :aria-label="`Xóa ${item.text}`" @click="askToDelete(`Chuyển “${item.text}” vào thùng rác?`, () => learningApi.trashItem(item.id), 'Đã chuyển mục học tập vào thùng rác.')"><Trash2 :size="16" aria-hidden="true" /></button></div></div>
+              <div class="saved-item-meta"><time :datetime="new Date(item.created_at < 100_000_000_000 ? item.created_at * 1000 : item.created_at).toISOString()">{{ formatAddedAt(item.created_at) }}</time><div class="saved-item-controls"><button v-if="item.linked_item_ids.length" type="button" class="linked-open-button" :aria-label="`Xem ${item.linked_item_ids.length} ${linkedKind(item)} liên kết của ${item.text}`" :title="`Xem ${item.linked_item_ids.length} mục liên kết`" @click="openLinkedItems(item)"><Link2 :size="16" aria-hidden="true" /><span>{{ item.linked_item_ids.length }}</span></button><button v-if="!readOnly" type="button" :aria-label="`Sửa ${item.text}`" @click="openItemEditor(item)"><Pencil :size="16" aria-hidden="true" /></button><button v-if="!readOnly" type="button" class="saved-item-delete" :aria-label="`Xóa ${item.text}`" @click="askToDelete(`Chuyển “${item.text}” vào thùng rác?`, () => learningApi.trashItem(item.id), 'Đã chuyển mục học tập vào thùng rác.')"><Trash2 :size="16" aria-hidden="true" /></button></div></div>
             </article>
           </div>
           <nav v-if="filteredItems.length" class="pagination" aria-label="Phân trang mục học tập"><button type="button" aria-label="Trang trước" :disabled="currentPage === 1" @click="page = currentPage - 1">Trước</button><span>Trang {{ currentPage }} / {{ pageCount }}</span><button type="button" aria-label="Trang sau" :disabled="currentPage === pageCount" @click="page = currentPage + 1">Sau</button></nav>
@@ -916,7 +946,7 @@ async function submitEditor(): Promise<void> {
 
     <FolderSharingDialog v-if="sharingFolder" :key="sharingFolder.id" :folder="sharingFolder" @close="sharingFolder = null" />
 
-    <dialog ref="editor" class="editor-dialog" @click.self="closeEditor">
+    <dialog v-if="!readOnly" ref="editor" class="editor-dialog" @click.self="closeEditor">
       <form @submit.prevent="submitEditor">
         <div class="dialog-icon"><Folder :size="23" aria-hidden="true" /></div>
         <h2>{{ editorMode === 'create' ? 'Tạo thư mục mới' : editorMode === 'rename' ? 'Đổi tên thư mục' : 'Chuyển thư mục' }}</h2>
@@ -927,7 +957,7 @@ async function submitEditor(): Promise<void> {
         <div class="dialog-actions"><button class="plain-button" type="button" @click="closeEditor">Hủy</button><button class="primary-button" type="submit" :disabled="editorBusy">{{ editorBusy ? 'Đang lưu…' : editorMode === 'create' ? 'Tạo thư mục' : 'Lưu thay đổi' }}</button></div>
       </form>
     </dialog>
-    <dialog ref="itemEditor" class="editor-dialog item-editor" @click.self="itemEditor?.close()">
+    <dialog v-if="!readOnly" ref="itemEditor" class="editor-dialog item-editor" @click.self="itemEditor?.close()">
       <form @submit.prevent="saveItem"><h2>Sửa mục học tập</h2><p>Chỉnh nội dung hoặc thư mục.</p>
         <label for="item-text">{{ editCategory === 'note' ? 'Tiêu đề' : editCategory === 'grammar' ? 'Cấu trúc' : 'Chữ Trung' }}</label><textarea v-if="editCategory === 'grammar'" id="item-text" v-model="editText" required lang="zh" rows="4"></textarea><input v-else id="item-text" v-model="editText" required :lang="editCategory === 'note' ? undefined : 'zh'" />
         <label for="item-meaning">{{ editCategory === 'note' ? 'Nội dung' : editCategory === 'grammar' ? 'Mô tả' : 'Nghĩa' }}</label><textarea v-if="editCategory === 'note' || editCategory === 'grammar'" id="item-meaning" v-model="editMeaning" required rows="5"></textarea><input v-else id="item-meaning" v-model="editMeaning" required />
@@ -939,7 +969,7 @@ async function submitEditor(): Promise<void> {
         <div class="dialog-actions"><button type="button" class="plain-button" @click="itemEditor?.close()">Hủy</button><button type="submit" class="primary-button" :disabled="itemBusy">{{ itemBusy ? 'Đang lưu…' : 'Lưu thay đổi' }}</button></div>
       </form>
     </dialog>
-    <dialog ref="newItemEditor" class="editor-dialog new-item-editor" @click.self="newItemEditor?.close()">
+    <dialog v-if="!readOnly" ref="newItemEditor" class="editor-dialog new-item-editor" @click.self="newItemEditor?.close()">
       <form @submit.prevent="submitNewItem">
         <div class="new-item-header">
           <span class="new-item-eyebrow">MỤC HỌC TẬP MỚI</span>
@@ -972,10 +1002,10 @@ async function submitEditor(): Promise<void> {
     </dialog>
     <dialog ref="linkedItemsDialog" class="editor-dialog linked-items-dialog" aria-labelledby="linked-items-title" @click.self="closeLinkedItems" @close="linkedSourceId = null">
       <div class="linked-dialog-header"><div><h2 id="linked-items-title">{{ linkedSource?.category === 'sentence' ? (linkedSource.linked_item_ids.some(id => itemById.get(id)?.category === 'grammar') ? 'Mục liên kết' : 'Từ liên kết') : 'Câu liên kết' }}</h2><p>Liên kết với “{{ linkedSource?.text }}”</p></div><button type="button" class="plain-button" aria-label="Đóng mục liên kết" @click="closeLinkedItems">Đóng</button></div>
-      <div class="linked-items-list"><article v-for="entry in linkedEntries" :key="entry.id" class="linked-entry"><h3 lang="zh">{{ entry.text }}</h3><p class="linked-entry-pinyin">{{ entry.pinyin }}</p><p class="linked-entry-meaning">{{ entry.meaning }}</p><span class="linked-entry-folder">{{ folderById.get(entry.folder_id)?.name ?? 'Thư viện' }}</span><p v-if="spokenItemId === entry.id && libraryAudioError" class="library-audio-feedback" role="status">{{ libraryAudioError }}</p><div class="linked-entry-actions"><PronunciationButton v-if="entry.category === 'word' || entry.category === 'sentence'" :text="entry.text" :playing="spokenItemId === entry.id && libraryAudioPlaying" @play="playItemPronunciation(entry)" /><button type="button" :aria-label="`Mở ${entry.text}`" @click="followLinkedItem(entry.id)"><ArrowRight :size="16" aria-hidden="true" /> Mở</button><button type="button" :aria-label="`Sửa ${entry.text} trong liên kết`" @click="editLinkedItem(entry)"><Pencil :size="16" aria-hidden="true" /> Sửa</button></div></article></div>
+      <div class="linked-items-list"><article v-for="entry in linkedEntries" :key="entry.id" class="linked-entry"><h3 lang="zh">{{ entry.text }}</h3><p class="linked-entry-pinyin">{{ entry.pinyin }}</p><p class="linked-entry-meaning">{{ entry.meaning }}</p><span class="linked-entry-folder">{{ folderById.get(entry.folder_id)?.name ?? 'Thư viện' }}</span><p v-if="spokenItemId === entry.id && libraryAudioError" class="library-audio-feedback" role="status">{{ libraryAudioError }}</p><div class="linked-entry-actions"><PronunciationButton v-if="entry.category === 'word' || entry.category === 'sentence'" :text="entry.text" :playing="spokenItemId === entry.id && libraryAudioPlaying" @play="playItemPronunciation(entry)" /><button type="button" :aria-label="`Mở ${entry.text}`" @click="followLinkedItem(entry.id)"><ArrowRight :size="16" aria-hidden="true" /> Mở</button><button v-if="!readOnly" type="button" :aria-label="`Sửa ${entry.text} trong liên kết`" @click="editLinkedItem(entry)"><Pencil :size="16" aria-hidden="true" /> Sửa</button></div></article></div>
       <p v-if="!linkedEntries.length" class="saved-items-empty">Không còn mục liên kết nào.</p>
     </dialog>
-    <dialog ref="confirmDialog" class="editor-dialog confirm-dialog" @click.self="confirmDialog?.close()">
+    <dialog v-if="!readOnly" ref="confirmDialog" class="editor-dialog confirm-dialog" @click.self="confirmDialog?.close()">
       <form @submit.prevent="confirmDeletion"><div class="dialog-icon danger-icon"><Trash2 :size="23" aria-hidden="true" /></div><h2>Xác nhận xóa</h2><p>{{ confirmLabel }}</p><p v-if="feedback" class="form-error" role="alert">{{ feedback }}</p><div class="dialog-actions"><button type="button" class="plain-button" @click="confirmDialog?.close()">Hủy</button><button type="submit" class="danger-button" :disabled="trashBusy">{{ trashBusy ? 'Đang xử lý…' : 'Xác nhận' }}</button></div></form>
     </dialog>
   </div>

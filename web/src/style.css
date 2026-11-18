@@ -178,7 +178,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .saved-item-meta time { font-variant-numeric: tabular-nums; }
 .saved-item-row .saved-item-controls button { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; min-height: 30px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: var(--indigo); }
 .saved-item-row .saved-item-controls .linked-open-button { gap: 2px; min-width: 38px; font-size: 11px; font-weight: 750; }
-.saved-item-row .saved-item-controls button:last-child { color: #a33d4c; }
+.saved-item-row .saved-item-controls .saved-item-delete { color: #a33d4c; }
 .saved-item-row .saved-item-controls button:hover { background: #f2f1ff; }
 .pagination { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 14px; color: var(--muted); font-size: 12px; }
 .pagination button { min-height: 34px; padding: 0 11px; border: 1px solid #d9deef; border-radius: 7px; background: #fff; color: var(--indigo); font-weight: 700; }
