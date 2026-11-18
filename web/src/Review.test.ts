@@ -17,19 +17,23 @@ test('learner reviews vocabulary with flip, scratchpad, correction and summary',
   api.startReview.mockResolvedValue({ id: 'session', kind: 'vocabulary', ineligible_count: 0, questions: [
     { sentence: null, item_ids: ['one'], items: [{ id: 'one', folder_id: 'f', category: 'word', text: '你好', meaning: 'xin chào', pinyin: 'nǐ hǎo', created_at: 1, linked_item_ids: [] }] },
   ] });
-  api.recordRecall.mockResolvedValue({ item_id: 'one', result: 'not_yet' });
+  api.recordRecall.mockResolvedValue({ item_id: 'one', result: 'again' });
   const page = mount(Review, { props: { folders: [{ id: 'f', name: 'HSK', parent_id: null }] }, attachTo: document.body });
   await flushPromises();
   await page.get('button[aria-label="Bắt đầu ôn tập"]').trigger('click');
   await flushPromises();
   expect(page.text()).toContain('xin chào');
   expect(page.get('.review-card-face-back').attributes('aria-hidden')).toBe('true');
+  expect(page.find('.review-ratings').exists()).toBe(false);
   await page.get('textarea[aria-label="Ô nháp ôn tập"]').setValue('my answer');
   await page.get('[role="button"][aria-label="Lật thẻ"]').trigger('click');
   expect(page.text()).toContain('nǐ hǎo');
-  await page.get('button[aria-label="Chưa nhớ"]').trigger('click');
+  expect(page.findAll('.review-ratings button').map(button => button.text())).toEqual(['Quên', 'Khó nhớ', 'Nhớ được', 'Nhớ ngay']);
+  await page.get('textarea').trigger('keydown', { key: '1' });
+  expect(api.recordRecall).not.toHaveBeenCalled();
+  await page.get('[aria-label="Lật thẻ"]').trigger('keydown', { key: '1' });
   await flushPromises();
-  expect(api.recordRecall).toHaveBeenCalledWith('session', 'one', 'not_yet', 1);
+  expect(api.recordRecall).toHaveBeenCalledWith('session', 'one', 'again', 1);
   expect(page.text()).toContain('Tóm tắt ôn tập');
   await page.get('button[aria-label="Lùi"]').trigger('click');
   await flushPromises();
@@ -117,7 +121,7 @@ test('review scope and three flashcard prompt modes change visible front', async
   expect(api.reviewOverview).toHaveBeenCalledWith('root');
   await page.get('button[aria-label="Bắt đầu ôn tập"]').trigger('click');
   await flushPromises();
-  expect(api.startReview).toHaveBeenCalledWith('vocabulary', 'root', { category: 'all', practice: 'classic', prompt_mode: 'meaning', autoplay: true });
+  expect(api.startReview).toHaveBeenCalledWith('vocabulary', 'root', { category: 'all', practice: 'classic', prompt_mode: 'meaning', autoplay: true, queue: 'scheduled' });
   expect(page.get('.review-front').text()).toBe('xin chào');
   await page.get('select[aria-label="Mặt trước flashcard"]').setValue('chinese');
   expect(page.get('.review-front').text()).toBe('你好');

@@ -21,7 +21,11 @@ test('mobile flashcards keep the card and large audio and assessment controls to
   await openPractice(page);
   await expect(page.getByRole('button', { name: 'Lật thẻ', exact: true })).toBeVisible();
   await expect(page.locator('details.practice-setup')).toHaveJSProperty('open', false);
-  for (const name of ['Nghe mẫu', 'Thu âm', 'Nghe bản thu', 'Nhớ', 'Chưa nhớ', 'Lùi', 'Tiếp']) {
+  await expect(page.getByRole('group', { name: 'Đánh giá mức độ ghi nhớ' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Lật thẻ', exact: true }).tap();
+  await expect(page.getByRole('button', { name: 'Quên', exact: true })).toContainText('1 phút');
+  await expect(page.getByRole('button', { name: 'Nhớ được', exact: true })).toContainText('10 phút');
+  for (const name of ['Nghe mẫu', 'Thu âm', 'Nghe bản thu', 'Quên', 'Khó nhớ', 'Nhớ được', 'Nhớ ngay', 'Lùi', 'Tiếp']) {
     const button = page.getByRole('button', { name, exact: true });
     const box = await button.boundingBox();
     expect(box, name).not.toBeNull();
@@ -31,7 +35,6 @@ test('mobile flashcards keep the card and large audio and assessment controls to
   }
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('flashcards-phone.png'), fullPage: true });
-  await page.getByRole('button', { name: 'Lật thẻ', exact: true }).tap();
   await expect(page.getByRole('button', { name: 'Lật thẻ', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'Tiếp', exact: true }).tap();
   await expect(page.getByRole('button', { name: 'Lật thẻ', exact: true })).toHaveAttribute('aria-pressed', 'false');
@@ -76,7 +79,8 @@ test('recording is temporary while practice progress survives a reload', async (
   page.on('request', request => { if (['POST', 'PUT', 'PATCH'].includes(request.method())) writes.push(request.headers()['content-type'] ?? ''); });
   await openPractice(page);
   testInfo.annotations.push({ type: 'media-boundary', description: await page.evaluate(() => (window as unknown as { __practiceMediaBoundary: string }).__practiceMediaBoundary) });
-  await page.getByRole('button', { name: 'Nhớ', exact: true }).click();
+  await page.getByRole('button', { name: 'Lật thẻ', exact: true }).click();
+  await page.getByRole('button', { name: 'Nhớ được', exact: true }).click();
   await expect(page.locator('.practice-progress')).toContainText('2 / 3');
   const expectedFront = await page.locator('.review-front').innerText();
   const saved = await (await page.request.get('/api/review/sessions/current')).json();
@@ -109,6 +113,7 @@ test('recording is temporary while practice progress survives a reload', async (
   await expect(page.getByRole('button', { name: 'Nghe bản thu', exact: true })).toBeDisabled();
   const resumed = await (await page.request.get('/api/review/sessions/current')).json();
   expect(resumed.id).toBe(saved.id);
+  expect(resumed.settings.queue).toBe('scheduled');
   expect(resumed.results).toEqual(saved.results);
   expect(resumed.questions).toEqual(saved.questions);
   expect(writes.every(type => type.startsWith('application/json'))).toBe(true);

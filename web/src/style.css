@@ -405,8 +405,13 @@ body:has(.new-item-editor[open]) { overflow: hidden; }
 .practice-autoplay input { width: 18px; height: 18px; accent-color: var(--indigo); }
 .practice-recording-note { margin: 8px 0 0; min-height: 18px; color: var(--muted); font-size: 11px; text-align: center; }
 .practice-feedback { padding: 10px 12px; border-radius: 9px; background: #fff7e8; color: #78521a; font-size: 13px; line-height: 1.5; }
-.review-navigation { display: grid; grid-template-columns: minmax(44px, .7fr) repeat(2, minmax(0, 1.2fr)) minmax(44px, .7fr); gap: 8px; margin-top: 12px; padding: 8px 0; background: #fff; }
+.review-navigation { display: grid; grid-template-columns: repeat(2, minmax(44px, 1fr)); gap: 8px; margin-top: 12px; padding: 8px 0; background: #fff; }
 .review-navigation button { min-width: 0; padding: 10px 4px; font-size: 13px; }
+.review-ratings { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.review-ratings button { min-height: 44px; }
+.review-ratings small { display: block; margin-top: 2px; font-weight: normal; }
+.review-interval-status { grid-column: 1 / -1; margin: 0; }
+.review-rating-summary { display: flex; flex-wrap: wrap; gap: 8px 16px; list-style: none; padding: 0; }
 .review-page .review-navigation > button:last-child { background: #f6f5ff; color: var(--indigo); }
 .review-page .practice-remembered { border-color: #298261; background: #298261; color: #fff; }
 .review-page .practice-remembered:hover { background: #20694e; }

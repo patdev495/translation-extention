@@ -291,10 +291,10 @@ An attempt to save a new Word or Phrase, Sentence, or Grammar entry with the sam
 The companion website area for reviewing entries from the Learning Library through Vocabulary Review or Grammar Review.
 
 **Review Session**:
-One pass through eligible entries in a chosen Review Scope and review activity.
+One pass through eligible entries in a chosen Review Scope and review activity. Scheduled Vocabulary Review takes cards due by the start of the session, followed by new cards within the learner's daily limit. Free Vocabulary Review takes eligible entries without changing their schedule.
 
 **Review Summary**:
-The remembered and not-yet-remembered totals for a completed Review Session.
+The remembered and not-yet-remembered totals for a completed Review Session, with a breakdown of the four ratings when Vocabulary Review results include them.
 
 **Review Scratchpad**:
 Free-form text the learner types while answering any Vocabulary Review card or Grammar Review question to compare with the revealed answer. The learner judges its correctness; the scratchpad is not automatically graded.
@@ -308,11 +308,14 @@ The Learning Folder chosen for a Review Session, including its descendants, or t
 **Vocabulary Review**:
 The Learning Review activity that tests recall of Word or Phrase and Sentence entries through flashcards, optionally with Listen and Repeat Practice or Meaning-to-Speech Practice.
 
+**Vocabulary Review Schedule**:
+The account-owned FSRS memory state and next due time for an individual Word or Phrase or Sentence. Only an assessment in Scheduled Vocabulary Review changes this state.
+
 **Flashcard Prompt Mode**:
 The learner's choice of which one of a Word or Phrase or Sentence entry's Vietnamese meaning, Chinese text, or Pinyin appears before an ordinary flashcard is flipped. Flipping the card reveals the other two.
 
 **Vocabulary Recall Result**:
-The learner's explicit remembered or not-yet-remembered assessment for one Word or Phrase or Sentence in one Review Session; moving between flashcards does not create an assessment. The latest result in the session counts toward that entry's Recall Statistics, including when the session ends early.
+The learner's explicit assessment after revealing one Word or Phrase or Sentence flashcard in a Review Session. Again means the learner forgot or answered incorrectly. Hard, Good, and Easy describe successful recall with decreasing effort. Moving between flashcards does not create an assessment. The latest result in the session counts toward that entry's Recall Statistics, including when the session ends early.
 
 **Grammar Review**:
 The Learning Review activity that tests recall of Grammar entries through their linked Example Sentences. A Grammar entry without an Example Sentence is ineligible, and results belong to individual Grammar entries even when a sentence tests several of them.

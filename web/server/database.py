@@ -124,7 +124,16 @@ def initialize(path: Path) -> None:
                 session_id TEXT NOT NULL REFERENCES review_sessions(id) ON DELETE CASCADE,
                 item_id TEXT NOT NULL REFERENCES learning_items(id) ON DELETE CASCADE,
                 result TEXT NOT NULL CHECK (result IN ('remembered', 'not_yet')),
+                rating TEXT CHECK (rating IN ('again', 'hard', 'good', 'easy')),
+                reviewed_at INTEGER,
                 PRIMARY KEY (session_id, item_id)
+            );
+            CREATE TABLE IF NOT EXISTS vocabulary_schedule (
+                item_id TEXT PRIMARY KEY REFERENCES learning_items(id) ON DELETE CASCADE,
+                card_json TEXT NOT NULL,
+                due_at INTEGER NOT NULL,
+                introduced_at INTEGER NOT NULL,
+                revision INTEGER NOT NULL
             );
             """
         )
@@ -141,6 +150,11 @@ def initialize(path: Path) -> None:
         for name, definition in (("settings_json", "TEXT"), ("position", "INTEGER NOT NULL DEFAULT 0"), ("completed_at", "INTEGER")):
             if name not in review_columns:
                 connection.execute(f"ALTER TABLE review_sessions ADD COLUMN {name} {definition}")
+        recall_columns = {str(row["name"]) for row in connection.execute("PRAGMA table_info(recall_results)")}
+        if "rating" not in recall_columns:
+            connection.execute("ALTER TABLE recall_results ADD COLUMN rating TEXT CHECK (rating IN ('again', 'hard', 'good', 'easy'))")
+        if "reviewed_at" not in recall_columns:
+            connection.execute("ALTER TABLE recall_results ADD COLUMN reviewed_at INTEGER")
         connection.executescript(
             """
             DROP INDEX IF EXISTS folder_sibling_name_idx;

@@ -36,19 +36,22 @@ export interface TrashEntry {
   folder_id: string | null;
 }
 
-export type RecallResult = 'remembered' | 'not_yet';
+export type VocabularyRating = 'again' | 'hard' | 'good' | 'easy';
+export type RecallResult = VocabularyRating | 'remembered' | 'not_yet';
 export interface ReviewSettings {
   folder_id: string | null;
   category: 'word' | 'sentence' | 'all';
   practice: 'classic' | 'listen' | 'speak';
   prompt_mode: 'meaning' | 'chinese' | 'pinyin';
   autoplay: boolean;
+  queue?: 'free' | 'scheduled';
 }
 export interface ReviewQuestion { sentence: SavedLearningItem | null; item_ids: string[]; items: SavedLearningItem[] }
 export interface ReviewSession {
   id: string; kind: 'vocabulary' | 'grammar'; questions: ReviewQuestion[];
   ineligible_count: number; ineligible_item_ids?: string[];
   position?: number; settings?: ReviewSettings; results?: Record<string, RecallResult>; completed?: boolean;
+  next_due_at?: number | null;
 }
 export interface ReviewOverview {
   entries: { id: string; category: 'word' | 'sentence' | 'grammar'; text: string; remembered: number; not_yet: number }[];
@@ -117,8 +120,10 @@ export const learningApi = {
     api('/review/sessions', { method: 'POST', body: JSON.stringify({ kind, folder_id: folderId, ...options }) }),
   currentReview: (): Promise<ReviewSession | null> => api('/review/sessions/current'),
   getReview: (id: string): Promise<ReviewSession> => api(`/review/sessions/${encodeURIComponent(id)}`),
-  progressReview: (id: string, position: number, settings: Partial<Omit<ReviewSettings, 'folder_id' | 'category'>> = {}): Promise<ReviewSession> =>
+  progressReview: (id: string, position: number, settings: Partial<Omit<ReviewSettings, 'folder_id' | 'category' | 'queue'>> = {}): Promise<ReviewSession> =>
     api(`/review/sessions/${encodeURIComponent(id)}/progress`, { method: 'PATCH', body: JSON.stringify({ position, ...settings }), keepalive: true }),
+  reviewIntervals: (id: string, position: number): Promise<Record<VocabularyRating, number>> =>
+    api(`/review/sessions/${encodeURIComponent(id)}/intervals?position=${position}`, { cache: 'no-store' }),
   recordRecall: (sessionId: string, itemId: string, result: RecallResult, position?: number): Promise<{ item_id: string; result: RecallResult }> =>
     api(`/review/sessions/${encodeURIComponent(sessionId)}/results/${encodeURIComponent(itemId)}`, { method: 'PUT', body: JSON.stringify({ result, position }) }),
   me: (): Promise<Account> => api('/auth/me'),

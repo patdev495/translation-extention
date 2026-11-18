@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import { learningApi, type LearningFolder, type RecallResult, type ReviewOverview, type ReviewSession } from './api';
+import { learningApi, type LearningFolder, type RecallResult, type ReviewOverview, type ReviewSession, type VocabularyRating } from './api';
 import ReviewFolderNode from './ReviewFolderNode.vue';
 import { usePracticeAudio } from './use-practice-audio';
 
@@ -28,6 +28,7 @@ function savedPractice(): 'classic' | 'listen' | 'speak' {
 }
 const practice = ref(savedPractice());
 const category = ref<'word' | 'sentence' | 'all'>('all');
+const queue = ref<'free' | 'scheduled'>('scheduled');
 function savedAutoplay(): boolean {
   try { return localStorage.getItem('polytranslate.practice.autoplay') !== 'false'; } catch { return true; }
 }
@@ -54,6 +55,47 @@ const results = ref<Record<string, RecallResult>>({});
 const busy = ref(false);
 const error = ref('');
 const current = computed(() => session.value?.questions[position.value] ?? null);
+const scheduled = computed(() => session.value?.kind === 'vocabulary' && session.value.settings?.queue === 'scheduled');
+const intervals = ref<Record<VocabularyRating, number> | null>(null);
+const intervalError = ref(false);
+const ratings = [
+  { value: 'again', key: '1', label: 'Quên', description: 'Không nhớ hoặc trả lời sai.' },
+  { value: 'hard', key: '2', label: 'Khó nhớ', description: 'Nhớ đúng sau khi cố gắng nhiều.' },
+  { value: 'good', key: '3', label: 'Nhớ được', description: 'Nhớ đúng sau khi nghĩ một chút.' },
+  { value: 'easy', key: '4', label: 'Nhớ ngay', description: 'Nhớ đúng gần như tức thì.' },
+] as const satisfies ReadonlyArray<{ value: VocabularyRating; key: string; label: string; description: string }>;
+const currentResult = computed(() => {
+  const id = current.value?.item_ids[0];
+  if (!id) return undefined;
+  const result = results.value[id];
+  if (result === 'remembered') return 'Đã nhớ';
+  if (result === 'not_yet') return 'Chưa nhớ';
+  return ratings.find(rating => rating.value === result)?.label;
+});
+const canRate = computed(() => revealed.value && (!scheduled.value || !currentResult.value));
+const nextDue = computed(() => {
+  const due = session.value?.next_due_at;
+  return due == null ? '' : new Date(due).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' });
+});
+watch([session, position, canRate], async ([active, index, ratingVisible], _, onCleanup) => {
+  intervals.value = null;
+  intervalError.value = false;
+  if (!active || !scheduled.value || !ratingVisible) return;
+  let stale = false;
+  onCleanup(() => { stale = true; });
+  try {
+    const preview = await learningApi.reviewIntervals(active.id, index);
+    if (!stale) intervals.value = preview;
+  } catch {
+    if (!stale) intervalError.value = true;
+  }
+});
+function formatInterval(ms: number): string {
+  const minutes = Math.ceil(ms / 60_000);
+  if (minutes < 60) return `${minutes} phút`;
+  if (minutes < 1440) return `${Math.round(minutes / 60)} giờ`;
+  return `${Math.round(minutes / 1440)} ngày`;
+}
 watch([current, practice, autoplay], () => {
   stopRecording();
   stopPlayback();
@@ -62,10 +104,15 @@ watch([current, practice, autoplay], () => {
   }
 });
 const complete = computed(() => !!session.value && position.value >= session.value.questions.length);
-const summary = computed(() => ({
-  remembered: Object.values(results.value).filter(value => value === 'remembered').length,
-  not_yet: Object.values(results.value).filter(value => value === 'not_yet').length,
-}));
+const summary = computed(() => {
+  const values = Object.values(results.value);
+  const notYet = values.filter(value => value === 'again' || value === 'not_yet').length;
+  return {
+    remembered: values.length - notYet,
+    not_yet: notYet,
+    ratings: ratings.map(rating => ({ ...rating, count: values.filter(value => value === rating.value).length })),
+  };
+});
 
 async function refresh(): Promise<void> {
   try { overview.value = await learningApi.reviewOverview(scope.value); error.value = ''; }
@@ -74,6 +121,7 @@ async function refresh(): Promise<void> {
 watch(scope, () => { if (!restoring) { session.value = null; clearRecordings(); } void refresh(); });
 watch(kind, () => { if (!restoring) { session.value = null; clearRecordings(); } });
 watch(category, () => { if (!restoring) { session.value = null; clearRecordings(); } });
+watch(queue, () => { if (!restoring) { session.value = null; clearRecordings(); } });
 watch([practice, mode, autoplay], () => {
   if (!restoring && session.value?.kind === 'vocabulary') void saveProgress(position.value).catch(cause => {
     error.value = cause instanceof Error ? cause.message : 'Chưa lưu được tùy chọn luyện.';
@@ -114,6 +162,7 @@ async function start(): Promise<void> {
     await progressQueue.catch(() => {});
     const started = await learningApi.startReview(kind.value, scope.value, {
       category: category.value, practice: practice.value, prompt_mode: mode.value, autoplay: autoplay.value,
+      ...(kind.value === 'vocabulary' ? { queue: queue.value } : {}),
     });
     clearRecordings();
     session.value = started;
@@ -140,6 +189,7 @@ async function resume(): Promise<void> {
     clearRecordings();
     scope.value = saved.settings?.folder_id ?? null;
     category.value = saved.settings?.category ?? 'all';
+    queue.value = saved.settings?.queue ?? 'free';
     practice.value = saved.settings?.practice ?? 'classic';
     mode.value = saved.settings?.prompt_mode ?? 'meaning';
     autoplay.value = saved.settings?.autoplay ?? true;
@@ -174,7 +224,7 @@ async function notYet(itemId: string): Promise<void> {
   await assess(itemId, 'not_yet');
 }
 async function assess(itemId: string, result: RecallResult): Promise<void> {
-  if (busy.value || !current.value) return;
+  if (busy.value || !current.value || !canRate.value) return;
   busy.value = true;
   try {
     await record(itemId, result, kind.value === 'vocabulary' ? position.value + 1 : undefined);
@@ -235,11 +285,17 @@ function onCardKeydown(event: KeyboardEvent): void {
   revealed.value = !revealed.value;
 }
 function onKeydown(event: KeyboardEvent): void {
-  if (event.code !== 'Space' || event.repeat || event.altKey || event.ctrlKey || event.metaKey || !session.value || !current.value) return;
+  if (event.defaultPrevented || event.repeat || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || !current.value) return;
   const target = event.target as HTMLElement | null;
-  if (target?.closest('input, textarea, select, button, summary, a, [role="button"], [contenteditable]')) return;
-  event.preventDefault();
-  void next();
+  if (target?.closest('input, textarea, select, [contenteditable]')) return;
+  const rating = ratings.find(option => option.key === event.key);
+  if (kind.value === 'vocabulary' && canRate.value && rating) {
+    event.preventDefault();
+    void assess(current.value.item_ids[0]!, rating.value);
+  } else if (event.code === 'Space' && !target?.closest('button, summary, a, [role="button"]')) {
+    event.preventDefault();
+    void next();
+  }
 }
 const front = computed(() => {
   const entry = current.value?.items[0];
@@ -258,6 +314,7 @@ const front = computed(() => {
       <div class="review-scope-control"><span>Phạm vi ôn tập</span><details ref="scopePicker" class="review-scope-picker"><summary aria-label="Phạm vi ôn tập">{{ scopeName }}</summary><div class="review-scope-menu"><button type="button" class="review-all-folders" :aria-current="scope === null ? 'true' : undefined" @click="selectScope(null)">Toàn bộ thư viện</button><ul class="review-scope-tree"><ReviewFolderNode v-for="folder in rootFolders" :key="folder.id" :folder="folder" :folders="folders" :selected="scope" @select="selectScope" /></ul></div></details></div>
       <label>Hoạt động <select v-model="kind" :disabled="busy" aria-label="Hoạt động ôn tập"><option value="vocabulary">Flashcard từ / câu</option><option value="grammar">Ôn ngữ pháp</option></select></label>
       <template v-if="kind === 'vocabulary'">
+        <label>Lịch ôn <select v-model="queue" :disabled="busy" aria-label="Lịch ôn"><option value="scheduled">Ôn theo lịch</option><option value="free">Ôn tự do</option></select></label>
         <label>Nội dung <select v-model="category" :disabled="busy" aria-label="Nội dung luyện"><option value="all">Từ/cụm và câu</option><option value="word">Từ / cụm từ</option><option value="sentence">Câu</option></select></label>
         <label>Cách luyện <select v-model="practice" :disabled="busy" aria-label="Cách luyện"><option value="classic">Flashcard thường</option><option value="listen">Nghe và nói theo</option><option value="speak">Nhìn nghĩa và tự nói</option></select></label>
         <label v-if="practice === 'classic'">Mặt trước <select v-model="mode" :disabled="busy" aria-label="Mặt trước flashcard"><option value="meaning">Nghĩa tiếng Việt</option><option value="chinese">Chữ Trung</option><option value="pinyin">Pinyin</option></select></label>
@@ -271,8 +328,21 @@ const front = computed(() => {
       <button type="button" aria-label="Tiếp tục bài dở" :disabled="busy" @click="resume">Tiếp tục bài dở →</button>
     </section>
     <div v-if="kind === 'grammar' && session?.ineligible_count" class="review-missing"><p>{{ session.ineligible_count }} mục Ngữ pháp chưa có Câu ví dụ.</p><button v-for="id in session.ineligible_item_ids" :key="id" type="button" @click="emit('openItem', id)">Thêm Câu ví dụ cho {{ overview.entries.find(entry => entry.id === id)?.text ?? 'Ngữ pháp' }}</button></div>
-    <section v-if="session && !session.questions.length" class="review-empty"><h2>Chưa có mục để ôn</h2><p>Chọn phạm vi khác hoặc thêm mục học tập.</p></section>
-    <section v-else-if="session && complete" class="review-summary"><h2>Tóm tắt ôn tập</h2><p>Đã nhớ: {{ summary.remembered }} · Chưa nhớ: {{ summary.not_yet }}</p><button type="button" aria-label="Lùi" @click="previous">Lùi</button><button type="button" @click="start">Ôn lại</button></section>
+    <section v-if="session && !session.questions.length" class="review-empty">
+      <h2>{{ scheduled ? 'Chưa có thẻ đến lượt' : 'Chưa có mục để ôn' }}</h2>
+      <p v-if="nextDue">Lượt kế tiếp {{ nextDue }}</p>
+      <p v-else>Chọn phạm vi khác hoặc thêm mục học tập.</p>
+      <button v-if="scheduled && nextDue" type="button" :disabled="busy" @click="start">Kiểm tra thẻ đến hạn</button>
+    </section>
+    <section v-else-if="session && complete" class="review-summary">
+      <h2>Tóm tắt ôn tập</h2>
+      <p>Đã nhớ: {{ summary.remembered }} · Chưa nhớ: {{ summary.not_yet }}</p>
+      <ul v-if="summary.ratings.some(rating => rating.count)" class="review-rating-summary">
+        <li v-for="rating in summary.ratings" :key="rating.value">{{ rating.label }}: {{ rating.count }}</li>
+      </ul>
+      <button type="button" aria-label="Lùi" @click="previous">Lùi</button>
+      <button type="button" :disabled="busy" @click="start">{{ scheduled ? 'Kiểm tra thẻ đến hạn' : 'Ôn lại' }}</button>
+    </section>
     <section v-else-if="current" class="review-question">
       <div class="practice-progress"><p>{{ position + 1 }} / {{ session?.questions.length }} <span v-if="kind === 'vocabulary'">{{ current.items[0]?.category === 'sentence' ? 'CÂU' : 'TỪ / CỤM' }}</span></p><button v-if="kind === 'vocabulary'" type="button" aria-label="Kết thúc luyện" :disabled="busy" @click="finishPractice">Kết thúc</button></div>
       <template v-if="kind === 'vocabulary'">
@@ -288,8 +358,23 @@ const front = computed(() => {
         <p class="practice-recording-note" role="status">{{ recordingState === 'recording' ? 'Đang thu âm — bấm Dừng thu khi nói xong.' : 'Bản thu chỉ giữ tạm trong buổi luyện.' }}</p>
       </template>
       <template v-else><div class="review-front" lang="zh">{{ current.sentence?.text }}</div><button type="button" aria-label="Hiện Pinyin" @click="pinyinVisible = !pinyinVisible">{{ pinyinVisible ? 'Ẩn Pinyin' : 'Hiện Pinyin' }}</button><p v-if="pinyinVisible">{{ current.sentence?.pinyin }}</p><button type="button" aria-label="Xem đáp án" @click="revealed = true">Xem đáp án</button><div v-if="revealed" class="review-answer"><p>{{ current.sentence?.meaning }}</p><div v-for="entry in current.items" :key="entry.id"><strong>{{ entry.text }}</strong><p>{{ entry.meaning }}</p><p v-if="results[entry.id]" role="status">{{ results[entry.id] === 'remembered' ? 'Đã nhớ' : 'Chưa nhớ' }}</p><button type="button" :aria-label="`Chưa nhớ ${entry.text}`" :disabled="busy" @click="notYet(entry.id)">Chưa nhớ</button><button type="button" :aria-label="`Đã nhớ ${entry.text}`" :disabled="busy" @click="assess(entry.id, 'remembered')">Đã nhớ</button></div></div></template>
-      <div class="review-navigation"><button type="button" aria-label="Lùi" :disabled="position === 0 || busy" @click="previous">← Lùi</button><button v-if="kind === 'vocabulary'" class="practice-not-yet" type="button" aria-label="Chưa nhớ" :disabled="busy" @click="notYet(current.item_ids[0]!)">Chưa nhớ</button><button v-if="kind === 'vocabulary'" class="practice-remembered" type="button" aria-label="Nhớ" :disabled="busy" @click="assess(current.item_ids[0]!, 'remembered')">Nhớ ✓</button><button type="button" aria-label="Tiếp" :disabled="busy" @click="next">Tiếp →</button></div>
-      <p v-if="kind === 'vocabulary' && results[current.item_ids[0]!]" class="practice-current-result" role="status">Đã đánh dấu: {{ results[current.item_ids[0]!] === 'remembered' ? 'Nhớ' : 'Chưa nhớ' }}</p>
+      <div class="review-navigation">
+        <p v-if="scheduled && canRate && intervalError" class="review-interval-status" role="status">Chưa tải được thời gian ôn tiếp theo.</p>
+        <div v-if="kind === 'vocabulary' && canRate" class="review-ratings" role="group" aria-label="Đánh giá mức độ ghi nhớ">
+          <button v-for="rating in ratings" :key="rating.value" type="button"
+            :aria-keyshortcuts="rating.key" :aria-label="rating.label"
+            :aria-description="intervals ? `Ôn lại sau ${formatInterval(intervals[rating.value])}. ${rating.description}` : rating.description"
+            :title="rating.description"
+            :class="{ 'practice-not-yet': rating.value === 'again', 'practice-remembered': rating.value === 'good' }" :disabled="busy"
+            @click="assess(current.item_ids[0]!, rating.value)">
+            {{ rating.label }}
+            <small v-if="intervals">{{ formatInterval(intervals[rating.value]) }}</small>
+          </button>
+        </div>
+        <button type="button" aria-label="Lùi" :disabled="position === 0 || busy" @click="previous">← Lùi</button>
+        <button type="button" aria-label="Tiếp" :disabled="busy" @click="next">Tiếp →</button>
+      </div>
+      <p v-if="kind === 'vocabulary' && currentResult" class="practice-current-result" role="status">Đã đánh dấu: {{ currentResult }}</p>
       <details class="practice-scratchpad"><summary>Ô nháp ôn tập <span>Không bắt buộc</span></summary><label>Thử viết câu trả lời <textarea v-model="scratchpads[position]" aria-label="Ô nháp ôn tập"></textarea></label></details>
     </section>
     <details class="review-statistics" aria-label="Thống kê ghi nhớ"><summary>Thống kê ghi nhớ <span>Đã nhớ {{ overview.totals.remembered }} · Chưa nhớ {{ overview.totals.not_yet }}</span></summary><ul><li v-for="entry in overview.entries" :key="entry.id">{{ entry.text }} — Đã nhớ: {{ entry.remembered }} · Chưa nhớ: {{ entry.not_yet }}</li></ul></details>

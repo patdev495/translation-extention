@@ -37,7 +37,9 @@ Trong một thư mục có thư mục con, bấm **Mở tất cả danh sách** 
 
 Mở website bằng Safari trên iPhone, đăng nhập cùng Learning Account và chọn **Ôn tập**. Chọn thư mục, **Từ/cụm**, **Câu** hoặc **Cả hai**, rồi dùng flashcard thường, **Nghe và nói theo** hoặc **Nhìn nghĩa và tự nói**. Thiết lập tự thu gọn khi bắt đầu; ô nháp có thể mở khi cần.
 
-**Nhớ / Chưa nhớ** ghi kết quả và sang thẻ kế; **Lùi / Tiếp** chỉ chuyển thẻ. **Tiếp tục bài dở** khôi phục đúng thứ tự, vị trí và kết quả. Phần nghe mẫu dùng giọng tiếng Trung phổ thông của thiết bị; nếu chưa có giọng hoặc trình duyệt chặn tự phát, trang hướng dẫn thử lại bằng nút Nghe mẫu.
+**Ôn theo lịch** dùng FSRS 6 với mục tiêu ghi nhớ 90%, bước học 1 và 10 phút, và bước học lại 10 phút. Khi lật thẻ, các nút **Quên**, **Khó nhớ**, **Nhớ được** và **Nhớ ngay** (phím `1` đến `4`) hiển thị khoảng ôn dự kiến. Sau khi chấm, lịch được lưu theo thẻ trong Learning Account. Buổi mới lấy thẻ đến hạn trước, rồi thêm tối đa 5 thẻ mới mỗi ngày theo UTC. Cuối buổi, bấm **Kiểm tra thẻ đến hạn** để lấy các thẻ vừa đến lượt. Lần đánh giá đầu tiên trong chế độ này bắt đầu lịch FSRS cho thẻ.
+
+**Ôn tự do** cho phép luyện mọi thẻ trong phạm vi đã chọn mà không làm thay đổi lịch FSRS. **Lùi / Tiếp** chỉ chuyển thẻ. **Tiếp tục bài dở** khôi phục đúng thứ tự, vị trí và kết quả. Phần nghe mẫu dùng giọng tiếng Trung phổ thông của thiết bị. Nếu chưa có giọng hoặc trình duyệt chặn tự phát, trang hướng dẫn thử lại bằng nút Nghe mẫu.
 
 Nếu iPhone báo chưa có giọng tiếng Trung phổ thông: vào **Cài đặt → Trợ năng → Đọc & Nói** (hoặc **Nội dung được đọc** trên iOS cũ) **→ Giọng nói → Tiếng Trung**, chọn và tải một giọng **Mandarin**. Mở lại trình duyệt rồi bấm **Nghe mẫu**. Website kiểm tra lại danh sách giọng mỗi lần bấm; nếu danh sách còn rỗng, website yêu cầu đọc bằng `zh-CN` ngay trong thao tác bấm để trình duyệt tự chọn giọng. Đây vẫn là giọng của thiết bị; website chưa cung cấp giọng đọc từ server.
 

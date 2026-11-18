@@ -16,11 +16,14 @@ function serveReview() {
   vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
     const body = JSON.parse(String(init?.body ?? '{}'));
     if (url === '/api/review/overview') return Response.json({ entries: [], totals: {
-      remembered: Object.values(results).filter(result => result === 'remembered').length,
-      not_yet: Object.values(results).filter(result => result === 'not_yet').length,
+      remembered: Object.values(results).filter(result => ['remembered', 'hard', 'good', 'easy'].includes(result)).length,
+      not_yet: Object.values(results).filter(result => ['not_yet', 'again'].includes(result)).length,
     } });
     if (url === '/api/review/sessions/current') return Response.json(started && !session.completed ? session : null);
     if (url === '/api/review/sessions/practice') return Response.json(session);
+    if (url.startsWith('/api/review/sessions/practice/intervals?')) {
+      return Response.json({ again: 60_000, hard: 360_000, good: 600_000, easy: 691_200_000 });
+    }
     if (url === '/api/review/sessions' && init?.method === 'POST') {
       started = true;
       Object.assign(session.settings, body);
@@ -101,17 +104,20 @@ test('moving between flashcards does not assess them; only explicit recall butto
   serveReview();
   page = mount(Review, { props: { folders: [] }, attachTo: document.body });
   await flushPromises();
+  await page.get('select[aria-label="Lịch ôn"]').setValue('free');
   await page.get('button[aria-label="Bắt đầu ôn tập"]').trigger('click');
   await flushPromises();
   await page.get('button[aria-label="Tiếp"]').trigger('click');
   await flushPromises();
   expect(page.get('.review-statistics').text()).toContain('Đã nhớ 0');
-  await page.get('button[aria-label="Chưa nhớ"]').trigger('click');
+  await page.get('[aria-label="Lật thẻ"]').trigger('click');
+  await page.get('button[aria-label="Quên"]').trigger('click');
   await flushPromises();
   expect(page.get('.review-summary').text()).toContain('Đã nhớ: 0 · Chưa nhớ: 1');
   await page.get('button[aria-label="Lùi"]').trigger('click');
   await flushPromises();
-  await page.get('button[aria-label="Nhớ"]').trigger('click');
+  await page.get('[aria-label="Lật thẻ"]').trigger('click');
+  await page.get('button[aria-label="Nhớ được"]').trigger('click');
   await flushPromises();
   expect(page.get('.review-summary').text()).toContain('Đã nhớ: 1 · Chưa nhớ: 0');
 });
@@ -205,7 +211,8 @@ test('practice resumes the same unfinished card and assessments after reopening,
   await flushPromises();
   await page.get('button[aria-label="Bắt đầu ôn tập"]').trigger('click');
   await flushPromises();
-  await page.get('button[aria-label="Chưa nhớ"]').trigger('click');
+  await page.get('[aria-label="Lật thẻ"]').trigger('click');
+  await page.get('button[aria-label="Quên"]').trigger('click');
   await flushPromises();
   await page.get('button[aria-label="Thu âm"]').trigger('click');
   await flushPromises();

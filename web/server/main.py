@@ -21,6 +21,7 @@ from pwdlib import PasswordHash
 from pypinyin import Style, lazy_pinyin
 
 from .database import connect, initialize
+from .review_schedule import DAY_MS, NEW_CARDS_PER_DAY, RATINGS, VocabularyRating, review_card
 
 WEB_SESSION_SECONDS = 30 * 24 * 60 * 60
 EXTENSION_SESSION_SECONDS = 90 * 24 * 60 * 60
@@ -228,10 +229,14 @@ class ReviewStart(BaseModel):
     practice: Literal["classic", "listen", "speak"] = "classic"
     prompt_mode: Literal["meaning", "chinese", "pinyin"] = "meaning"
     autoplay: bool = True
+    queue: Literal["free", "scheduled"] = "free"
+
+
+BinaryRecall = Literal["remembered", "not_yet"]
 
 
 class RecallInput(BaseModel):
-    result: Literal["remembered", "not_yet"]
+    result: VocabularyRating | BinaryRecall
     position: int | None = Field(default=None, ge=0)
 
 
@@ -591,7 +596,7 @@ def create_app(database_path: Path | None = None) -> FastAPI:
             return {"entries": entries, "totals": {key: sum(entry[key] for entry in entries) for key in ("remembered", "not_yet")}}
 
     def review_payload(connection: sqlite3.Connection, session: sqlite3.Row) -> dict:
-        results = connection.execute("SELECT item_id, result FROM recall_results WHERE session_id = ?", (session["id"],)).fetchall()
+        results = connection.execute("SELECT item_id, COALESCE(rating, result) AS result FROM recall_results WHERE session_id = ?", (session["id"],)).fetchall()
         return {"id": session["id"], "kind": session["kind"], "questions": json.loads(session["questions_json"]),
                 "position": session["position"], "settings": json.loads(session["settings_json"] or "{}"),
                 "results": {row["item_id"]: row["result"] for row in results},
@@ -619,6 +624,42 @@ def create_app(database_path: Path | None = None) -> FastAPI:
             raise HTTPException(status_code=422, detail="Review position out of range")
         connection.execute("UPDATE review_sessions SET position = ?, completed_at = ? WHERE id = ?",
                            (position, _now_ms() if position == size else None, session["id"]))
+
+    def remaining_new_cards(connection: sqlite3.Connection, user_id: str, now: int) -> int:
+        introduced = connection.execute("""SELECT COUNT(*) FROM vocabulary_schedule s
+            JOIN learning_items i ON i.id = s.item_id
+            WHERE i.user_id = ? AND s.introduced_at >= ?""", (user_id, now - now % DAY_MS)).fetchone()[0]
+        return max(0, NEW_CARDS_PER_DAY - introduced)
+
+    def scheduled_questions(connection: sqlite3.Connection, user_id: str, eligible: list[sqlite3.Row], now: int) -> tuple[list[dict], int | None]:
+        schedules = {row["item_id"]: row for row in connection.execute("""SELECT s.item_id, s.due_at, s.revision
+            FROM vocabulary_schedule s JOIN learning_items i ON i.id = s.item_id
+            WHERE i.user_id = ? AND i.deleted_at IS NULL""", (user_id,))}
+        due = sorted(
+            (row for row in eligible if row["id"] in schedules and schedules[row["id"]]["due_at"] <= now),
+            key=lambda row: schedules[row["id"]]["due_at"],
+        )
+        new = [row for row in eligible if row["id"] not in schedules]
+        remaining = remaining_new_cards(connection, user_id, now)
+        questions = []
+        for row in due + new[:remaining]:
+            schedule = schedules.get(row["id"])
+            questions.append({"sentence": None, "item_ids": [row["id"]], "items": [dict(item(connection, row))],
+                              "schedule_revision": schedule["revision"] if schedule is not None else 0})
+        upcoming = [schedules[row["id"]]["due_at"] for row in eligible
+                    if row["id"] in schedules and schedules[row["id"]]["due_at"] > now]
+        if new and not remaining:
+            upcoming.append(now - now % DAY_MS + DAY_MS)
+        return questions, min(upcoming, default=None)
+
+    def scheduled_card(connection: sqlite3.Connection, question: dict, item_id: str, user_id: str, now: int) -> sqlite3.Row | None:
+        schedule = connection.execute("SELECT * FROM vocabulary_schedule WHERE item_id = ?", (item_id,)).fetchone()
+        if schedule is None:
+            if question["schedule_revision"] == 0 and remaining_new_cards(connection, user_id, now):
+                return None
+        elif schedule["revision"] == question["schedule_revision"] and schedule["due_at"] <= now:
+            return schedule
+        raise HTTPException(status_code=409, detail="Lịch ôn đã thay đổi. Hãy bắt đầu buổi ôn mới.")
 
     @app.get("/api/review/sessions/current")
     def current_review(account: Account = Depends(web_account)) -> dict | None:
@@ -650,10 +691,18 @@ def create_app(database_path: Path | None = None) -> FastAPI:
     @app.post("/api/review/sessions", status_code=201, dependencies=[Depends(require_browser_origin)])
     def start_review(body: ReviewStart, account: Account = Depends(web_account)) -> dict:
         with connect(db_path) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            now = _now_ms()
             scoped = scoped_items(connection, account.id, body.folder_id)
+            next_due_at = None
             if body.kind == "vocabulary":
-                questions = [{"sentence": None, "item_ids": [str(row["id"])], "items": [dict(item(connection, row))]}
-                             for row in scoped if row["category"] in (("word", "sentence") if body.category == "all" else (body.category,))]
+                categories = ("word", "sentence") if body.category == "all" else (body.category,)
+                eligible = [row for row in scoped if row["category"] in categories]
+                if body.queue == "scheduled":
+                    questions, next_due_at = scheduled_questions(connection, account.id, eligible, now)
+                else:
+                    questions = [{"sentence": None, "item_ids": [str(row["id"])], "items": [dict(item(connection, row))]}
+                                 for row in eligible]
                 ineligible_count = 0
                 ineligible_item_ids: list[str] = []
             else:
@@ -677,30 +726,80 @@ def create_app(database_path: Path | None = None) -> FastAPI:
                     question["item_ids"].append(str(row["id"]))
                     question["items"].append(dict(item(connection, row)))
                 questions = list(questions_by_sentence.values())
-            random.shuffle(questions)
+            if body.kind != "vocabulary" or body.queue != "scheduled":
+                random.shuffle(questions)
             session_id = _new_id()
+            settings = body.model_dump(exclude={"kind"})
+            if "queue" not in body.model_fields_set:
+                settings.pop("queue")
             connection.execute("UPDATE review_sessions SET completed_at = ? WHERE user_id = ? AND kind = ? AND completed_at IS NULL",
-                               (_now_ms(), account.id, body.kind))
+                               (now, account.id, body.kind))
             connection.execute("""INSERT INTO review_sessions
                 (id, user_id, kind, questions_json, created_at, settings_json, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (session_id, account.id, body.kind, json.dumps(questions), _now_ms(),
-                 json.dumps(body.model_dump(exclude={"kind"})), None if questions else _now_ms()))
+                (session_id, account.id, body.kind, json.dumps(questions), now,
+                 json.dumps(settings), None if questions else now))
             return {**review_payload(connection, owned_review(connection, session_id, account.id)),
-                    "ineligible_count": ineligible_count, "ineligible_item_ids": ineligible_item_ids}
+                    "ineligible_count": ineligible_count, "ineligible_item_ids": ineligible_item_ids,
+                    "next_due_at": next_due_at}
+
+    @app.get("/api/review/sessions/{session_id}/intervals")
+    def review_intervals(session_id: str, position: int, account: Account = Depends(web_account)) -> dict[str, int]:
+        with connect(db_path) as connection:
+            connection.execute("BEGIN")
+            session = owned_review(connection, session_id, account.id)
+            questions = json.loads(session["questions_json"])
+            if position != session["position"] or position >= len(questions) or "schedule_revision" not in questions[position]:
+                raise HTTPException(status_code=404, detail="Thẻ này không có lịch ôn.")
+            if not review_available(connection, session):
+                raise HTTPException(status_code=409, detail="Nội dung buổi ôn đã bị xóa. Hãy bắt đầu buổi mới.")
+            question = questions[position]
+            now = _now_ms()
+            schedule = scheduled_card(connection, question, question["item_ids"][0], account.id, now)
+            card_json = schedule["card_json"] if schedule is not None else None
+            return {rating: review_card(card_json, rating, now)[1] - now for rating in RATINGS}
 
     @app.put("/api/review/sessions/{session_id}/results/{item_id}", dependencies=[Depends(require_browser_origin)])
     def record_recall(session_id: str, item_id: str, body: RecallInput, account: Account = Depends(web_account)) -> dict:
         with connect(db_path) as connection:
+            connection.execute("BEGIN IMMEDIATE")
             session = owned_review(connection, session_id, account.id)
             questions = json.loads(session["questions_json"])
-            if not any(item_id in question["item_ids"] for question in questions):
+            card_position = next((index for index, question in enumerate(questions) if item_id in question["item_ids"]), None)
+            if card_position is None:
                 raise HTTPException(status_code=404, detail="Review item not found")
             if connection.execute("SELECT 1 FROM learning_items WHERE id = ? AND user_id = ? AND deleted_at IS NULL", (item_id, account.id)).fetchone() is None:
                 raise HTTPException(status_code=404, detail="Review item not found")
+            rating = body.result if body.result not in ("remembered", "not_yet") else None
+            if rating is not None and session["kind"] != "vocabulary":
+                raise HTTPException(status_code=422, detail="Mức đánh giá này dùng cho thẻ từ và câu.")
+            result = "not_yet" if body.result in ("again", "not_yet") else "remembered"
+            reviewed_at = None
+            question = questions[card_position]
+            if "schedule_revision" in question:
+                if not review_available(connection, session):
+                    raise HTTPException(status_code=409, detail="Nội dung buổi ôn đã bị xóa. Hãy bắt đầu buổi mới.")
+                if rating is None or body.position != card_position + 1:
+                    raise HTTPException(status_code=422, detail="Chọn một trong bốn mức đánh giá cho thẻ hiện tại.")
+                previous = connection.execute("SELECT rating FROM recall_results WHERE session_id = ? AND item_id = ?",
+                                              (session_id, item_id)).fetchone()
+                if previous is not None:
+                    if previous["rating"] == rating:
+                        return {"item_id": item_id, "result": rating}
+                    raise HTTPException(status_code=409, detail="Thẻ này đã được chấm trong buổi ôn.")
+                if session["position"] != card_position:
+                    raise HTTPException(status_code=409, detail="Vị trí buổi ôn đã thay đổi. Hãy mở lại bài đang dở.")
+                reviewed_at = _now_ms()
+                schedule = scheduled_card(connection, question, item_id, account.id, reviewed_at)
+                card, due_at = review_card(schedule["card_json"] if schedule is not None else None, rating, reviewed_at)
+                connection.execute("""INSERT INTO vocabulary_schedule (item_id, card_json, due_at, introduced_at, revision)
+                    VALUES (?, ?, ?, ?, 1) ON CONFLICT(item_id) DO UPDATE SET
+                    card_json = excluded.card_json, due_at = excluded.due_at, revision = vocabulary_schedule.revision + 1""",
+                    (item_id, card.to_json(), due_at, reviewed_at))
             if body.position is not None:
                 save_review_position(connection, session, body.position)
-            connection.execute("""INSERT INTO recall_results (session_id, item_id, result) VALUES (?, ?, ?)
-                ON CONFLICT(session_id, item_id) DO UPDATE SET result = excluded.result""", (session_id, item_id, body.result))
+            connection.execute("""INSERT INTO recall_results (session_id, item_id, result, rating, reviewed_at) VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(session_id, item_id) DO UPDATE SET result = excluded.result, rating = excluded.rating,
+                reviewed_at = excluded.reviewed_at""", (session_id, item_id, result, rating, reviewed_at))
             return {"item_id": item_id, "result": body.result}
 
     @app.post("/api/items", response_model=Item, status_code=201, dependencies=[Depends(require_browser_origin)])

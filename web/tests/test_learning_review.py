@@ -1,10 +1,124 @@
 from pathlib import Path
+import sqlite3
 
 from fastapi.testclient import TestClient
+from pytest import MonkeyPatch
 
+from web.server import main
 from web.server.main import create_app
 
 ORIGIN = {"Origin": "http://127.0.0.1:5173"}
+
+
+def test_scheduled_review_learning_relearning_and_retry(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    now = 1_800_000_000_000
+    monkeypatch.setattr(main, "_now_ms", lambda: now)
+    with TestClient(create_app(tmp_path / "schedule.sqlite3")) as learner:
+        learner.post("/api/auth/register", json={"username": "learner", "password": "pass"}, headers=ORIGIN)
+        folder = learner.post("/api/folders", json={"name": "Vocabulary"}, headers=ORIGIN).json()["id"]
+        word = learner.post("/api/items", json={
+            "folder_id": folder, "category": "word", "text": "坚持", "meaning": "kiên trì",
+        }, headers=ORIGIN).json()["id"]
+
+        def start(queue: str = "scheduled") -> dict:
+            return learner.post("/api/review/sessions", json={"kind": "vocabulary", "queue": queue}, headers=ORIGIN).json()
+
+        def intervals(session: dict) -> dict:
+            response = learner.get(f"/api/review/sessions/{session['id']}/intervals", params={"position": 0})
+            assert response.status_code == 200, response.text
+            return response.json()
+
+        def grade(session: dict, result: str):
+            return learner.put(f"/api/review/sessions/{session['id']}/results/{word}",
+                               json={"result": result, "position": 1}, headers=ORIGIN)
+
+        first = start()
+        second = start()
+        preview = intervals(second)
+        assert preview["again"] == 60_000
+        assert preview["good"] == 600_000
+        assert preview["again"] < preview["hard"] < preview["good"] < preview["easy"]
+        assert grade(second, "again").status_code == 200
+        assert grade(first, "good").status_code == 409
+        now += 30_000
+        assert grade(second, "again").status_code == 200
+        assert grade(second, "good").status_code == 409
+        assert grade(start("free"), "easy").status_code == 200
+        waiting = start()
+        assert waiting["questions"] == []
+        assert waiting["next_due_at"] == now + 30_000
+
+        now = waiting["next_due_at"]
+        learning = start()
+        assert intervals(learning)["good"] == 600_000
+        assert grade(learning, "good").status_code == 200
+        now += 600_000
+        graduating = start()
+        long_interval = intervals(graduating)["good"]
+        assert long_interval >= 86_400_000
+        assert grade(graduating, "good").status_code == 200
+        assert start()["next_due_at"] == now + long_interval
+
+        now += long_interval
+        review = start()
+        assert intervals(review)["again"] == 600_000
+        assert grade(review, "again").status_code == 200
+        assert start()["next_due_at"] == now + 600_000
+
+
+def test_scheduled_review_prioritizes_due_cards_and_limits_new_cards(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    now = 1_800_000_000_000
+    monkeypatch.setattr(main, "_now_ms", lambda: now)
+    with TestClient(create_app(tmp_path / "daily-limit.sqlite3")) as learner:
+        learner.post("/api/auth/register", json={"username": "learner", "password": "pass"}, headers=ORIGIN)
+        folder = learner.post("/api/folders", json={"name": "Vocabulary"}, headers=ORIGIN).json()["id"]
+        words = []
+        for text in ("你好", "工作", "坚持", "练习", "终于", "以后"):
+            now += 1
+            words.append(learner.post("/api/items", json={
+                "folder_id": folder, "category": "word", "text": text, "meaning": text,
+            }, headers=ORIGIN).json()["id"])
+
+        def start() -> dict:
+            return learner.post("/api/review/sessions", json={"kind": "vocabulary", "queue": "scheduled"}, headers=ORIGIN).json()
+
+        session = start()
+        assert [card["item_ids"][0] for card in session["questions"]] == words[:5]
+        for index, word in enumerate(words[:5]):
+            response = learner.put(f"/api/review/sessions/{session['id']}/results/{word}",
+                                   json={"result": "again", "position": index + 1}, headers=ORIGIN)
+            assert response.status_code == 200, response.text
+        assert start()["questions"] == []
+        now += 60_000
+        assert [card["item_ids"][0] for card in start()["questions"]] == words[:5]
+        now = now - now % 86_400_000 + 86_400_000
+        assert [card["item_ids"][0] for card in start()["questions"]] == words
+
+
+def test_vocabulary_ratings_survive_resume_and_preserve_legacy_results(tmp_path: Path) -> None:
+    database = tmp_path / "ratings.sqlite3"
+    with TestClient(create_app(database)) as learner:
+        learner.post("/api/auth/register", json={"username": "learner", "password": "pass"}, headers=ORIGIN)
+        folder = learner.post("/api/folders", json={"name": "Vocabulary"}, headers=ORIGIN).json()["id"]
+        word = learner.post("/api/items", json={
+            "folder_id": folder, "category": "word", "text": "坚持", "meaning": "kiên trì",
+        }, headers=ORIGIN).json()["id"]
+        legacy = learner.post("/api/review/sessions", json={"kind": "vocabulary"}, headers=ORIGIN).json()["id"]
+        assert learner.put(f"/api/review/sessions/{legacy}/results/{word}", json={"result": "remembered"}, headers=ORIGIN).status_code == 200
+        cookies = learner.cookies
+
+    with sqlite3.connect(database) as connection:
+        connection.execute("ALTER TABLE recall_results DROP COLUMN rating")
+
+    with TestClient(create_app(database), cookies=cookies) as learner:
+        assert learner.get(f"/api/review/sessions/{legacy}").json()["results"] == {word: "remembered"}
+        session = learner.post("/api/review/sessions", json={"kind": "vocabulary"}, headers=ORIGIN).json()["id"]
+        for rating in ("again", "hard", "good", "easy"):
+            response = learner.put(f"/api/review/sessions/{session}/results/{word}", json={"result": rating}, headers=ORIGIN)
+            assert response.json() == {"item_id": word, "result": rating}
+            assert learner.get("/api/review/sessions/current").json()["results"] == {word: rating}
+            expected = {"remembered": 1, "not_yet": 1} if rating == "again" else {"remembered": 2, "not_yet": 0}
+            assert learner.get("/api/review/overview").json()["totals"] == expected
 
 
 def test_flashcards_include_saved_sentences_and_filter_categories_in_scope(tmp_path: Path) -> None:
