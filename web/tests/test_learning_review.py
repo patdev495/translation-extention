@@ -66,34 +66,41 @@ def test_scheduled_review_learning_relearning_and_retry(tmp_path: Path, monkeypa
         assert start()["next_due_at"] == now + 600_000
 
 
-def test_scheduled_review_prioritizes_due_cards_and_limits_new_cards(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+def test_scheduled_review_includes_all_new_cards_in_scope_after_due_cards(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     now = 1_800_000_000_000
     monkeypatch.setattr(main, "_now_ms", lambda: now)
-    with TestClient(create_app(tmp_path / "daily-limit.sqlite3")) as learner:
+    with TestClient(create_app(tmp_path / "folder-schedule.sqlite3")) as learner:
         learner.post("/api/auth/register", json={"username": "learner", "password": "pass"}, headers=ORIGIN)
         folder = learner.post("/api/folders", json={"name": "Vocabulary"}, headers=ORIGIN).json()["id"]
+        child = learner.post("/api/folders", json={"name": "Lessons", "parent_id": folder}, headers=ORIGIN).json()["id"]
+        outside = learner.post("/api/folders", json={"name": "Other"}, headers=ORIGIN).json()["id"]
+        assert learner.post("/api/items", json={
+            "folder_id": outside, "category": "word", "text": "书", "meaning": "sách",
+        }, headers=ORIGIN).status_code == 201
         words = []
         for index in range(1, 22):
             text = f"第{index}课"
             now += 1
             words.append(learner.post("/api/items", json={
-                "folder_id": folder, "category": "word", "text": text, "meaning": text,
+                "folder_id": child if index % 2 else folder, "category": "word", "text": text, "meaning": text,
             }, headers=ORIGIN).json()["id"])
 
         def start() -> dict:
-            return learner.post("/api/review/sessions", json={"kind": "vocabulary", "queue": "scheduled"}, headers=ORIGIN).json()
+            return learner.post("/api/review/sessions", json={
+                "kind": "vocabulary", "queue": "scheduled", "folder_id": folder,
+            }, headers=ORIGIN).json()
 
         session = start()
-        assert [card["item_ids"][0] for card in session["questions"]] == words[:20]
-        for index, word in enumerate(words[:20]):
+        assert [card["item_ids"][0] for card in session["questions"]] == words
+        assert learner.patch(f"/api/review/sessions/{session['id']}/progress",
+                             json={"position": 1}, headers=ORIGIN).status_code == 200
+        for index, word in enumerate(words[1:], start=1):
             response = learner.put(f"/api/review/sessions/{session['id']}/results/{word}",
                                    json={"result": "again", "position": index + 1}, headers=ORIGIN)
             assert response.status_code == 200, response.text
-        assert start()["questions"] == []
+        assert [card["item_ids"][0] for card in start()["questions"]] == words[:1]
         now += 60_000
-        assert [card["item_ids"][0] for card in start()["questions"]] == words[:20]
-        now = now - now % 86_400_000 + 86_400_000
-        assert [card["item_ids"][0] for card in start()["questions"]] == words
+        assert [card["item_ids"][0] for card in start()["questions"]] == words[1:] + words[:1]
 
 
 def test_vocabulary_ratings_survive_resume_and_preserve_legacy_results(tmp_path: Path) -> None:

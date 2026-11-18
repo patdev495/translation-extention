@@ -291,7 +291,7 @@ An attempt to save a new Word or Phrase, Sentence, or Grammar entry with the sam
 The companion website area for reviewing entries from the Learning Library through Vocabulary Review or Grammar Review.
 
 **Review Session**:
-One pass through eligible entries in a chosen Review Scope and review activity. Scheduled Vocabulary Review takes cards due by the start of the session, followed by new cards within the learner's daily limit. Free Vocabulary Review takes eligible entries without changing their schedule.
+One pass through eligible entries in a chosen Review Scope and review activity. Scheduled Vocabulary Review takes cards due by the start of the session, followed by all new cards in the selected scope. Free Vocabulary Review takes eligible entries without changing their schedule.
 
 **Review Summary**:
 The remembered and not-yet-remembered totals for a completed Review Session, with a breakdown of the four ratings when Vocabulary Review results include them.

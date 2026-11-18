@@ -12,9 +12,6 @@ RATINGS: dict[VocabularyRating, Rating] = {
     "good": Rating.Good,
     "easy": Rating.Easy,
 }
-NEW_CARDS_PER_DAY = 20
-DAY_MS = 86_400_000
-
 scheduler = Scheduler(
     desired_retention=0.9,
     learning_steps=(timedelta(minutes=1), timedelta(minutes=10)),

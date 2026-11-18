@@ -21,7 +21,7 @@ from pwdlib import PasswordHash
 from pypinyin import Style, lazy_pinyin
 
 from .database import connect, initialize
-from .review_schedule import DAY_MS, NEW_CARDS_PER_DAY, RATINGS, VocabularyRating, review_card
+from .review_schedule import RATINGS, VocabularyRating, review_card
 
 WEB_SESSION_SECONDS = 30 * 24 * 60 * 60
 EXTENSION_SESSION_SECONDS = 90 * 24 * 60 * 60
@@ -625,12 +625,6 @@ def create_app(database_path: Path | None = None) -> FastAPI:
         connection.execute("UPDATE review_sessions SET position = ?, completed_at = ? WHERE id = ?",
                            (position, _now_ms() if position == size else None, session["id"]))
 
-    def remaining_new_cards(connection: sqlite3.Connection, user_id: str, now: int) -> int:
-        introduced = connection.execute("""SELECT COUNT(*) FROM vocabulary_schedule s
-            JOIN learning_items i ON i.id = s.item_id
-            WHERE i.user_id = ? AND s.introduced_at >= ?""", (user_id, now - now % DAY_MS)).fetchone()[0]
-        return max(0, NEW_CARDS_PER_DAY - introduced)
-
     def scheduled_questions(connection: sqlite3.Connection, user_id: str, eligible: list[sqlite3.Row], now: int) -> tuple[list[dict], int | None]:
         schedules = {row["item_id"]: row for row in connection.execute("""SELECT s.item_id, s.due_at, s.revision
             FROM vocabulary_schedule s JOIN learning_items i ON i.id = s.item_id
@@ -640,22 +634,19 @@ def create_app(database_path: Path | None = None) -> FastAPI:
             key=lambda row: schedules[row["id"]]["due_at"],
         )
         new = [row for row in eligible if row["id"] not in schedules]
-        remaining = remaining_new_cards(connection, user_id, now)
         questions = []
-        for row in due + new[:remaining]:
+        for row in due + new:
             schedule = schedules.get(row["id"])
             questions.append({"sentence": None, "item_ids": [row["id"]], "items": [dict(item(connection, row))],
                               "schedule_revision": schedule["revision"] if schedule is not None else 0})
         upcoming = [schedules[row["id"]]["due_at"] for row in eligible
                     if row["id"] in schedules and schedules[row["id"]]["due_at"] > now]
-        if new and not remaining:
-            upcoming.append(now - now % DAY_MS + DAY_MS)
         return questions, min(upcoming, default=None)
 
-    def scheduled_card(connection: sqlite3.Connection, question: dict, item_id: str, user_id: str, now: int) -> sqlite3.Row | None:
+    def scheduled_card(connection: sqlite3.Connection, question: dict, item_id: str, now: int) -> sqlite3.Row | None:
         schedule = connection.execute("SELECT * FROM vocabulary_schedule WHERE item_id = ?", (item_id,)).fetchone()
         if schedule is None:
-            if question["schedule_revision"] == 0 and remaining_new_cards(connection, user_id, now):
+            if question["schedule_revision"] == 0:
                 return None
         elif schedule["revision"] == question["schedule_revision"] and schedule["due_at"] <= now:
             return schedule
@@ -754,7 +745,7 @@ def create_app(database_path: Path | None = None) -> FastAPI:
                 raise HTTPException(status_code=409, detail="Nội dung buổi ôn đã bị xóa. Hãy bắt đầu buổi mới.")
             question = questions[position]
             now = _now_ms()
-            schedule = scheduled_card(connection, question, question["item_ids"][0], account.id, now)
+            schedule = scheduled_card(connection, question, question["item_ids"][0], now)
             card_json = schedule["card_json"] if schedule is not None else None
             return {rating: review_card(card_json, rating, now)[1] - now for rating in RATINGS}
 
@@ -789,7 +780,7 @@ def create_app(database_path: Path | None = None) -> FastAPI:
                 if session["position"] != card_position:
                     raise HTTPException(status_code=409, detail="Vị trí buổi ôn đã thay đổi. Hãy mở lại bài đang dở.")
                 reviewed_at = _now_ms()
-                schedule = scheduled_card(connection, question, item_id, account.id, reviewed_at)
+                schedule = scheduled_card(connection, question, item_id, reviewed_at)
                 card, due_at = review_card(schedule["card_json"] if schedule is not None else None, rating, reviewed_at)
                 connection.execute("""INSERT INTO vocabulary_schedule (item_id, card_json, due_at, introduced_at, revision)
                     VALUES (?, ?, ?, ?, 1) ON CONFLICT(item_id) DO UPDATE SET
