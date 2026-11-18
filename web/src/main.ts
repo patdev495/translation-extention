@@ -1,6 +1,6 @@
 import { createApp, h, onMounted, onUnmounted, ref } from 'vue';
 import App from './App.vue';
-import SharedFolder from './SharedFolder.vue';
+import SharedFolder from './SharedFolders.vue';
 import './style.css';
 
 function shareToken(): string | null {
