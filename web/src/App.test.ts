@@ -817,7 +817,7 @@ test('creates, browses, renames and moves a nested folder through the website', 
   await page.get('nav[aria-label="Cây thư mục"]').findAll('.tree-button')[1]!.trigger('contextmenu', { clientX: 100, clientY: 120 });
   await flushPromises();
   expect(page.get('[role="menu"]').findAll('[role="menuitem"]').map((item) => item.text())).toEqual([
-    'Tạo thư mục con', 'Đổi tên', 'Chuyển thư mục', 'Thêm', 'Xóa thư mục',
+    'Tạo thư mục con', 'Đổi tên', 'Chuyển thư mục', 'Thêm', 'Chia sẻ', 'Xóa thư mục',
   ]);
   document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
   await page.vm.$nextTick();
