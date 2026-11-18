@@ -12,7 +12,7 @@ RATINGS: dict[VocabularyRating, Rating] = {
     "good": Rating.Good,
     "easy": Rating.Easy,
 }
-NEW_CARDS_PER_DAY = 5
+NEW_CARDS_PER_DAY = 20
 DAY_MS = 86_400_000
 
 scheduler = Scheduler(

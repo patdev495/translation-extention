@@ -73,7 +73,8 @@ def test_scheduled_review_prioritizes_due_cards_and_limits_new_cards(tmp_path: P
         learner.post("/api/auth/register", json={"username": "learner", "password": "pass"}, headers=ORIGIN)
         folder = learner.post("/api/folders", json={"name": "Vocabulary"}, headers=ORIGIN).json()["id"]
         words = []
-        for text in ("你好", "工作", "坚持", "练习", "终于", "以后"):
+        for index in range(1, 22):
+            text = f"第{index}课"
             now += 1
             words.append(learner.post("/api/items", json={
                 "folder_id": folder, "category": "word", "text": text, "meaning": text,
@@ -83,14 +84,14 @@ def test_scheduled_review_prioritizes_due_cards_and_limits_new_cards(tmp_path: P
             return learner.post("/api/review/sessions", json={"kind": "vocabulary", "queue": "scheduled"}, headers=ORIGIN).json()
 
         session = start()
-        assert [card["item_ids"][0] for card in session["questions"]] == words[:5]
-        for index, word in enumerate(words[:5]):
+        assert [card["item_ids"][0] for card in session["questions"]] == words[:20]
+        for index, word in enumerate(words[:20]):
             response = learner.put(f"/api/review/sessions/{session['id']}/results/{word}",
                                    json={"result": "again", "position": index + 1}, headers=ORIGIN)
             assert response.status_code == 200, response.text
         assert start()["questions"] == []
         now += 60_000
-        assert [card["item_ids"][0] for card in start()["questions"]] == words[:5]
+        assert [card["item_ids"][0] for card in start()["questions"]] == words[:20]
         now = now - now % 86_400_000 + 86_400_000
         assert [card["item_ids"][0] for card in start()["questions"]] == words
 
