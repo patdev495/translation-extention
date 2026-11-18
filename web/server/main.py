@@ -93,14 +93,8 @@ class Folder(BaseModel):
     parent_id: str | None
 
 
-class FolderViewerInput(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True)
-
-    username: str = Field(pattern=r"^[A-Za-z0-9_.@-]+$")
-
-
-class SharedFolder(Folder):
-    owner_username: str
+class FolderShareLink(BaseModel):
+    token: str | None
 
 
 class ItemInput(BaseModel):
@@ -190,6 +184,7 @@ class Item(BaseModel):
 
 
 class SharedFolderContents(BaseModel):
+    root_id: str
     folders: list[Folder]
     items: list[Item]
 
@@ -971,82 +966,68 @@ def create_app(database_path: Path | None = None) -> FastAPI:
             connection.execute("DELETE FROM learning_items WHERE user_id = ? AND deleted_at IS NOT NULL", (account.id,))
             connection.execute("DELETE FROM folders WHERE user_id = ? AND deleted_at IS NOT NULL", (account.id,))
 
-    @app.get("/api/folders/{folder_id}/viewers", response_model=list[Account])
-    def list_folder_viewers(folder_id: str, account: Account = Depends(web_account)) -> list[Account]:
+    @app.get("/api/folders/{folder_id}/share-link", response_model=FolderShareLink)
+    def get_folder_share_link(folder_id: str, response: Response, account: Account = Depends(web_account)) -> FolderShareLink:
+        response.headers["Cache-Control"] = "private, no-store"
         with connect(db_path) as connection:
             connection.execute("BEGIN")
             require_folder(connection, account.id, folder_id)
-            rows = connection.execute(
-                """SELECT users.id, users.username FROM folder_viewers
-                   JOIN users ON users.id = folder_viewers.viewer_id
-                   WHERE folder_id = ? ORDER BY users.username""",
-                (folder_id,),
-            ).fetchall()
-            return [_account(row) for row in rows]
+            row = connection.execute("SELECT token FROM folder_share_links WHERE folder_id = ?", (folder_id,)).fetchone()
+            return FolderShareLink(token=row["token"] if row else None)
 
-    @app.post("/api/folders/{folder_id}/viewers", response_model=Account, dependencies=[Depends(require_browser_origin)])
-    def grant_folder_viewer(folder_id: str, body: FolderViewerInput, account: Account = Depends(web_account)) -> Account:
+    @app.put("/api/folders/{folder_id}/share-link", response_model=FolderShareLink, dependencies=[Depends(require_browser_origin)])
+    def enable_folder_share_link(folder_id: str, response: Response, account: Account = Depends(web_account)) -> FolderShareLink:
+        response.headers["Cache-Control"] = "private, no-store"
         with connect(db_path) as connection:
             connection.execute("BEGIN IMMEDIATE")
             require_folder(connection, account.id, folder_id)
-            row = connection.execute("SELECT id, username FROM users WHERE username = ?", (body.username,)).fetchone()
-            if row is None:
-                raise HTTPException(status_code=404, detail="Viewer account not found")
-            if row["id"] == account.id:
-                raise HTTPException(status_code=400, detail="Folder owner already has access")
             connection.execute(
-                "INSERT INTO folder_viewers (folder_id, viewer_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
-                (folder_id, row["id"]),
+                "INSERT INTO folder_share_links (folder_id, token) VALUES (?, ?) ON CONFLICT(folder_id) DO NOTHING",
+                (folder_id, secrets.token_urlsafe(32)),
             )
-            return _account(row)
+            row = connection.execute("SELECT token FROM folder_share_links WHERE folder_id = ?", (folder_id,)).fetchone()
+            return FolderShareLink(token=row["token"])
 
-    @app.delete("/api/folders/{folder_id}/viewers/{viewer_id}", status_code=204, dependencies=[Depends(require_browser_origin)])
-    def revoke_folder_viewer(folder_id: str, viewer_id: str, account: Account = Depends(web_account)) -> None:
+    @app.delete("/api/folders/{folder_id}/share-link", status_code=204, dependencies=[Depends(require_browser_origin)])
+    def disable_folder_share_link(folder_id: str, account: Account = Depends(web_account)) -> None:
         with connect(db_path) as connection:
             connection.execute("BEGIN IMMEDIATE")
             require_folder(connection, account.id, folder_id)
-            connection.execute("DELETE FROM folder_viewers WHERE folder_id = ? AND viewer_id = ?", (folder_id, viewer_id))
+            connection.execute("DELETE FROM folder_share_links WHERE folder_id = ?", (folder_id,))
 
-    @app.get("/api/shared-folders", response_model=list[SharedFolder])
-    def list_shared_folders(response: Response, account: Account = Depends(web_account)) -> list[SharedFolder]:
-        response.headers["Cache-Control"] = "private, no-store"
-        with connect(db_path) as connection:
-            rows = connection.execute(
-                """SELECT folders.id, folders.name, users.username FROM folder_viewers
-                   JOIN folders ON folders.id = folder_viewers.folder_id
-                   JOIN users ON users.id = folders.user_id
-                   WHERE viewer_id = ? AND folders.deleted_at IS NULL ORDER BY folders.created_at, folders.id""",
-                (account.id,),
-            ).fetchall()
-            return [SharedFolder(id=row["id"], name=row["name"], parent_id=None, owner_username=row["username"]) for row in rows]
-
-    @app.get("/api/shared-folders/{folder_id}", response_model=SharedFolderContents)
-    def shared_folder_contents(folder_id: str, response: Response, account: Account = Depends(web_account)) -> SharedFolderContents:
-        response.headers["Cache-Control"] = "private, no-store"
+    @app.get("/api/public-folder", response_model=SharedFolderContents)
+    def shared_folder_contents(request: Request, response: Response) -> SharedFolderContents:
+        cache_headers = {"Cache-Control": "private, no-store"}
+        response.headers.update(cache_headers)
+        token = request.headers.get("X-Folder-Share")
         with connect(db_path) as connection:
             connection.execute("BEGIN")
+            share = connection.execute(
+                """SELECT f.id, f.user_id FROM folders f JOIN folder_share_links s ON s.folder_id = f.id
+                   WHERE s.token = ? AND f.deleted_at IS NULL""",
+                (token,),
+            ).fetchone()
+            if share is None:
+                raise HTTPException(status_code=404, detail="Shared folder not found", headers=cache_headers)
+            folder_id, owner_id = share["id"], share["user_id"]
             rows = connection.execute(
                 """WITH RECURSIVE tree AS (
-                       SELECT f.* FROM folders f JOIN folder_viewers v ON v.folder_id = f.id
-                       WHERE f.id = ? AND v.viewer_id = ? AND f.deleted_at IS NULL
+                       SELECT * FROM folders WHERE id = ?
                        UNION ALL
                        SELECT child.* FROM folders child JOIN tree ON child.parent_id = tree.id
                        WHERE child.user_id = tree.user_id AND child.deleted_at IS NULL
                    ) SELECT * FROM tree ORDER BY created_at, id""",
-                (folder_id, account.id),
+                (folder_id,),
             ).fetchall()
-            if not rows:
-                raise HTTPException(status_code=404, detail="Shared folder not found")
-            folders = [_folder(row) for row in rows]
-            for folder in folders:
-                if folder.id == folder_id:
-                    folder.parent_id = None
-                    break
-            entries = [item(connection, row) for row in scoped_items(connection, rows[0]["user_id"], folder_id)]
+            folders = [
+                Folder(id=row["id"], name=row["name"], parent_id=None if row["id"] == folder_id else row["parent_id"])
+                for row in rows
+            ]
+            entries = [item(connection, row) for row in scoped_items(connection, owner_id, folder_id)]
             visible_ids = {entry.id for entry in entries}
             for entry in entries:
                 entry.linked_item_ids = [linked_id for linked_id in entry.linked_item_ids if linked_id in visible_ids]
-            return SharedFolderContents(folders=folders, items=entries)
+            return SharedFolderContents(root_id=folder_id, folders=folders, items=entries)
 
     @app.get("/api/folders", response_model=list[Folder])
     def list_folders(account: Account = Depends(web_account)) -> list[Folder]:

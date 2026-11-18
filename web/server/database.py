@@ -85,12 +85,10 @@ def initialize(path: Path) -> None:
             CREATE UNIQUE INDEX IF NOT EXISTS folder_sibling_name_idx
                 ON folders(user_id, COALESCE(parent_id, ''), name_key);
             CREATE INDEX IF NOT EXISTS folders_parent_idx ON folders(user_id, parent_id);
-            CREATE TABLE IF NOT EXISTS folder_viewers (
-                folder_id TEXT NOT NULL REFERENCES folders(id) ON DELETE CASCADE,
-                viewer_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                PRIMARY KEY (folder_id, viewer_id)
+            CREATE TABLE IF NOT EXISTS folder_share_links (
+                folder_id TEXT PRIMARY KEY REFERENCES folders(id) ON DELETE CASCADE,
+                token TEXT NOT NULL UNIQUE
             );
-            CREATE INDEX IF NOT EXISTS folder_viewers_viewer_idx ON folder_viewers(viewer_id, folder_id);
             CREATE TABLE IF NOT EXISTS learning_items (
                 id TEXT PRIMARY KEY,
                 user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

@@ -9,11 +9,8 @@ export interface LearningFolder {
   parent_id: string | null;
 }
 
-export interface SharedFolder extends LearningFolder {
-  owner_username: string;
-}
-
 export interface SharedFolderContents {
+  root_id: string;
   folders: LearningFolder[];
   items: SavedLearningItem[];
 }
@@ -132,13 +129,14 @@ export const learningApi = {
   logout: (): Promise<void> => api('/auth/logout', { method: 'POST' }),
   approveLink: (requestId: string): Promise<void> =>
     api(`/link/approve/${encodeURIComponent(requestId)}`, { method: 'POST' }),
-  folderViewers: (id: string): Promise<Account[]> => api(`/folders/${encodeURIComponent(id)}/viewers`),
-  grantFolderViewer: (id: string, username: string): Promise<Account> =>
-    api(`/folders/${encodeURIComponent(id)}/viewers`, { method: 'POST', body: JSON.stringify({ username }) }),
-  revokeFolderViewer: (id: string, viewerId: string): Promise<void> =>
-    api(`/folders/${encodeURIComponent(id)}/viewers/${encodeURIComponent(viewerId)}`, { method: 'DELETE' }),
-  sharedFolders: (): Promise<SharedFolder[]> => api('/shared-folders'),
-  sharedFolderContents: (id: string): Promise<SharedFolderContents> => api(`/shared-folders/${encodeURIComponent(id)}`),
+  folderShareLink: (id: string): Promise<{ token: string | null }> =>
+    api(`/folders/${encodeURIComponent(id)}/share-link`),
+  enableFolderShareLink: (id: string): Promise<{ token: string }> =>
+    api(`/folders/${encodeURIComponent(id)}/share-link`, { method: 'PUT' }),
+  disableFolderShareLink: (id: string): Promise<void> =>
+    api(`/folders/${encodeURIComponent(id)}/share-link`, { method: 'DELETE' }),
+  sharedFolderContents: (token: string): Promise<SharedFolderContents> =>
+    api('/public-folder', { credentials: 'omit', headers: { 'X-Folder-Share': token } }),
   folders: (): Promise<LearningFolder[]> => api('/folders'),
   createFolder: (name: string, parentId: string | null): Promise<LearningFolder> =>
     api('/folders', { method: 'POST', body: JSON.stringify({ name, parent_id: parentId }) }),

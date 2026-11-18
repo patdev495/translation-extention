@@ -4,7 +4,6 @@ import { ArrowRight, BookOpen, ChevronRight, Ellipsis, Folder, FolderPlus, Home,
 import { ApiError, learningApi, type Account, type ExampleSentenceDraft, type LearningFolder, type SavedLearningItem, type TrashEntry } from './api';
 import Review from './Review.vue';
 import FolderSharingDialog from './FolderSharingDialog.vue';
-import SharedFolders from './SharedFolders.vue';
 import PronunciationButton from './PronunciationButton.vue';
 import { usePracticeAudio } from './use-practice-audio';
 
@@ -51,7 +50,6 @@ const items = ref<SavedLearningItem[]>([]);
 const trash = ref<TrashEntry[]>([]);
 const showTrash = ref(false);
 const showReview = ref(false);
-const showShared = ref(false);
 const sharingFolder = ref<LearningFolder | null>(null);
 const trashBusy = ref(false);
 const feedback = ref('');
@@ -154,7 +152,7 @@ function playItemPronunciation(item: SavedLearningItem): void {
   playLibrarySample(item.text);
 }
 
-watch([showShared, showReview, showTrash, selectedId, includeDescendants, account, page, categoryFilter, sortOrder, linkedSourceId], stopLibraryAudio);
+watch([showReview, showTrash, selectedId, includeDescendants, account, page, categoryFilter, sortOrder, linkedSourceId], stopLibraryAudio);
 
 function stopHiddenLibraryAudio(): void {
   if (document.visibilityState === 'hidden') stopLibraryAudio();
@@ -215,7 +213,6 @@ async function loadTrash(): Promise<void> {
 }
 
 async function openTrash(): Promise<void> {
-  showShared.value = false;
   showReview.value = false;
   showTrash.value = true;
   selectedId.value = null;
@@ -223,7 +220,6 @@ async function openTrash(): Promise<void> {
 }
 
 function openLibrary(folderId: string | null): void {
-  showShared.value = false;
   includeDescendants.value = false;
   showReview.value = false;
   showTrash.value = false;
@@ -240,7 +236,6 @@ function openLibrary(folderId: string | null): void {
 }
 
 function openSidebarFolder(folderId: string): void {
-  showShared.value = false;
   includeDescendants.value = false;
   showReview.value = false;
   showTrash.value = false;
@@ -249,12 +244,6 @@ function openSidebarFolder(folderId: string): void {
   if (expanded.has(folderId)) expanded.delete(folderId);
   else expanded.add(folderId);
   expandedFolderIds.value = expanded;
-}
-
-function openShared(): void {
-  showTrash.value = false;
-  showReview.value = false;
-  showShared.value = true;
 }
 
 function shareContextFolder(): void {
@@ -387,7 +376,6 @@ async function signOut(): Promise<void> {
   folderError.value = '';
   try {
     await learningApi.logout();
-    showShared.value = false;
     sharingFolder.value = null;
     account.value = null;
     username.value = '';
@@ -851,11 +839,10 @@ async function submitEditor(): Promise<void> {
       <aside class="sidebar" aria-label="Thư mục học tập">
         <div class="sidebar-heading"><span>THƯ VIỆN</span></div>
         <nav aria-label="Cây thư mục">
-          <div class="tree-row" :class="{ active: selectedId === null && !showTrash && !showShared }"><button class="tree-button" :class="{ active: selectedId === null && !showTrash && !showShared }" type="button" :aria-current="selectedId === null && !showTrash && !showShared ? 'page' : undefined" @click="openLibrary(null)" @contextmenu.prevent="showFolderContextMenu(null, $event.clientX, $event.clientY)" @keydown="handleFolderContextKey($event, null)"><Home :size="17" aria-hidden="true" /> Tất cả thư mục</button><button class="tree-menu-button" type="button" aria-label="Tùy chọn Thư viện" title="Tùy chọn Thư viện" @mouseenter="hoverFolderMenuFromButton(null, $event)" @mouseleave="scheduleFolderMenuClose" @click="openFolderMenuFromButton(null, $event)"><Ellipsis :size="17" aria-hidden="true" /></button></div>
-          <div v-for="row in treeRows" :key="row.folder.id" class="tree-row" :class="{ active: selectedId === row.folder.id && !showTrash && !showShared }"><button class="tree-button" :class="{ active: selectedId === row.folder.id && !showTrash && !showShared }" :style="{ paddingLeft: `${14 + row.depth * 18}px` }" type="button" :aria-current="selectedId === row.folder.id && !showTrash && !showShared ? 'page' : undefined" :aria-expanded="folders.some(folder => folder.parent_id === row.folder.id) ? expandedFolderIds.has(row.folder.id) : undefined" @click="openSidebarFolder(row.folder.id)" @contextmenu.prevent="showFolderContextMenu(row.folder.id, $event.clientX, $event.clientY)" @keydown="handleFolderContextKey($event, row.folder.id)"><Folder :size="17" aria-hidden="true" /> <span class="truncate">{{ row.folder.name }}</span><ChevronRight v-if="folders.some(folder => folder.parent_id === row.folder.id)" :size="14" class="tree-chevron" :class="{ expanded: expandedFolderIds.has(row.folder.id) }" aria-hidden="true" /></button><button class="tree-menu-button" type="button" :aria-label="`Tùy chọn ${row.folder.name}`" :title="`Tùy chọn ${row.folder.name}`" @mouseenter="hoverFolderMenuFromButton(row.folder.id, $event)" @mouseleave="scheduleFolderMenuClose" @click="openFolderMenuFromButton(row.folder.id, $event)"><Ellipsis :size="17" aria-hidden="true" /></button></div>
+          <div class="tree-row" :class="{ active: selectedId === null && !showTrash }"><button class="tree-button" :class="{ active: selectedId === null && !showTrash }" type="button" :aria-current="selectedId === null && !showTrash ? 'page' : undefined" @click="openLibrary(null)" @contextmenu.prevent="showFolderContextMenu(null, $event.clientX, $event.clientY)" @keydown="handleFolderContextKey($event, null)"><Home :size="17" aria-hidden="true" /> Tất cả thư mục</button><button class="tree-menu-button" type="button" aria-label="Tùy chọn Thư viện" title="Tùy chọn Thư viện" @mouseenter="hoverFolderMenuFromButton(null, $event)" @mouseleave="scheduleFolderMenuClose" @click="openFolderMenuFromButton(null, $event)"><Ellipsis :size="17" aria-hidden="true" /></button></div>
+          <div v-for="row in treeRows" :key="row.folder.id" class="tree-row" :class="{ active: selectedId === row.folder.id && !showTrash }"><button class="tree-button" :class="{ active: selectedId === row.folder.id && !showTrash }" :style="{ paddingLeft: `${14 + row.depth * 18}px` }" type="button" :aria-current="selectedId === row.folder.id && !showTrash ? 'page' : undefined" :aria-expanded="folders.some(folder => folder.parent_id === row.folder.id) ? expandedFolderIds.has(row.folder.id) : undefined" @click="openSidebarFolder(row.folder.id)" @contextmenu.prevent="showFolderContextMenu(row.folder.id, $event.clientX, $event.clientY)" @keydown="handleFolderContextKey($event, row.folder.id)"><Folder :size="17" aria-hidden="true" /> <span class="truncate">{{ row.folder.name }}</span><ChevronRight v-if="folders.some(folder => folder.parent_id === row.folder.id)" :size="14" class="tree-chevron" :class="{ expanded: expandedFolderIds.has(row.folder.id) }" aria-hidden="true" /></button><button class="tree-menu-button" type="button" :aria-label="`Tùy chọn ${row.folder.name}`" :title="`Tùy chọn ${row.folder.name}`" @mouseenter="hoverFolderMenuFromButton(row.folder.id, $event)" @mouseleave="scheduleFolderMenuClose" @click="openFolderMenuFromButton(row.folder.id, $event)"><Ellipsis :size="17" aria-hidden="true" /></button></div>
         </nav>
-        <button class="tree-button trash-nav" :class="{ active: showShared }" type="button" :aria-current="showShared ? 'page' : undefined" @click="openShared"><Share2 :size="17" aria-hidden="true" /> Được chia sẻ với tôi</button>
-        <button class="tree-button trash-nav" :class="{ active: showReview }" type="button" aria-label="Mở ôn tập" :aria-current="showReview ? 'page' : undefined" @click="showShared = false; showTrash = false; showReview = true"><BookOpen :size="17" aria-hidden="true" /> Ôn tập</button>
+        <button class="tree-button trash-nav" :class="{ active: showReview }" type="button" aria-label="Mở ôn tập" :aria-current="showReview ? 'page' : undefined" @click="showTrash = false; showReview = true"><BookOpen :size="17" aria-hidden="true" /> Ôn tập</button>
         <button class="tree-button trash-nav" :class="{ active: showTrash }" type="button" aria-label="Mở thùng rác" :aria-current="showTrash ? 'page' : undefined" @click="openTrash"><Trash2 :size="17" aria-hidden="true" /> Thùng rác</button>
       </aside>
 
@@ -876,7 +863,6 @@ async function submitEditor(): Promise<void> {
 
       <div v-if="showReview" class="review-mobile-library"><button type="button" @click="openLibrary(null)">← Thư viện</button><span>Luyện theo nhịp của bạn</span></div>
       <Review v-if="showReview" :folders="folders" @open-item="id => { const entry = items.find(item => item.id === id); if (entry) openItemEditor(entry); }" />
-      <SharedFolders v-else-if="showShared" />
       <section v-else-if="showTrash" class="library-main trash-main" aria-labelledby="trash-title">
         <div class="library-header"><div><p class="overline">CÓ THỂ KHÔI PHỤC</p><h1 id="trash-title">Thùng rác</h1><p class="library-subtitle">Mục chỉ bị xóa vĩnh viễn khi bạn chọn.</p></div><button v-if="trash.length" type="button" class="danger-button" :disabled="trashBusy" @click="askToDelete('Xóa vĩnh viễn toàn bộ thùng rác? Thao tác này không thể hoàn tác.', () => learningApi.emptyTrash(), 'Đã xóa vĩnh viễn toàn bộ thùng rác.')">Dọn sạch thùng rác</button></div>
         <p v-if="feedback" class="trash-feedback" role="status">{{ feedback }}</p>
