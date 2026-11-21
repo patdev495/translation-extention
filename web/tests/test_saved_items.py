@@ -40,6 +40,29 @@ def test_extension_save_is_account_owned_and_duplicate_is_visible(tmp_path: Path
         assert extension.post("/api/extension/items", json=payload).status_code == 401
 
 
+def test_word_meaning_lookup_uses_the_selected_folder_or_the_preferred_match(tmp_path: Path) -> None:
+    app = create_app(tmp_path / "word-meaning.sqlite3")
+    with TestClient(app) as alice, TestClient(app) as bob, TestClient(app) as extension:
+        register(alice, "alice")
+        register(bob, "bob")
+        first = alice.post("/api/folders", json={"name": "HSK"}, headers=ORIGIN).json()["id"]
+        second = alice.post("/api/folders", json={"name": "Other"}, headers=ORIGIN).json()["id"]
+        bearer = link(alice, extension)
+        endpoint = "/api/extension/items/word-meaning"
+        for folder, meaning in [(first, "học tập"), (second, "học")]:
+            assert extension.post("/api/extension/items", headers=bearer, json={
+                "folder_id": folder, "category": "word", "text": "学习", "meaning": meaning,
+            }).status_code == 201
+        assert extension.get(endpoint, headers=bearer, params={
+            "text": "学习", "preferred_folder_id": first,
+        }).json() == {"meaning": "học tập"}
+        assert extension.get(endpoint, headers=bearer, params={
+            "text": "学习", "folder_id": second, "preferred_folder_id": first,
+        }).json() == {"meaning": "học"}
+        assert extension.get(endpoint, headers=bearer, params={"text": "学习中"}).json() is None
+        assert extension.get(endpoint, headers=link(bob, extension), params={"text": "学习", "folder_id": first}).json() is None
+
+
 def test_learner_creates_word_on_website_and_reads_it_back(tmp_path: Path) -> None:
     app = create_app(tmp_path / "web-word.sqlite3")
     with TestClient(app) as browser:

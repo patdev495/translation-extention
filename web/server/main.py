@@ -520,6 +520,22 @@ def create_app(database_path: Path | None = None) -> FastAPI:
             ).fetchone()
             return item(connection, row) if row is not None else None
 
+    @app.get("/api/extension/items/word-meaning")
+    def extension_word_meaning(
+        text: str, folder_id: str | None = None, preferred_folder_id: str | None = None,
+        account: Account = Depends(extension_account),
+    ) -> dict[str, str] | None:
+        with connect(db_path) as connection:
+            row = connection.execute(
+                """SELECT i.meaning FROM learning_items i
+                   JOIN folders f ON f.id = i.folder_id AND f.deleted_at IS NULL
+                   WHERE i.user_id = ? AND i.category = 'word' AND i.text = ?
+                     AND i.deleted_at IS NULL AND (? IS NULL OR i.folder_id = ?)
+                   ORDER BY (i.folder_id = ?) DESC, i.created_at DESC, i.id DESC LIMIT 1""",
+                (account.id, text, folder_id, folder_id, preferred_folder_id),
+            ).fetchone()
+            return {"meaning": row["meaning"]} if row is not None else None
+
     @app.post("/api/extension/items", response_model=Item, status_code=201)
     def extension_save_item(body: ItemInput, account: Account = Depends(extension_account)) -> Item:
         if body.category not in ("word", "sentence"):
