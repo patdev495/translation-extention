@@ -171,6 +171,7 @@ class SyncInput(BaseModel):
     request_id: str = Field(min_length=1, max_length=100)
     choice: Literal["word", "sentence", "both"]
     item: ItemInput | BothInput
+    update_existing_word_meaning: bool = False
 
 
 class Item(BaseModel):
@@ -448,14 +449,19 @@ def create_app(database_path: Path | None = None) -> FastAPI:
         if connection.execute("SELECT 1 FROM folders WHERE id = ? AND user_id = ? AND deleted_at IS NULL", (folder_id, user_id)).fetchone() is None:
             raise HTTPException(status_code=404, detail="Learning Folder not found")
 
-    def create_item(connection: sqlite3.Connection, user_id: str, body: ItemInput, reuse: bool = False) -> Item:
+    def create_item(connection: sqlite3.Connection, user_id: str, body: ItemInput, reuse: bool = False,
+                    update_meaning: bool = False) -> Item:
         require_folder(connection, user_id, body.folder_id)
         existing = connection.execute(
             "SELECT * FROM learning_items WHERE user_id = ? AND folder_id = ? AND category = ? AND text = ? AND deleted_at IS NULL",
             (user_id, body.folder_id, body.category, body.text),
         ).fetchone()
         if existing is not None and body.category != "note":
-            if reuse:
+            if update_meaning and existing["meaning"] != body.meaning:
+                connection.execute("UPDATE learning_items SET meaning = ? WHERE id = ?", (body.meaning, existing["id"]))
+                existing = connection.execute("SELECT * FROM learning_items WHERE id = ?", (existing["id"],)).fetchone()
+                assert existing is not None
+            if reuse or update_meaning:
                 return item(connection, existing)
             raise HTTPException(status_code=409, detail={"message": "Duplicate Learning Item", "existing_item": item(connection, existing).model_dump()})
         item_id = _new_id()
@@ -535,7 +541,13 @@ def create_app(database_path: Path | None = None) -> FastAPI:
         if body.choice != "both" and (not isinstance(body.item, ItemInput) or body.item.category != body.choice or body.item.category not in ("word", "sentence")):
             raise HTTPException(status_code=422, detail="Save category mismatch")
         payload = body.model_dump(mode="json")
-        payload_hash = _digest(json.dumps({"choice": payload["choice"], "item": payload["item"]}, sort_keys=True, ensure_ascii=False))
+        save_content = {"choice": payload["choice"], "item": payload["item"]}
+        if body.update_existing_word_meaning:
+            if body.choice != "word":
+                raise HTTPException(status_code=422, detail="Meaning update requires a word save")
+            # Preserve the original receipt hash for previously queued requests.
+            save_content["update_existing_word_meaning"] = True
+        payload_hash = _digest(json.dumps(save_content, sort_keys=True, ensure_ascii=False))
         with connect(db_path) as connection:
             connection.execute("BEGIN IMMEDIATE")
             receipt = connection.execute(
@@ -550,7 +562,8 @@ def create_app(database_path: Path | None = None) -> FastAPI:
                 paired = create_paired_items(connection, account.id, body.item)
                 result: dict[str, object] = {key: value.model_dump() for key, value in paired.items()}
             else:
-                result = create_item(connection, account.id, body.item).model_dump()
+                result = create_item(connection, account.id, body.item,
+                                     update_meaning=body.update_existing_word_meaning).model_dump()
             connection.execute(
                 "INSERT INTO learning_sync_receipts (user_id, request_id, payload_hash, result_json) VALUES (?, ?, ?, ?)",
                 (account.id, body.request_id, payload_hash, json.dumps(result, ensure_ascii=False)),

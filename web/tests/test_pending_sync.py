@@ -6,6 +6,26 @@ from web.server.main import create_app
 from web.tests.test_saved_items import ORIGIN, link, register
 
 
+def test_saving_an_edited_word_updates_the_existing_library_entry(tmp_path: Path) -> None:
+    app = create_app(tmp_path / "edited-word.sqlite3")
+    with TestClient(app) as browser, TestClient(app) as desktop:
+        register(browser, "learner")
+        folder = browser.post("/api/folders", json={"name": "HSK"}, headers=ORIGIN).json()["id"]
+        bearer = link(browser, desktop)
+        word = {"folder_id": folder, "category": "word", "text": "学习", "meaning": "học"}
+        saved = desktop.post("/api/extension/sync", headers=bearer, json={
+            "request_id": "original", "choice": "word", "item": word,
+        })
+        assert saved.status_code == 201
+        resave = {"request_id": "edited", "choice": "word", "item": {**word, "meaning": "học tập"}}
+        assert desktop.post("/api/extension/sync", headers=bearer, json=resave).status_code == 409
+        resave["update_existing_word_meaning"] = True
+        updated = desktop.post("/api/extension/sync", headers=bearer, json=resave)
+        assert updated.status_code == 201, updated.text
+        assert desktop.post("/api/extension/sync", headers=bearer, json=resave).json() == updated.json()
+        assert browser.get("/api/items").json() == [{**saved.json(), "meaning": "học tập"}]
+
+
 def test_retry_after_lost_response_creates_one_item(tmp_path: Path) -> None:
     app = create_app(tmp_path / "sync.sqlite3")
     with TestClient(app) as browser, TestClient(app) as extension:
